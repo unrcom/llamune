@@ -1,4 +1,4 @@
-i# Gemma2:9B Reasoning テスト結果
+# Gemma2:9B Reasoning テスト結果
 
 ## 目次
 1. [モデル基本情報](#モデル基本情報)
