@@ -1,5 +1,20 @@
 # Llamune サービス仕様書
 
+> **📝 このドキュメントの位置づけ**
+>
+> このドキュメントは、Llamune のサービス仕様について、思いつく都度、その具体的な定義を忘れてしまわないよう、**覚書**として残しています。
+>
+> 各項目には以下の分類タグを付けています：
+>
+> - **[MVP 必須]**: Phase 1（CLI 版 MVP）で必ず実装する機能
+> - **[MVP 検討]**: Phase 1 で実装を検討中の機能（技術的課題や優先度により見送る可能性あり）
+> - **[将来機能]**: Phase 2 以降で検討する機能
+>
+> **正式な実装仕様:**
+>
+> - Phase 1（CLI 版）: [llamune-cli-specification.md](./llamune-cli-specification.md)
+> - プロジェクト概要: [README.md](../README.md)
+
 ## 目次
 
 1. [プロジェクト概要](#プロジェクト概要)
@@ -18,7 +33,7 @@
 ### 基本情報
 
 ```
-プロジェクト名: Llamune (ラムネ/ラミューン)
+プロジェクト名: Llamune (ラミューン)
 ドメイン: llamune.com (取得済み)
 GitHub: https://github.com/unrcom/llamune
 タグライン: クローズドネットワークで複数のローカルLLMを比較・活用するプラットフォーム
@@ -150,12 +165,10 @@ GitHub: https://github.com/unrcom/llamune
       インターネット
 ```
 
-### 完全クローズド環境
-
 **重要な演出:**
 
-- ダッシュボードに「外部通信: なし ✅」を常時表示
-- データがローカル内でのみ処理されていることを視覚的に証明
+- ダッシュボードに「通信量: 0 MB ✅」を常時表示
+- 外部通信が発生していないことを視覚的に証明
 - ユーザーの安心感を醸成
 
 ### 2. 2 モード構造
@@ -193,13 +206,13 @@ GitHub: https://github.com/unrcom/llamune
 「新規事業のアイデアを考えたい。
 年間売上5億円、社員50名のIT企業です。」
 
-【Llamune (gemma2:9b)】
+【Llamune (LLM A)】
 現状分析から始めましょう...
 [会話が続く]
 
 【バックグラウンド】
-・deepseek-r1:7b でも推論中...
-・qwen2.5:14b でも推論中...
+・LLM C (Reasoning) でも推論中...
+・LLM B でも推論中...
 ```
 
 #### ドメインモード（業界特化）
@@ -261,9 +274,9 @@ GitHub: https://github.com/unrcom/llamune
 
 ## 機能要件
 
-### MVP 機能（Reasoning Mode）
+### MVP 機能（Reasoning Mode） **[Phase 1 の機能群]**
 
-#### 1. 基本的な会話機能
+#### 1. 基本的な会話機能 **[MVP 必須]**
 
 **機能:**
 
@@ -294,7 +307,7 @@ interface Message {
 }
 ```
 
-#### 2. LLM 選択・実行機能
+#### 2. LLM 選択・実行機能 **[MVP 必須]**
 
 **2.1 運営推奨設定**
 
@@ -310,7 +323,7 @@ interface RecommendedSettings {
 }
 
 interface ModelConfig {
-  name: string; // "gemma2:9b"
+  name: string; // "LLM A"
   priority: number; // 1, 2, 3...
   purpose: string; // "メイン推論"
   parameters: {
@@ -326,25 +339,25 @@ const recommendedQ4 = {
   quarter: "2025 Q4",
   models: [
     {
-      name: "gemma2:9b",
+      name: "LLM A",
       priority: 1,
       purpose: "メイン推論（高品質・高速）",
       parameters: { temperature: 0.8, top_p: 0.9 },
     },
     {
-      name: "deepseek-r1:7b",
+      name: "LLM C (Reasoning)",
       priority: 2,
       purpose: "Reasoning特化",
       parameters: { temperature: 0.8, top_p: 0.9 },
     },
     {
-      name: "qwen2.5:14b",
+      name: "LLM B",
       priority: 3,
       purpose: "汎用・バランス型",
       parameters: { temperature: 0.8, top_p: 0.9 },
     },
   ],
-  executionOrder: ["gemma2:9b", "deepseek-r1:7b", "qwen2.5:14b"],
+  executionOrder: ["LLM A", "LLM C (Reasoning)", "LLM B"],
   concurrentLimit: 2,
   updatedAt: "2025-10-01",
 };
@@ -382,7 +395,7 @@ interface UserSettings {
 const userCustom = {
   userId: "user123",
   useRecommended: false,
-  customModels: ["phi3.5", "gemma2:27b", "qwq:32b"],
+  customModels: ["LLM D", "LLM A-Large", "qwq:32b"],
   concurrentLimit: 3,
   parameters: {
     temperature: 0.5,
@@ -419,7 +432,7 @@ interface QuarterlyUpdate {
 │ 🎉 新しい推奨設定 (2026 Q1)     │
 ├─────────────────────────────────┤
 │ 主な変更:                       │
-│ ✨ gemma2:27b を追加            │
+│ ✨ LLM A-Large を追加            │
 │ ✨ qwq:32b (Reasoning特化)追加  │
 │ 🔧 実行順序を最適化             │
 │ ⚡ 推論速度 15%向上             │
@@ -431,7 +444,7 @@ interface QuarterlyUpdate {
 └─────────────────────────────────┘
 ```
 
-#### 3. パラメータ調整機能
+#### 3. パラメータ調整機能 **[MVP 必須]**
 
 **スライダー UI（Amazon Bedrock 風）:**
 
@@ -490,7 +503,9 @@ const presets = {
 </ParameterPanel>
 ```
 
-#### 4. アーティファクト機能
+#### 4. アーティファクト機能 **[将来機能]**
+
+> **Phase 1 では未実装**: CLI 版では技術的に困難なため、Phase 2（Web 版）で実装予定。
 
 **概念:**
 会話の中で生成された成果物（コード、ドキュメント、データ等）を時系列で管理
@@ -555,7 +570,9 @@ const artifact: Artifact = {
 └────────────────────────┘
 ```
 
-#### 5. バックグラウンド推論
+#### 5. バックグラウンド推論 **[MVP 検討]**
+
+> **Phase 1 での実装は要検討**: CLI 版で実装可能か技術検証が必要。UX への影響も考慮し、Phase 2 で実装の可能性あり。
 
 **機能:**
 メインの会話を妨げずに、他の LLM で同時に推論を実行
@@ -583,15 +600,15 @@ const artifact: Artifact = {
 ┌─────────────────────────────────┐
 │ 💬 会話中                       │
 │                                 │
-│ [gemma2:9b の回答が表示]        │
+│ [LLM A の回答が表示]        │
 │                                 │
 ├─────────────────────────────────┤
 │ 🔄 バックグラウンド実行中:      │
 │                                 │
-│ ⏳ deepseek-r1:7b               │
+│ ⏳ LLM C (Reasoning)               │
 │    推論中... 15秒経過           │
 │                                 │
-│ ⏳ qwen2.5:14b                  │
+│ ⏳ LLM B                  │
 │    推論中... 18秒経過           │
 │                                 │
 │ [すべて中断]                    │
@@ -604,8 +621,8 @@ const artifact: Artifact = {
 ┌─────────────────────────────────┐
 │ ✅ 他のLLMからも回答が届きました │
 ├─────────────────────────────────┤
-│ ・deepseek-r1:7b                │
-│ ・qwen2.5:14b                   │
+│ ・LLM C (Reasoning)                │
+│ ・LLM B                   │
 │                                 │
 │ [すべて表示] [個別に見る] [無視]│
 └─────────────────────────────────┘
@@ -622,13 +639,13 @@ const artifact: Artifact = {
 **「別の LLM で試す」機能:**
 
 ```
-現在: gemma2:9b で回答中
+現在: LLM A で回答中
 ↓
 [別のLLMで試す ▼]
-  ├─ deepseek-r1:7b (Reasoning)
-  ├─ qwen2.5:14b (汎用)
-  ├─ phi3.5 (軽量)
-  └─ gemma2:27b (高性能)
+  ├─ LLM C (Reasoning) (Reasoning)
+  ├─ LLM B (汎用)
+  ├─ LLM D (軽量)
+  └─ LLM A-Large (高性能)
 
 選択 → 同じプロンプトで再実行
 ```
@@ -659,9 +676,11 @@ async function retryWithDifferentModel(
 }
 ```
 
-### 将来機能（Post-MVP）
+### 将来機能（Post-MVP） **[Phase 2 以降]**
 
-#### 1. LLM 評価機能
+#### 1. LLM 評価機能 **[将来機能]**
+
+> **Phase 3 で実装予定**: 高度な機能として検討。
 
 **目的:**
 LLM の回答を別の LLM に評価させ、品質を向上
@@ -709,14 +728,14 @@ LLM の回答を別の LLM に評価させ、品質を向上
 
 ```
 ┌─────────────────────────────────┐
-│ [gemma2:9b の回答]              │
+│ [LLM A の回答]              │
 │ ...                             │
 │                                 │
 │ [評価を見る] ← クリック         │
 └─────────────────────────────────┘
          ↓
 ┌─────────────────────────────────┐
-│ 📊 qwen2.5:14b による評価       │
+│ 📊 LLM B による評価       │
 ├─────────────────────────────────┤
 │ ✅ 事実の正確性: 高             │
 │ ⚠️  論理の一貫性: 中            │
@@ -728,7 +747,9 @@ LLM の回答を別の LLM に評価させ、品質を向上
 └─────────────────────────────────┘
 ```
 
-#### 2. Web 検索統合
+#### 2. Web 検索統合 **[MVP 検討]**
+
+> **Phase 1 で実装を検討中**: 技術的実現可能性と UX への影響を評価し、優先度により実装判断。CLI 環境での実装方法も含めて検討。
 
 **目的:**
 claude.ai のように、LLM が必要に応じて最新情報を検索
@@ -788,7 +809,9 @@ const searchConfig = {
 └─────────────────────────────────┘
 ```
 
-#### 3. 業務知識注入（RAG/ファインチューニング）
+#### 3. 業務知識注入（RAG/ファインチューニング） **[将来機能]**
+
+> **Phase 3 で実装予定**: ドメイン特化機能の中核として検討。
 
 **レベル 1: 追加プロンプト**
 
@@ -909,7 +932,11 @@ const auditTrainingData = [
 └─────────────────────────────────┘
 ```
 
-#### 4. コード生成モード（Modelfile 構築型）
+#### 4. コード生成モード（Modelfile 構築型） **[将来機能]**
+
+> **Phase 3 以降で検討**: より高度な機能として検討。
+
+> 💡 **関連**: [安全な Vibe Coding](./vibe-coding-with-llamune.md) - 複数 LLM でコードを生成・比較する詳細ガイド
 
 **コンセプト:**
 会話しながら仕様を収集 → Modelfile に蓄積 → 一発でコード生成
@@ -984,7 +1011,9 @@ ollama run task-app-generator "すべてのコードを生成"
 
 ---
 
-## UI/UX 設計
+## UI/UX 設計 **[Phase 2: Web 版 UI]**
+
+> **Phase 1（CLI 版）の UI 設計は**: [llamune-cli-specification.md](./llamune-cli-specification.md) を参照
 
 ### 基本レイアウト（縦長）
 
@@ -1007,7 +1036,7 @@ ollama run task-app-generator "すべてのコードを生成"
 │ └─────────────────────────────────┘ │
 │                                     │
 │ ┌─────────────────────────────────┐ │
-│ │ AI (gemma2:9b)                  │ │
+│ │ AI (LLM A)                  │ │
 │ │ はい、実装します...             │ │
 │ │                                 │ │
 │ │ ┌─────────────────────────┐     │ │
@@ -1024,7 +1053,7 @@ ollama run task-app-generator "すべてのコードを生成"
 │ └─────────────────────────────────┘ │
 │                                     │
 │ ┌─────────────────────────────────┐ │
-│ │ AI (gemma2:9b)                  │ │
+│ │ AI (LLM A)                  │ │
 │ │ Timsortを使うことで...          │ │
 │ │                                 │ │
 │ │ ┌─────────────────────────┐     │ │
@@ -1038,10 +1067,10 @@ ollama run task-app-generator "すべてのコードを生成"
 │ ┌─────────────────────────────────┐ │
 │ │ 🔄 バックグラウンド実行中       │ │
 │ │                                 │ │
-│ │ ⏳ deepseek-r1:7b              │ │
+│ │ ⏳ LLM C (Reasoning)              │ │
 │ │    推論中... 25秒               │ │
 │ │                                 │ │
-│ │ ⏳ qwen2.5:14b                 │ │
+│ │ ⏳ LLM B                 │ │
 │ │    推論中... 28秒               │ │
 │ │                                 │ │
 │ │ [すべて中断]                    │ │
@@ -1073,8 +1102,8 @@ ollama run task-app-generator "すべてのコードを生成"
 ║    クローズド環境を視覚的に証明           ║
 ║                                           ║
 ║ 🤖 アクティブLLM: 2/5                     ║
-║    ・gemma2:9b (メイン)                   ║
-║    ・deepseek-r1:7b (バックグラウンド)    ║
+║    ・LLM A (メイン)                   ║
+║    ・LLM C (Reasoning) (バックグラウンド)    ║
 ║                                           ║
 ║ ⚙️ [LLM設定] [パラメータ] [ヘルプ]       ║
 ╚═══════════════════════════════════════════╝
@@ -1109,15 +1138,15 @@ ollama run task-app-generator "すべてのコードを生成"
 │                                           │
 │   📊 推奨LLM:                             │
 │   ┌─────────────────────────────────────┐ │
-│   │ 1️⃣ gemma2:9b                        │ │
+│   │ 1️⃣ LLM A                        │ │
 │   │    目的: メイン推論                  │ │
 │   │    特徴: 高品質・高速                │ │
 │   ├─────────────────────────────────────┤ │
-│   │ 2️⃣ deepseek-r1:7b                   │ │
+│   │ 2️⃣ LLM C (Reasoning)                   │ │
 │   │    目的: Reasoning特化               │ │
 │   │    特徴: 思考プロセス可視化          │ │
 │   ├─────────────────────────────────────┤ │
-│   │ 3️⃣ qwen2.5:14b                      │ │
+│   │ 3️⃣ LLM B                      │ │
 │   │    目的: 汎用・バランス              │ │
 │   │    特徴: 幅広いタスクに対応          │ │
 │   └─────────────────────────────────────┘ │
@@ -1143,11 +1172,11 @@ ollama run task-app-generator "すべてのコードを生成"
 │                                           │
 │   利用可能なLLM（ローカルにインストール済み）│
 │   ┌─────────────────────────────────────┐ │
-│   │ ☑ gemma2:9b         5.4GB          │ │
-│   │ ☑ gemma2:27b        16GB  (推奨32GB)│ │
-│   │ □ qwen2.5:14b       8.5GB          │ │
-│   │ ☑ deepseek-r1:7b    4.7GB          │ │
-│   │ □ phi3.5            2.2GB          │ │
+│   │ ☑ LLM A         5.4GB          │ │
+│   │ ☑ LLM A-Large        16GB  (推奨32GB)│ │
+│   │ □ LLM B       8.5GB          │ │
+│   │ ☑ LLM C (Reasoning)    4.7GB          │ │
+│   │ □ LLM D            2.2GB          │ │
 │   │ □ qwq:32b           19GB  (要32GB) │ │
 │   └─────────────────────────────────────┘ │
 │                                           │
@@ -1242,7 +1271,9 @@ ollama run task-app-generator "すべてのコードを生成"
 
 ## 技術アーキテクチャ
 
-### システム構成
+### システム構成 **[Phase 2: Web 版の構成]**
+
+> **Phase 1（CLI 版）の構成は**: [llamune-cli-specification.md](./llamune-cli-specification.md) を参照
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -1290,17 +1321,19 @@ ollama run task-app-generator "すべてのコードを生成"
 │              │                                   │
 │  ┌───────────▼─────────────────────────────┐    │
 │  │ ローカルLLMモデル                       │    │
-│  │ - gemma2:9b                             │    │
-│  │ - gemma2:27b                            │    │
-│  │ - deepseek-r1:7b                        │    │
-│  │ - qwen2.5:14b                           │    │
-│  │ - phi3.5                                │    │
+│  │ - LLM A                             │    │
+│  │ - LLM A-Large                            │    │
+│  │ - LLM C (Reasoning)                        │    │
+│  │ - LLM B                           │    │
+│  │ - LLM D                                │    │
 │  │ - (その他)                              │    │
 │  └─────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────┘
 ```
 
-### データベーススキーマ
+### データベーススキーマ **[Phase 2: PostgreSQL]**
+
+> **Phase 1（CLI 版）のスキーマは**: [llamune-cli-specification.md](./llamune-cli-specification.md) を参照（SQLite 使用）
 
 ```sql
 -- ユーザー（Supabase Authが管理）
@@ -1322,7 +1355,7 @@ CREATE TABLE messages (
   conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
   role VARCHAR(20) NOT NULL, -- 'user', 'assistant'
   content TEXT NOT NULL,
-  model_name VARCHAR(100), -- 'gemma2:9b', etc.
+  model_name VARCHAR(100), -- 'LLM A', etc.
   parameters JSONB, -- LLMパラメータ
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -1343,7 +1376,7 @@ CREATE TABLE artifacts (
 CREATE TABLE user_settings (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   use_recommended BOOLEAN DEFAULT true,
-  custom_models JSONB, -- ["gemma2:9b", "phi3.5"]
+  custom_models JSONB, -- ["LLM A", "LLM D"]
   concurrent_limit INTEGER DEFAULT 2,
   default_parameters JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -1467,7 +1500,7 @@ interface LLMExecuteResponse {
 ```typescript
 // リクエスト
 interface BatchExecuteRequest {
-  models: string[]; // ["gemma2:9b", "qwen2.5:14b"]
+  models: string[]; // ["LLM A", "LLM B"]
   prompt: string;
   parameters: LLMParameters;
   concurrent: number; // 同時実行数
@@ -1504,7 +1537,7 @@ ws.send({
   type: "background-complete",
   data: {
     jobId: "job_123",
-    modelName: "deepseek-r1:7b",
+    modelName: "LLM C (Reasoning)",
     response: "...",
     executionTime: 25000,
   },
@@ -1557,55 +1590,57 @@ USING (auth.uid() = user_id);
 - M1 Mac 16GB（テスト環境）
 - MacBook Air M4 32GB 発注済み（本番開発環境）
 
-### フェーズ 1: MVP 開発（Reasoning Mode）
+### フェーズ 1: MVP 開発（CLI 版）
 
-**期間:** 2025-11-11 ~ 2025-12-31（7 週間）
+**期間:** 2025-12 ~ 2026-01（7 週間）
 
 **Week 1-2: 基盤構築**
 
 ```
-□ Supabase プロジェクト作成
-□ Next.js プロジェクトセットアップ
-□ データベーススキーマ実装
-□ 認証機能実装
+□ Node.js + TypeScript プロジェクトセットアップ
+□ Commander.js によるCLI構造
+□ ink によるTUI実装
+□ SQLite データベーススキーマ
 □ ollama連携API実装
 ```
 
 **Week 3-4: コア機能**
 
 ```
-□ 会話UI実装
+□ チャットUI実装（ink）
 □ LLM実行機能
 □ メッセージ送受信
+□ 複数LLM並列実行
 □ 会話履歴管理
 □ レスポンシブ対応
 ```
 
-**Week 5-6: 拡張機能**
+**Week 5-6: 完成度向上**
 
 ```
-□ パラメータ調整UI
-□ アーティファクト機能
-□ 運営推奨設定機能
-□ LLM選択・切り替え
-□ バックグラウンド実行
+□ パラメータ調整機能（CLI）
+□ 設定管理（config file）
+□ 会話履歴表示・検索
+□ モデル一覧・詳細表示
+□ エラーハンドリング
 ```
 
-**Week 7: テスト・調整**
+**Week 7: テスト・リリース準備**
 
 ```
 □ 動作テスト
 □ パフォーマンスチューニング
-□ UI/UX改善
+□ CLI UX改善
 □ ドキュメント整備
+□ npm公開準備
 □ MVP リリース
 ```
 
 **成果物:**
 
-- Reasoning Mode 稼働
-- 基本的な LLM 比較機能
-- ダッシュボード（通信量ゼロ表示）
+- llamune CLI 版 v0.1.0
+- 基本的な LLM 比較機能（CLI）
+- 会話履歴管理（SQLite）
 
 ### フェーズ 2: 社内展開（2026 Q1）
 
@@ -1631,28 +1666,9 @@ USING (auth.uid() = user_id);
 - 会話数: 500 回
 - ユーザー満足度: 4.0/5.0
 
-### フェーズ 3: 高度な機能（2026 Q2-Q3）
+### フェーズ 3: ドメイン特化・PoC（2026 Q1~）
 
-**期間:** 2026-04-01 ~ 2026-09-30
-
-**機能追加:**
-
-```
-□ LLM評価機能
-□ RAG機能（レベル2）
-□ Web検索統合
-□ コード生成モード（基本版）
-□ パフォーマンス最適化
-□ 運営推奨設定 2026 Q2版
-□ 運営推奨設定 2026 Q3版
-```
-
-**目標:**
-本格的な業務活用、生産性向上の実証
-
-### フェーズ 4: ドメイン特化（2026 Q4~）
-
-**期間:** 2026-10-01 ~
+**期間:** 2026-01-01 ~
 
 **PoC 開始:**
 
@@ -1664,6 +1680,9 @@ USING (auth.uid() = user_id);
   - など
 □ カスタマイズ機能の実装
 □ ファインチューニング機能
+□ LLM評価機能
+□ RAG機能
+□ Web検索統合
 ```
 
 **目標:**
@@ -1672,7 +1691,7 @@ USING (auth.uid() = user_id);
 - ドメイン特化の有効性実証
 - ビジネスモデルの確立
 
-### フェーズ 5: スケール（2027~）
+### フェーズ 4: スケール（2027~）
 
 **展開:**
 
@@ -1787,12 +1806,14 @@ interface UsageMetrics {
 **即座に:**
 
 - MacBook Air M4 32GB 受取（3 日後）
-- gemma2:27b パラメータテスト実行
+- LLM A-Large パラメータテスト実行
 
 **1-2 週間:**
 
-- MVP 開発開始
-- Supabase 環境構築
+- CLI 版 MVP 開発開始
+- Node.js + TypeScript セットアップ
+- ink による TUI 実装
+- SQLite データベース構築
 
 **1-2 ヶ月:**
 
@@ -1811,7 +1832,8 @@ interface UsageMetrics {
 
 ---
 
-**最終更新:** 2025-11-11
-**作成者:** mop & Claude Sonnet 4.5
-**バージョン:** 1.0  
+**初版作成:** 2025-11-08  
+**最終更新:** 2025-11-15  
+**作成者:** mop & Claude Sonnet 4.5  
+**バージョン:** 1.0.3  
 **次回レビュー:** MVP 完成時
