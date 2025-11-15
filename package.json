@@ -1,0 +1,50 @@
+{
+  "name": "llamune",
+  "version": "0.1.0",
+  "description": "クローズドネットワーク環境で複数のローカルLLMを比較・活用するプラットフォーム",
+  "main": "dist/index.js",
+  "bin": {
+    "llamune": "./bin/llamune.js"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts,.tsx",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+  },
+  "keywords": [
+    "llm",
+    "ollama",
+    "cli",
+    "local",
+    "ai"
+  ],
+  "author": "mop",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "commander": "^11.1.0",
+    "ink": "^4.4.1",
+    "react": "^18.2.0",
+    "better-sqlite3": "^9.2.2",
+    "cosmiconfig": "^9.0.0",
+    "chalk": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/react": "^18.2.46",
+    "@types/better-sqlite3": "^7.6.8",
+    "@typescript-eslint/eslint-plugin": "^6.16.0",
+    "@typescript-eslint/parser": "^6.16.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.0",
+    "tsx": "^4.7.0"
+  }
+}
