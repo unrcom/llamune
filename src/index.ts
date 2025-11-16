@@ -207,21 +207,8 @@ program
 
         // 終了コマンド
         if (userInput === 'exit' || userInput === 'quit') {
-          console.log('');
-
-          // 会話を保存（メッセージがある場合のみ）
-          if (messages.length > 0) {
-            try {
-              const sessionId = saveConversation(selectedModel, messages);
-              console.log(`💾 会話を保存しました (ID: ${sessionId})`);
-            } catch (error) {
-              console.log('⚠️  会話の保存に失敗しました');
-            }
-          }
-
-          console.log('👋 チャットを終了します');
           rl.close();
-          process.exit(0);
+          return;
         }
 
         // 空入力は無視
