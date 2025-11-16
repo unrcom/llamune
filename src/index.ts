@@ -4,6 +4,13 @@ import { Command } from 'commander';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import {
+  listModels,
+  checkOllamaStatus,
+  formatSize,
+  formatParams,
+  OllamaError,
+} from './utils/ollama.js';
 
 // ESModuleでpackage.jsonを読み込む
 const __filename = fileURLToPath(import.meta.url);
@@ -23,7 +30,7 @@ program
 // メインコマンド（引数なしで実行）
 program
   .action(() => {
-    console.log('✨ Llamune - Closed Network LLM Platform');
+    console.log('🔵 ✨ Llamune - Closed Network LLM Platform');
     console.log('');
     console.log('使い方:');
     console.log('  llamune [コマンド] [オプション]');
@@ -79,18 +86,55 @@ program
     console.log('⚠️  このコマンドは開発中です');
   });
 
-// models コマンド（後で実装）
+// models コマンド
 program
   .command('models')
   .description('利用可能なモデル一覧を表示')
-  .action(() => {
-    console.log('📦 利用可能なモデル:');
-    console.log('');
-    console.log('  ✓ gemma2:9b      (9.2B params)');
-    console.log('  ✓ deepseek-r1:7b (7.0B params)');
-    console.log('  ✓ qwen2.5:14b    (14.0B params)');
-    console.log('');
-    console.log('⚠️  このリストは仮データです');
+  .action(async () => {
+    try {
+      console.log('📦 利用可能なモデル:');
+      console.log('');
+
+      // Ollama の起動確認
+      const isRunning = await checkOllamaStatus();
+      if (!isRunning) {
+        console.log('❌ Ollama が起動していません');
+        console.log('');
+        console.log('以下のコマンドで Ollama を起動してください:');
+        console.log('  ollama serve');
+        process.exit(1);
+      }
+
+      // モデル一覧を取得
+      const models = await listModels();
+
+      if (models.length === 0) {
+        console.log('⚠️  インストール済みのモデルがありません');
+        console.log('');
+        console.log('以下のコマンドでモデルをインストールしてください:');
+        console.log('  ollama pull gemma2:9b');
+        console.log('  ollama pull deepseek-r1:7b');
+        console.log('  ollama pull qwen2.5:14b');
+        return;
+      }
+
+      // モデル一覧を表示
+      models.forEach((model) => {
+        const params = formatParams(model);
+        const size = formatSize(model.size);
+        console.log(`  ✓ ${model.name.padEnd(20)} (${params}, ${size})`);
+      });
+
+      console.log('');
+      console.log(`合計: ${models.length} モデル`);
+    } catch (error) {
+      if (error instanceof OllamaError) {
+        console.error('❌ エラー:', error.message);
+      } else {
+        console.error('❌ 予期しないエラーが発生しました');
+      }
+      process.exit(1);
+    }
   });
 
 // history コマンド（後で実装）
