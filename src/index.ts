@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import {
   listModels,
-  checkOllamaStatus,
+  ensureOllamaRunning,
   formatSize,
   formatParams,
   OllamaError,
@@ -95,12 +95,12 @@ program
       console.log('📦 利用可能なモデル:');
       console.log('');
 
-      // Ollama の起動確認
-      const isRunning = await checkOllamaStatus();
+      // Ollama の起動確認・自動起動
+      const isRunning = await ensureOllamaRunning();
       if (!isRunning) {
-        console.log('❌ Ollama が起動していません');
+        console.log('❌ Ollama の起動に失敗しました');
         console.log('');
-        console.log('以下のコマンドで Ollama を起動してください:');
+        console.log('手動で起動してください:');
         console.log('  ollama serve');
         process.exit(1);
       }

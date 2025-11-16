@@ -3,6 +3,8 @@
  * Ollama のローカル API と通信するためのユーティリティ
  */
 
+import { spawn } from 'child_process';
+
 // Ollama APIのベースURL
 const OLLAMA_BASE_URL = 'http://localhost:11434';
 
@@ -86,6 +88,71 @@ export async function checkOllamaStatus(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Ollama をバックグラウンドで起動
+ */
+export function startOllama(): void {
+  const ollamaProcess = spawn('ollama', ['serve'], {
+    detached: true,
+    stdio: 'ignore',
+  });
+
+  // プロセスを切り離してバックグラウンド実行
+  ollamaProcess.unref();
+}
+
+/**
+ * Ollama の起動を待機
+ * @param maxWaitSeconds 最大待機時間（秒）
+ * @param intervalMs チェック間隔（ミリ秒）
+ */
+export async function waitForOllama(
+  maxWaitSeconds = 30,
+  intervalMs = 500
+): Promise<boolean> {
+  const maxAttempts = (maxWaitSeconds * 1000) / intervalMs;
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    const isRunning = await checkOllamaStatus();
+    if (isRunning) {
+      return true;
+    }
+
+    // 次のチェックまで待機
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    attempts++;
+  }
+
+  return false;
+}
+
+/**
+ * Ollama を確認し、必要に応じて起動
+ * @returns 起動成功または既に起動している場合は true
+ */
+export async function ensureOllamaRunning(): Promise<boolean> {
+  // まず起動状態を確認
+  const isRunning = await checkOllamaStatus();
+  if (isRunning) {
+    return true;
+  }
+
+  // 起動していない場合は起動を試みる
+  console.log('🚀 Ollama を起動しています...');
+  startOllama();
+
+  // 起動を待機
+  const started = await waitForOllama();
+  if (started) {
+    console.log('✅ Ollama が起動しました');
+    console.log('');
+    return true;
+  }
+
+  return false;
 }
 
 /**
