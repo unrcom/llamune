@@ -9,8 +9,15 @@ import {
   ensureOllamaRunning,
   formatSize,
   formatParams,
+  pullModel,
   OllamaError,
 } from './utils/ollama.js';
+import {
+  getSystemSpec,
+  getRecommendedModels,
+  displaySystemSpec,
+  displayRecommendedModels,
+} from './utils/system.js';
 
 // ESModuleでpackage.jsonを読み込む
 const __filename = fileURLToPath(import.meta.url);
@@ -38,6 +45,7 @@ program
     console.log('');
     console.log('利用可能なコマンド:');
     console.log('  ls         利用可能なモデル一覧を表示');
+    console.log('  pull       モデルをダウンロード');
     console.log('  chat       チャットを開始');
     console.log('  compare    複数のLLMで比較実行');
     console.log('  config     設定を管理');
@@ -87,16 +95,74 @@ program
     console.log('⚠️  このコマンドは開発中です');
   });
 
-// ls コマンド（models のエイリアスも追加）
-program
-  .command('ls')
-  .alias('models')
-  .description('利用可能なモデル一覧を表示')
-  .action(async () => {
-    try {
-      console.log('📦 利用可能なモデル:');
+// モデル一覧表示の共通処理
+async function showModelList() {
+  try {
+    console.log('📦 利用可能なモデル:');
+    console.log('');
+
+    // Ollama の起動確認・自動起動
+    const isRunning = await ensureOllamaRunning();
+    if (!isRunning) {
+      console.log('❌ Ollama の起動に失敗しました');
+      console.log('');
+      console.log('手動で起動してください:');
+      console.log('  ollama serve');
+      process.exit(1);
+    }
+
+    // モデル一覧を取得
+    const models = await listModels();
+
+    if (models.length === 0) {
+      console.log('⚠️  インストール済みのモデルがありません');
+      console.log('');
+      console.log('🎉 Llamune へようこそ！');
       console.log('');
 
+      // システムスペックを取得して表示
+      const spec = getSystemSpec();
+      displaySystemSpec(spec);
+
+      // 推奨モデルを表示
+      const recommended = getRecommendedModels(spec);
+      displayRecommendedModels(recommended);
+
+      return;
+    }
+
+    // モデル一覧を表示
+    models.forEach((model) => {
+      const params = formatParams(model);
+      const size = formatSize(model.size);
+      console.log(`  ✓ ${model.name.padEnd(20)} (${params}, ${size})`);
+    });
+
+    console.log('');
+    console.log(`合計: ${models.length} モデル`);
+  } catch (error) {
+    if (error instanceof OllamaError) {
+      console.error('❌ エラー:', error.message);
+    } else {
+      console.error('❌ 予期しないエラーが発生しました');
+    }
+    process.exit(1);
+  }
+}
+
+// ls コマンド
+program.command('ls').description('利用可能なモデル一覧を表示').action(showModelList);
+
+// models コマンド（後方互換性のためのエイリアス）
+program.command('models', { hidden: true }).action(showModelList);
+
+// pull コマンド
+program
+  .command('pull')
+  .description('モデルをダウンロード')
+  .argument('[model]', 'モデル名（例: gemma2:9b）')
+  .action(async (modelName?: string) => {
+    try {
       // Ollama の起動確認・自動起動
       const isRunning = await ensureOllamaRunning();
       if (!isRunning) {
@@ -107,28 +173,36 @@ program
         process.exit(1);
       }
 
-      // モデル一覧を取得
-      const models = await listModels();
-
-      if (models.length === 0) {
-        console.log('⚠️  インストール済みのモデルがありません');
+      // モデル名が指定されていない場合は推奨モデルを表示
+      if (!modelName) {
+        console.log('📥 モデルをダウンロードします');
         console.log('');
-        console.log('以下のコマンドでモデルをインストールしてください:');
-        console.log('  ollama pull gemma2:9b');
-        console.log('  ollama pull deepseek-r1:7b');
-        console.log('  ollama pull qwen2.5:14b');
+
+        const spec = getSystemSpec();
+        displaySystemSpec(spec);
+
+        const recommended = getRecommendedModels(spec);
+        console.log('🎯 推奨モデル:');
+        console.log('');
+        recommended.forEach((model, index) => {
+          const badge = index === 0 ? '⭐' : '  ';
+          console.log(`${badge} ${model.name} - ${model.description}`);
+        });
+        console.log('');
+        console.log('使い方:');
+        console.log(`  llamune pull ${recommended[0].name}`);
+        console.log(`  llmn pull ${recommended[0].name}`);
         return;
       }
 
-      // モデル一覧を表示
-      models.forEach((model) => {
-        const params = formatParams(model);
-        const size = formatSize(model.size);
-        console.log(`  ✓ ${model.name.padEnd(20)} (${params}, ${size})`);
-      });
-
+      // モデルをプル
+      await pullModel(modelName);
       console.log('');
-      console.log(`合計: ${models.length} モデル`);
+      console.log('✅ インストール完了！');
+      console.log('');
+      console.log('次のコマンドで確認できます:');
+      console.log('  llamune ls');
+      console.log('  llmn ls');
     } catch (error) {
       if (error instanceof OllamaError) {
         console.error('❌ エラー:', error.message);

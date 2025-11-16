@@ -181,3 +181,45 @@ export function formatParams(model: OllamaModel): string {
   }
   return 'Unknown size';
 }
+
+/**
+ * モデルをプル（ダウンロード）する
+ * @param modelName モデル名（例: "gemma2:9b"）
+ * @returns プル成功時は true
+ */
+export function pullModel(modelName: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    console.log(`📥 ${modelName} をダウンロードしています...`);
+    console.log('');
+
+    const pullProcess = spawn('ollama', ['pull', modelName], {
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+
+    // 標準出力をリアルタイム表示
+    pullProcess.stdout?.on('data', (data) => {
+      process.stdout.write(data.toString());
+    });
+
+    // エラー出力をリアルタイム表示
+    pullProcess.stderr?.on('data', (data) => {
+      process.stderr.write(data.toString());
+    });
+
+    pullProcess.on('close', (code) => {
+      console.log('');
+      if (code === 0) {
+        console.log(`✅ ${modelName} のダウンロードが完了しました`);
+        resolve(true);
+      } else {
+        console.error(`❌ ${modelName} のダウンロードに失敗しました`);
+        reject(new OllamaError(`プル失敗: 終了コード ${code}`));
+      }
+    });
+
+    pullProcess.on('error', (error) => {
+      console.error('❌ ollama コマンドの実行に失敗しました');
+      reject(new OllamaError(`プル失敗: ${error.message}`));
+    });
+  });
+}
