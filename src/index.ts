@@ -20,6 +20,10 @@ import {
   displaySystemSpec,
   displayRecommendedModels,
 } from './utils/system.js';
+import {
+  getLastUsedModel,
+  saveLastUsedModel,
+} from './utils/config.js';
 import * as readline from 'readline';
 
 // ESModuleでpackage.jsonを読み込む
@@ -57,6 +61,47 @@ program
     console.log('ヘルプを表示: llamune --help');
   });
 
+/**
+ * モデルを選択（インタラクティブ）
+ */
+async function selectModel(
+  models: { name: string }[],
+  lastUsedModel?: string
+): Promise<string> {
+  return new Promise((resolve) => {
+    console.log('利用可能なモデル:');
+    console.log('');
+
+    models.forEach((model, index) => {
+      const isLast = model.name === lastUsedModel;
+      const prefix = isLast ? '⭐' : '  ';
+      const suffix = isLast ? ' (前回使用)' : '';
+      console.log(`${prefix} ${index + 1}. ${model.name}${suffix}`);
+    });
+
+    console.log('');
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    rl.question('モデルを選択してください (番号): ', (answer) => {
+      rl.close();
+
+      const num = parseInt(answer.trim(), 10);
+      if (num >= 1 && num <= models.length) {
+        resolve(models[num - 1].name);
+      } else {
+        console.log('');
+        console.log('無効な番号です。最初のモデルを使用します。');
+        console.log('');
+        resolve(models[0].name);
+      }
+    });
+  });
+}
+
 // chat コマンド
 program
   .command('chat')
@@ -86,22 +131,29 @@ program
       }
 
       // モデルを選択
-      let selectedModel = options.model;
-      if (!selectedModel) {
-        // 最初のモデルをデフォルトとして使用
-        selectedModel = models[0].name;
+      let selectedModel: string;
+
+      if (options.model) {
+        // -m オプションで指定された場合
+        const modelExists = models.some((m) => m.name === options.model);
+        if (!modelExists) {
+          console.log(`❌ モデル "${options.model}" が見つかりません`);
+          console.log('');
+          console.log('利用可能なモデル:');
+          models.forEach((m) => console.log(`  - ${m.name}`));
+          process.exit(1);
+        }
+        selectedModel = options.model;
+      } else {
+        // オプション未指定の場合、インタラクティブに選択
+        const lastUsedModel = getLastUsedModel();
+        selectedModel = await selectModel(models, lastUsedModel);
       }
 
-      // 指定されたモデルが存在するか確認
-      const modelExists = models.some((m) => m.name === selectedModel);
-      if (!modelExists) {
-        console.log(`❌ モデル "${selectedModel}" が見つかりません`);
-        console.log('');
-        console.log('利用可能なモデル:');
-        models.forEach((m) => console.log(`  - ${m.name}`));
-        process.exit(1);
-      }
+      // 選択したモデルを保存
+      saveLastUsedModel(selectedModel);
 
+      console.log('');
       console.log('💬 Chat モード');
       console.log(`モデル: ${selectedModel}`);
       console.log('');
