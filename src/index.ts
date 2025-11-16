@@ -34,12 +34,13 @@ program
     console.log('');
     console.log('使い方:');
     console.log('  llamune [コマンド] [オプション]');
+    console.log('  llmn [コマンド] [オプション]  # 短縮版');
     console.log('');
     console.log('利用可能なコマンド:');
+    console.log('  ls         利用可能なモデル一覧を表示');
     console.log('  chat       チャットを開始');
     console.log('  compare    複数のLLMで比較実行');
     console.log('  config     設定を管理');
-    console.log('  models     利用可能なモデル一覧を表示');
     console.log('  history    会話履歴を表示');
     console.log('');
     console.log('ヘルプを表示: llamune --help');
@@ -86,9 +87,10 @@ program
     console.log('⚠️  このコマンドは開発中です');
   });
 
-// models コマンド
+// ls コマンド（models のエイリアスも追加）
 program
-  .command('models')
+  .command('ls')
+  .alias('models')
   .description('利用可能なモデル一覧を表示')
   .action(async () => {
     try {
