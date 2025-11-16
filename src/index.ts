@@ -68,7 +68,7 @@ async function selectModel(
   models: { name: string }[],
   lastUsedModel?: string
 ): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     console.log('利用可能なモデル:');
     console.log('');
 
@@ -94,12 +94,32 @@ async function selectModel(
         resolve(models[num - 1].name);
       } else {
         console.log('');
-        console.log('無効な番号です。最初のモデルを使用します。');
-        console.log('');
-        resolve(models[0].name);
+        console.log('❌ 無効な番号です');
+        reject(new Error('Invalid model selection'));
       }
     });
   });
+}
+
+/**
+ * スピナーを表示
+ */
+function showSpinner(): NodeJS.Timeout {
+  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  let i = 0;
+
+  return setInterval(() => {
+    process.stdout.write(`\r${frames[i]} 考え中...`);
+    i = (i + 1) % frames.length;
+  }, 80);
+}
+
+/**
+ * スピナーを停止
+ */
+function stopSpinner(spinner: NodeJS.Timeout): void {
+  clearInterval(spinner);
+  process.stdout.write('\r\x1b[K'); // 行をクリア
 }
 
 // chat コマンド
@@ -146,8 +166,13 @@ program
         selectedModel = options.model;
       } else {
         // オプション未指定の場合、インタラクティブに選択
-        const lastUsedModel = getLastUsedModel();
-        selectedModel = await selectModel(models, lastUsedModel);
+        try {
+          const lastUsedModel = getLastUsedModel();
+          selectedModel = await selectModel(models, lastUsedModel);
+        } catch {
+          // 無効な選択の場合は終了
+          process.exit(1);
+        }
       }
 
       // 選択したモデルを保存
@@ -197,12 +222,20 @@ program
         });
 
         // AI の応答を取得
-        process.stdout.write('\nAI: ');
+        console.log('');
+        const spinner = showSpinner();
 
         let fullResponse = '';
+        let isFirstChunk = true;
 
         try {
           await chatWithModel(selectedModel!, messages, (chunk) => {
+            // 最初のチャンクでスピナーを停止
+            if (isFirstChunk) {
+              stopSpinner(spinner);
+              process.stdout.write('AI: ');
+              isFirstChunk = false;
+            }
             fullResponse += chunk;
             process.stdout.write(chunk);
           });
@@ -215,6 +248,7 @@ program
 
           process.stdout.write('\n\n');
         } catch (error) {
+          stopSpinner(spinner);
           console.error('\n');
           if (error instanceof OllamaError) {
             console.error('❌ エラー:', error.message);
