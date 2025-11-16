@@ -87,21 +87,21 @@ export function getRecommendedModels(spec: SystemSpec): RecommendedModel[] {
   // RAM 32GB以上
   return [
     {
+      name: 'gemma2:27b',
+      size: '16 GB',
+      description: '最高性能。複雑なタスクを高精度で処理',
+      priority: 1,
+    },
+    {
       name: 'qwen2.5:14b',
       size: '8.5 GB',
-      description: '高性能。複雑なタスクに対応',
-      priority: 1,
+      description: '高性能。日本語処理に優れる',
+      priority: 2,
     },
     {
       name: 'deepseek-r1:7b',
       size: '4.7 GB',
       description: '推論特化。思考プロセスを表示',
-      priority: 2,
-    },
-    {
-      name: 'gemma2:9b',
-      size: '5.4 GB',
-      description: 'バランス型。汎用性が高い',
       priority: 3,
     },
   ];
