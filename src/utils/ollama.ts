@@ -223,3 +223,102 @@ export function pullModel(modelName: string): Promise<boolean> {
     });
   });
 }
+
+/**
+ * Chat メッセージの型定義
+ */
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+/**
+ * Chat リクエストの型定義
+ */
+export interface ChatRequest {
+  model: string;
+  messages: ChatMessage[];
+  stream?: boolean;
+}
+
+/**
+ * Chat レスポンスの型定義（ストリーミング）
+ */
+export interface ChatResponse {
+  model: string;
+  created_at: string;
+  message: ChatMessage;
+  done: boolean;
+}
+
+/**
+ * モデルとチャット（ストリーミング）
+ * @param modelName モデル名
+ * @param messages 会話履歴
+ * @param onChunk ストリーミングチャンクを受信したときのコールバック
+ */
+export async function chatWithModel(
+  modelName: string,
+  messages: ChatMessage[],
+  onChunk: (chunk: string) => void
+): Promise<void> {
+  const request: ChatRequest = {
+    model: modelName,
+    messages,
+    stream: true,
+  };
+
+  try {
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new OllamaError(
+        `Chat API error: ${response.statusText}`,
+        response.status
+      );
+    }
+
+    if (!response.body) {
+      throw new OllamaError('レスポンスボディがありません');
+    }
+
+    // ストリーミングレスポンスを処理
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n').filter((line) => line.trim());
+
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line) as ChatResponse;
+          if (data.message?.content) {
+            onChunk(data.message.content);
+          }
+        } catch {
+          // JSON パースエラーは無視
+        }
+      }
+    }
+  } catch (error) {
+    if (error instanceof OllamaError) {
+      throw error;
+    }
+
+    if (error instanceof Error) {
+      throw new OllamaError(`Chat エラー: ${error.message}`);
+    }
+
+    throw new OllamaError('不明なエラーが発生しました');
+  }
+}

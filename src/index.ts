@@ -10,7 +10,9 @@ import {
   formatSize,
   formatParams,
   pullModel,
+  chatWithModel,
   OllamaError,
+  type ChatMessage,
 } from './utils/ollama.js';
 import {
   getSystemSpec,
@@ -18,6 +20,7 @@ import {
   displaySystemSpec,
   displayRecommendedModels,
 } from './utils/system.js';
+import * as readline from 'readline';
 
 // ESModuleでpackage.jsonを読み込む
 const __filename = fileURLToPath(import.meta.url);
@@ -54,19 +57,137 @@ program
     console.log('ヘルプを表示: llamune --help');
   });
 
-// chat コマンド（後で実装）
+// chat コマンド
 program
   .command('chat')
   .description('チャットを開始')
-  .option('-m, --model <model>', 'モデルを指定', 'gemma2:9b')
-  .option('-t, --temperature <temp>', '温度パラメータ', '0.7')
-  .option('-c, --continue <session-id>', '会話を継続')
-  .action((options) => {
-    console.log('💬 Chat モードを起動します...');
-    console.log('モデル:', options.model);
-    console.log('Temperature:', options.temperature);
-    console.log('');
-    console.log('⚠️  このコマンドは開発中です');
+  .option('-m, --model <model>', 'モデルを指定')
+  .action(async (options: { model?: string }) => {
+    try {
+      // Ollama の起動確認・自動起動
+      const isRunning = await ensureOllamaRunning();
+      if (!isRunning) {
+        console.log('❌ Ollama の起動に失敗しました');
+        console.log('');
+        console.log('手動で起動してください:');
+        console.log('  ollama serve');
+        process.exit(1);
+      }
+
+      // モデル一覧を取得
+      const models = await listModels();
+      if (models.length === 0) {
+        console.log('❌ インストール済みのモデルがありません');
+        console.log('');
+        console.log('モデルをインストールしてください:');
+        console.log('  llamune pull gemma2:9b');
+        console.log('  llmn pull gemma2:9b');
+        process.exit(1);
+      }
+
+      // モデルを選択
+      let selectedModel = options.model;
+      if (!selectedModel) {
+        // 最初のモデルをデフォルトとして使用
+        selectedModel = models[0].name;
+      }
+
+      // 指定されたモデルが存在するか確認
+      const modelExists = models.some((m) => m.name === selectedModel);
+      if (!modelExists) {
+        console.log(`❌ モデル "${selectedModel}" が見つかりません`);
+        console.log('');
+        console.log('利用可能なモデル:');
+        models.forEach((m) => console.log(`  - ${m.name}`));
+        process.exit(1);
+      }
+
+      console.log('💬 Chat モード');
+      console.log(`モデル: ${selectedModel}`);
+      console.log('');
+      console.log('終了するには "exit" または "quit" と入力してください');
+      console.log('---');
+      console.log('');
+
+      // 会話履歴
+      const messages: ChatMessage[] = [];
+
+      // Readline インターフェース
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        prompt: 'You: ',
+      });
+
+      rl.prompt();
+
+      rl.on('line', async (input: string) => {
+        const userInput = input.trim();
+
+        // 終了コマンド
+        if (userInput === 'exit' || userInput === 'quit') {
+          console.log('');
+          console.log('👋 チャットを終了します');
+          rl.close();
+          process.exit(0);
+        }
+
+        // 空入力は無視
+        if (!userInput) {
+          rl.prompt();
+          return;
+        }
+
+        // ユーザーメッセージを追加
+        messages.push({
+          role: 'user',
+          content: userInput,
+        });
+
+        // AI の応答を取得
+        process.stdout.write('\nAI: ');
+
+        let fullResponse = '';
+
+        try {
+          await chatWithModel(selectedModel!, messages, (chunk) => {
+            fullResponse += chunk;
+            process.stdout.write(chunk);
+          });
+
+          // アシスタントの応答を履歴に追加
+          messages.push({
+            role: 'assistant',
+            content: fullResponse,
+          });
+
+          process.stdout.write('\n\n');
+        } catch (error) {
+          console.error('\n');
+          if (error instanceof OllamaError) {
+            console.error('❌ エラー:', error.message);
+          } else {
+            console.error('❌ 予期しないエラーが発生しました');
+          }
+          console.log('');
+        }
+
+        rl.prompt();
+      });
+
+      rl.on('close', () => {
+        console.log('');
+        console.log('👋 チャットを終了します');
+        process.exit(0);
+      });
+    } catch (error) {
+      if (error instanceof OllamaError) {
+        console.error('❌ エラー:', error.message);
+      } else {
+        console.error('❌ 予期しないエラーが発生しました');
+      }
+      process.exit(1);
+    }
   });
 
 // compare コマンド（後で実装）
