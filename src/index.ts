@@ -24,6 +24,10 @@ import {
   getLastUsedModel,
   saveLastUsedModel,
 } from './utils/config.js';
+import {
+  saveConversation,
+  listSessions,
+} from './utils/database.js';
 import * as readline from 'readline';
 
 // ESModuleでpackage.jsonを読み込む
@@ -204,6 +208,17 @@ program
         // 終了コマンド
         if (userInput === 'exit' || userInput === 'quit') {
           console.log('');
+
+          // 会話を保存（メッセージがある場合のみ）
+          if (messages.length > 0) {
+            try {
+              const sessionId = saveConversation(selectedModel, messages);
+              console.log(`💾 会話を保存しました (ID: ${sessionId})`);
+            } catch (error) {
+              console.log('⚠️  会話の保存に失敗しました');
+            }
+          }
+
           console.log('👋 チャットを終了します');
           rl.close();
           process.exit(0);
@@ -263,6 +278,17 @@ program
 
       rl.on('close', () => {
         console.log('');
+
+        // 会話を保存（メッセージがある場合のみ）
+        if (messages.length > 0) {
+          try {
+            const sessionId = saveConversation(selectedModel, messages);
+            console.log(`💾 会話を保存しました (ID: ${sessionId})`);
+          } catch (error) {
+            console.log('⚠️  会話の保存に失敗しました');
+          }
+        }
+
         console.log('👋 チャットを終了します');
         process.exit(0);
       });
@@ -420,16 +446,59 @@ program
     }
   });
 
-// history コマンド（後で実装）
+// history コマンド
 program
   .command('history')
   .description('会話履歴を表示')
   .option('-n, --limit <number>', '表示する履歴数', '10')
   .action((options) => {
-    console.log('📜 会話履歴を表示します...');
-    console.log('表示件数:', options.limit);
-    console.log('');
-    console.log('⚠️  このコマンドは開発中です');
+    try {
+      const limit = parseInt(options.limit, 10);
+      const sessions = listSessions(limit);
+
+      if (sessions.length === 0) {
+        console.log('📜 会話履歴がありません');
+        console.log('');
+        console.log('チャットを開始して会話を保存しましょう:');
+        console.log('  llamune chat');
+        console.log('  llmn chat');
+        return;
+      }
+
+      console.log('📜 会話履歴:');
+      console.log('');
+
+      sessions.forEach((session) => {
+        const date = new Date(session.created_at);
+        const formattedDate = date.toLocaleString('ja-JP', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+        // プレビューを最大50文字に制限
+        const preview = session.preview
+          ? session.preview.length > 50
+            ? session.preview.substring(0, 50) + '...'
+            : session.preview
+          : '(空の会話)';
+
+        console.log(`  ID: ${session.id}`);
+        console.log(`  日時: ${formattedDate}`);
+        console.log(`  モデル: ${session.model}`);
+        console.log(`  メッセージ数: ${session.message_count}`);
+        console.log(`  内容: ${preview}`);
+        console.log('');
+      });
+
+      console.log(`合計: ${sessions.length} 件の会話`);
+    } catch (error) {
+      console.error('❌ 履歴の取得に失敗しました');
+      console.error(error);
+      process.exit(1);
+    }
   });
 
 // コマンドをパース
