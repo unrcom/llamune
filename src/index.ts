@@ -705,6 +705,12 @@ program
       });
 
       console.log(`合計: ${sessions.length} 件の会話`);
+      console.log('');
+      console.log('💡 会話を再開するには:');
+      console.log('  llamune chat --continue <ID>');
+      console.log('  llmn chat --continue <ID>');
+      console.log('');
+      console.log('例: llmn chat --continue 1');
     } catch (error) {
       console.error('❌ 履歴の取得に失敗しました');
       console.error(error);
