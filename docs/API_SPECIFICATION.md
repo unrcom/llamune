@@ -18,13 +18,26 @@
 Authorization: Bearer {API_KEY}
 ```
 
-### デフォルトAPIキー
+### APIキーの設定
 
-```
-sk_llamune_default_key_change_this
+**⚠️ 重要: デフォルトキーは使用しないでください**
+
+初期セットアップ時に独自のAPIキーを生成する必要があります：
+
+```bash
+# テンプレートファイルをコピー
+cp config/api-keys.json.example config/api-keys.json
+
+# セキュアなキーを生成
+openssl rand -base64 32
+
+# 生成されたキーの前に "sk_llamune_" を付けて
+# config/api-keys.json に設定
 ```
 
-**⚠️ 本番環境では必ず変更してください**
+詳細は [セットアップガイド](./SETUP.md) を参照してください。
+
+**以下のドキュメント例では `sk_llamune_default_key_change_this` を使用していますが、これは例示のみです。実際の環境では絶対に使用しないでください。**
 
 ### エラーレスポンス
 

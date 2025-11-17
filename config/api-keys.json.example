@@ -2,7 +2,7 @@
   "enabled": true,
   "keys": [
     {
-      "key": "sk_llamune_default_key_change_this",
+      "key": "sk_llamune_your_secret_key_here",
       "name": "Default Key",
       "description": "デフォルトAPIキー（必ず変更してください）",
       "createdAt": "2025-01-17T00:00:00Z"
