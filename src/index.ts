@@ -540,25 +540,34 @@ program
               return;
 
             case '/history':
-              if (!sessionId) {
-                console.log('');
-                console.log('❌ セッションIDがありません');
-                console.log('');
-                rl.prompt();
-                return;
-              }
-
               console.log('');
               console.log('📜 現在の会話履歴:');
               console.log('');
 
               // 往復単位でメッセージを取得して表示
-              const turns = getSessionMessagesWithTurns(sessionId);
+              let historyTurns;
 
-              if (turns.length === 0) {
+              if (sessionId) {
+                // セッションがある場合はDBから取得
+                historyTurns = getSessionMessagesWithTurns(sessionId);
+              } else {
+                // 新規会話の場合はメモリから往復を作成
+                historyTurns = [];
+                for (let i = 0; i < messages.length; i += 2) {
+                  if (i + 1 < messages.length && messages[i].role === 'user' && messages[i + 1].role === 'assistant') {
+                    historyTurns.push({
+                      turnNumber: Math.floor(i / 2) + 1,
+                      user: messages[i],
+                      assistant: messages[i + 1],
+                    });
+                  }
+                }
+              }
+
+              if (historyTurns.length === 0) {
                 console.log('  会話履歴がありません');
               } else {
-                turns.forEach((turn) => {
+                historyTurns.forEach((turn) => {
                   console.log(`[${turn.turnNumber}] You: ${turn.user.content}`);
                   const aiModel = turn.assistant.model || selectedModel;
                   const aiPreview = turn.assistant.content.length > 50
@@ -569,7 +578,7 @@ program
                 });
               }
 
-              console.log(`合計: ${turns.length} 往復`);
+              console.log(`合計: ${historyTurns.length} 往復`);
               console.log('');
 
               rl.prompt();
