@@ -182,18 +182,6 @@ curl -H "Authorization: Bearer sk_llamune_default_key_change_this" \
       "repeat_penalty": 1.05,
       "num_ctx": 2048,
       "created_at": "2025-11-17T09:03:25.819Z"
-    },
-    {
-      "id": 3,
-      "name": "precise",
-      "display_name": "事務的",
-      "description": "正確で決定的な回答",
-      "temperature": 0.3,
-      "top_p": 0.8,
-      "top_k": 20,
-      "repeat_penalty": 1.2,
-      "num_ctx": 2048,
-      "created_at": "2025-11-17T09:03:25.819Z"
     }
   ]
 }
