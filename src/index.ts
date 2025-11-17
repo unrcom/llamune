@@ -286,6 +286,90 @@ program
           return;
         }
 
+        // yes/no の簡易入力処理（スラッシュなしでも認識）
+        const lowerInput = userInput.toLowerCase();
+        if (lowerInput === 'yes' || lowerInput === 'y') {
+          // /yes の処理を実行
+          // /retry の採用
+          if (pendingRetry) {
+            // 新しい回答を採用
+            messages.push({
+              role: 'assistant',
+              content: pendingRetry.response,
+              model: pendingRetry.model,
+            });
+
+            console.log('');
+            console.log(`✅ ${pendingRetry.model} の回答を採用しました`);
+            console.log('');
+
+            // 保留中の回答をクリア
+            pendingRetry = null;
+
+            rl.prompt();
+            return;
+          }
+
+          // /rewind の実行
+          if (pendingRewind) {
+            const deletedCount = logicalDeleteMessagesAfterTurn(
+              pendingRewind.sessionId,
+              pendingRewind.turnNumber
+            );
+
+            console.log('');
+            console.log(`✅ 会話 #${pendingRewind.turnNumber} まで巻き戻しました`);
+            console.log(`削除されたメッセージ: ${deletedCount}件`);
+            console.log('');
+
+            // メモリ上の messages 配列も更新
+            const keepCount = pendingRewind.turnNumber * 2;
+            messages = messages.slice(0, keepCount);
+
+            // 保留中の巻き戻しをクリア
+            pendingRewind = null;
+
+            rl.prompt();
+            return;
+          }
+
+          // 保留中の操作がない場合は通常メッセージとして処理
+        }
+
+        if (lowerInput === 'no' || lowerInput === 'n') {
+          // /no の処理を実行
+          // /retry のキャンセル
+          if (pendingRetry) {
+            // 前の回答を復元
+            messages.push(pendingRetry.previousResponse);
+
+            console.log('');
+            console.log(`✅ ${pendingRetry.previousResponse.model || 'previous'} の回答を維持しました`);
+            console.log('');
+
+            // 保留中の回答をクリア
+            pendingRetry = null;
+
+            rl.prompt();
+            return;
+          }
+
+          // /rewind のキャンセル
+          if (pendingRewind) {
+            console.log('');
+            console.log('✅ 巻き戻しをキャンセルしました');
+            console.log('');
+
+            // 保留中の巻き戻しをクリア
+            pendingRewind = null;
+
+            rl.prompt();
+            return;
+          }
+
+          // 保留中の操作がない場合は通常メッセージとして処理
+        }
+
         // スラッシュコマンド処理
         if (userInput.startsWith('/')) {
           const parts = userInput.split(/\s+/);
@@ -298,8 +382,8 @@ program
               console.log('📖 コマンド一覧:');
               console.log('');
               console.log('  /retry <model>  - 最後の質問を別のモデルで再実行');
-              console.log('  /yes            - retry の回答を採用');
-              console.log('  /no             - retry の回答を破棄');
+              console.log('  yes, y, /yes    - retry の回答を採用');
+              console.log('  no, n, /no      - retry の回答を破棄');
               console.log('  /switch <model> - モデルを切り替え');
               console.log('  /models         - 利用可能なモデル一覧');
               console.log('  /current        - 現在のモデルを表示');
@@ -434,8 +518,8 @@ program
 
                 const previousModelName = previousResponse.model || 'previous model';
                 console.log('💡 この回答を採用しますか？');
-                console.log(`  /yes - 採用 (${retryModel} の回答を採用する)`);
-                console.log(`  /no  - 破棄 (${previousModelName} の回答を採用する)`);
+                console.log(`  yes, y  - 採用 (${retryModel} の回答を採用する)`);
+                console.log(`  no, n   - 破棄 (${previousModelName} の回答を採用する)`);
                 console.log('');
               } catch (error) {
                 stopSpinner(retrySpinner);
@@ -628,8 +712,8 @@ program
               console.log(`削除される往復: #${rewindTurn + 1}〜#${currentTurns.length} (${deletedTurns}往復)`);
               console.log('');
               console.log('この操作を実行しますか？');
-              console.log('  /yes - 巻き戻しを実行');
-              console.log('  /no  - キャンセル');
+              console.log('  yes, y - 巻き戻しを実行');
+              console.log('  no, n  - キャンセル');
               console.log('');
 
               // 巻き戻し情報を保存
