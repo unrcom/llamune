@@ -225,6 +225,43 @@ export function pullModel(modelName: string): Promise<boolean> {
 }
 
 /**
+ * モデルを削除する
+ * @param modelName モデル名（例: "gemma2:9b"）
+ * @returns 削除成功時は true
+ */
+export async function deleteModel(modelName: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/delete`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: modelName }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new OllamaError(
+        `モデル削除エラー: ${errorText || response.statusText}`,
+        response.status
+      );
+    }
+
+    return true;
+  } catch (error) {
+    if (error instanceof OllamaError) {
+      throw error;
+    }
+
+    if (error instanceof Error) {
+      throw new OllamaError(`モデル削除エラー: ${error.message}`);
+    }
+
+    throw new OllamaError('不明なエラーが発生しました');
+  }
+}
+
+/**
  * Chat メッセージの型定義
  */
 export interface ChatMessage {

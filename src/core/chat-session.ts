@@ -1,0 +1,217 @@
+/**
+ * チャットセッション管理（共通ビジネスロジック）
+ */
+
+import type { ChatMessage, ChatParameters } from '../utils/ollama.js';
+import {
+  chatWithModel,
+  listModels,
+} from '../utils/ollama.js';
+import {
+  saveConversation,
+  getSession,
+  appendMessagesToSession,
+  logicalDeleteMessagesAfterTurn,
+  getParameterPresetById,
+  getAllParameterPresets,
+} from '../utils/database.js';
+
+/**
+ * チャットセッションクラス
+ */
+export class ChatSession {
+  private messages: ChatMessage[];
+  private sessionId: number | null;
+  private model: string;
+  private parameters?: ChatParameters;
+
+  constructor(
+    model: string,
+    sessionId?: number | null,
+    messages?: ChatMessage[],
+    parameters?: ChatParameters
+  ) {
+    this.model = model;
+    this.sessionId = sessionId || null;
+    this.messages = messages || [];
+    this.parameters = parameters;
+  }
+
+  /**
+   * メッセージを送信してストリーミングレスポンスを取得
+   */
+  async *sendMessage(content: string): AsyncGenerator<string, string, unknown> {
+    // ユーザーメッセージを追加
+    this.messages.push({
+      role: 'user',
+      content,
+    });
+
+    let fullResponse = '';
+
+    // chatWithModelを使用してストリーミング
+    await chatWithModel(
+      this.model,
+      this.messages,
+      (chunk) => {
+        fullResponse += chunk;
+      },
+      this.parameters
+    );
+
+    // アシスタントの応答を追加
+    this.messages.push({
+      role: 'assistant',
+      content: fullResponse,
+      model: this.model,
+    });
+
+    return fullResponse;
+  }
+
+  /**
+   * リトライ: 別のモデル・プリセットで再実行
+   */
+  async *retry(
+    modelName: string,
+    presetId?: number
+  ): AsyncGenerator<string, string, unknown> {
+    // 最後のメッセージがアシスタントでない場合はエラー
+    if (
+      this.messages.length === 0 ||
+      this.messages[this.messages.length - 1].role !== 'assistant'
+    ) {
+      throw new Error('No assistant message to retry');
+    }
+
+    // 最後のアシスタントの応答を削除
+    this.messages.pop();
+
+    // プリセットからパラメータを取得
+    let parameters: ChatParameters | undefined;
+    if (presetId) {
+      const preset = getParameterPresetById(presetId);
+      if (preset) {
+        parameters = {};
+        if (preset.temperature !== null)
+          parameters.temperature = preset.temperature;
+        if (preset.top_p !== null) parameters.top_p = preset.top_p;
+        if (preset.top_k !== null) parameters.top_k = preset.top_k;
+        if (preset.repeat_penalty !== null)
+          parameters.repeat_penalty = preset.repeat_penalty;
+        if (preset.num_ctx !== null) parameters.num_ctx = preset.num_ctx;
+      }
+    }
+
+    let fullResponse = '';
+
+    // 新しいモデルで実行
+    await chatWithModel(
+      modelName,
+      this.messages,
+      (chunk) => {
+        fullResponse += chunk;
+      },
+      parameters
+    );
+
+    // 新しい応答を追加
+    this.messages.push({
+      role: 'assistant',
+      content: fullResponse,
+      model: modelName,
+    });
+
+    // モデルとパラメータを更新
+    this.model = modelName;
+    this.parameters = parameters;
+
+    return fullResponse;
+  }
+
+  /**
+   * 会話を巻き戻す
+   */
+  rewind(turnNumber: number): void {
+    if (!this.sessionId) {
+      // 新規会話の場合はメモリ上で巻き戻し
+      const keepCount = turnNumber * 2;
+      this.messages = this.messages.slice(0, keepCount);
+    } else {
+      // セッションがある場合はDBも更新
+      logicalDeleteMessagesAfterTurn(this.sessionId, turnNumber);
+      const keepCount = turnNumber * 2;
+      this.messages = this.messages.slice(0, keepCount);
+    }
+  }
+
+  /**
+   * モデルを切り替える
+   */
+  switchModel(modelName: string): void {
+    this.model = modelName;
+  }
+
+  /**
+   * セッションを保存
+   */
+  save(): number {
+    const newMessages = this.sessionId
+      ? this.messages.slice(0) // 既存セッションの場合
+      : this.messages;
+
+    if (newMessages.length === 0) {
+      if (this.sessionId) {
+        return this.sessionId;
+      }
+      throw new Error('No messages to save');
+    }
+
+    if (this.sessionId) {
+      // 既存セッションに追加
+      appendMessagesToSession(this.sessionId, newMessages);
+      return this.sessionId;
+    } else {
+      // 新規セッション作成
+      this.sessionId = saveConversation(this.model, this.messages);
+      return this.sessionId;
+    }
+  }
+
+  /**
+   * セッションIDを取得
+   */
+  getSessionId(): number | null {
+    return this.sessionId;
+  }
+
+  /**
+   * メッセージ履歴を取得
+   */
+  getMessages(): ChatMessage[] {
+    return this.messages;
+  }
+
+  /**
+   * 現在のモデルを取得
+   */
+  getModel(): string {
+    return this.model;
+  }
+
+  /**
+   * セッションIDからセッションを復元
+   */
+  static fromSessionId(sessionId: number): ChatSession | null {
+    const sessionData = getSession(sessionId);
+    if (!sessionData) {
+      return null;
+    }
+
+    return new ChatSession(
+      sessionData.session.model,
+      sessionId,
+      sessionData.messages
+    );
+  }
+}

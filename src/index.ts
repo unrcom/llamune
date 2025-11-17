@@ -10,6 +10,7 @@ import {
   formatSize,
   formatParams,
   pullModel,
+  deleteModel,
   chatWithModel,
   OllamaError,
   type ChatMessage,
@@ -64,6 +65,7 @@ program
     console.log('利用可能なコマンド:');
     console.log('  ls         利用可能なモデル一覧を表示');
     console.log('  pull       モデルをダウンロード');
+    console.log('  rm         モデルを削除');
     console.log('  chat       チャットを開始');
     console.log('  compare    複数のLLMで比較実行');
     console.log('  config     設定を管理');
@@ -1087,6 +1089,44 @@ program
       console.log('✅ インストール完了！');
       console.log('');
       console.log('次のコマンドで確認できます:');
+      console.log('  llamune ls');
+      console.log('  llmn ls');
+    } catch (error) {
+      if (error instanceof OllamaError) {
+        console.error('❌ エラー:', error.message);
+      } else {
+        console.error('❌ 予期しないエラーが発生しました');
+      }
+      process.exit(1);
+    }
+  });
+
+// rm コマンド
+program
+  .command('rm')
+  .description('モデルを削除')
+  .argument('<model>', 'モデル名（例: gemma2:9b）')
+  .action(async (modelName: string) => {
+    try {
+      // Ollama の起動確認・自動起動
+      const isRunning = await ensureOllamaRunning();
+      if (!isRunning) {
+        console.log('❌ Ollama の起動に失敗しました');
+        console.log('');
+        console.log('手動で起動してください:');
+        console.log('  ollama serve');
+        process.exit(1);
+      }
+
+      console.log(`🗑️  ${modelName} を削除しています...`);
+      console.log('');
+
+      // モデルを削除
+      await deleteModel(modelName);
+
+      console.log(`✅ ${modelName} を削除しました`);
+      console.log('');
+      console.log('残りのモデルを確認:');
       console.log('  llamune ls');
       console.log('  llmn ls');
     } catch (error) {
