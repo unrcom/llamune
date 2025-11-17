@@ -10,7 +10,7 @@
 
 ## 認証
 
-すべての `/api/*` エンドポイントは認証が必要です（`/health` を除く）。
+すべての `/api/*` エンドポイントは認証が必要です（`/health` と `/api` メタ情報を除く）。
 
 ### 認証ヘッダー
 
@@ -63,11 +63,89 @@ openssl rand -base64 32
 
 ## エンドポイント一覧
 
-### 1. ヘルスチェック
+### 1. API メタ情報
+
+#### `GET /api`
+
+APIの情報、バージョン、利用可能なエンドポイント一覧を取得します（認証不要）。
+
+**認証**: 不要
+
+**リクエスト例:**
+```bash
+curl http://localhost:3000/api
+```
+
+**レスポンス:**
+```json
+{
+  "name": "Llamune API",
+  "version": "0.1.0",
+  "description": "クローズドネットワーク環境で複数のローカルLLMを比較・活用するプラットフォーム",
+  "platform": "Closed Network LLM Platform",
+  "endpoints": {
+    "models": {
+      "list": "GET /api/models",
+      "pull": "POST /api/models/pull",
+      "delete": "DELETE /api/models",
+      "recommended": "GET /api/models/recommended"
+    },
+    "chat": {
+      "sendMessage": "POST /api/chat/messages",
+      "retry": "POST /api/chat/retry",
+      "listSessions": "GET /api/chat/sessions",
+      "getSession": "GET /api/chat/sessions/:id",
+      "rewind": "DELETE /api/chat/sessions/:id/rewind",
+      "switchModel": "PUT /api/chat/sessions/:id/model"
+    },
+    "system": {
+      "spec": "GET /api/system/spec",
+      "health": "GET /api/system/health"
+    },
+    "presets": {
+      "list": "GET /api/presets"
+    }
+  },
+  "documentation": {
+    "main": "https://github.com/unrcom/llamune/blob/main/docs/API_SPECIFICATION.md",
+    "chat": "https://github.com/unrcom/llamune/blob/main/docs/API_CHAT_ENDPOINTS.md",
+    "setup": "https://github.com/unrcom/llamune/blob/main/docs/SETUP.md"
+  },
+  "authentication": {
+    "type": "Bearer Token",
+    "header": "Authorization: Bearer {API_KEY}",
+    "setup": "See docs/SETUP.md for configuration"
+  }
+}
+```
+
+**用途:**
+- GUIクライアントがAPIサーバーの機能を自動検出
+- バージョン確認
+- エンドポイント一覧の取得
+- ドキュメントURLの取得
+
+**CLI対応:**
+
+CLI の `llamune` コマンド（引数なし）に相当する情報を提供します。
+
+```bash
+# CLI
+llamune
+
+# API
+curl http://localhost:3000/api
+```
+
+---
+
+### 2. ヘルスチェック
 
 #### `GET /health`
 
 サーバーの稼働状態を確認します（認証不要）。
+
+**認証**: 不要
 
 **リクエスト例:**
 ```bash
@@ -83,7 +161,7 @@ curl http://localhost:3000/health
 
 ---
 
-### 2. システム情報
+### 3. システム情報
 
 #### `GET /api/system/spec`
 
