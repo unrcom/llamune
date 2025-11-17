@@ -230,6 +230,7 @@ export function pullModel(modelName: string): Promise<boolean> {
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  model?: string; // どのモデルが生成したメッセージか（assistantの場合）
 }
 
 /**

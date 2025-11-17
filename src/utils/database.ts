@@ -67,6 +67,7 @@ export function initDatabase(): Database.Database {
       role TEXT NOT NULL,
       content TEXT NOT NULL,
       created_at TEXT NOT NULL,
+      model TEXT,
       FOREIGN KEY (session_id) REFERENCES sessions(id)
     )
   `);
@@ -109,14 +110,15 @@ export function createSession(model: string): number {
 export function saveMessage(
   sessionId: number,
   role: string,
-  content: string
+  content: string,
+  model?: string
 ): void {
   const db = initDatabase();
   const now = new Date().toISOString();
 
   db.prepare(
-    'INSERT INTO messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)'
-  ).run(sessionId, role, content, now);
+    'INSERT INTO messages (session_id, role, content, created_at, model) VALUES (?, ?, ?, ?, ?)'
+  ).run(sessionId, role, content, now, model || null);
 
   // セッションの更新日時を更新
   db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
@@ -143,11 +145,11 @@ export function saveConversation(
 
   // メッセージを一括保存
   const insertMessage = db.prepare(
-    'INSERT INTO messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)'
+    'INSERT INTO messages (session_id, role, content, created_at, model) VALUES (?, ?, ?, ?, ?)'
   );
 
   for (const message of messages) {
-    insertMessage.run(sessionId, message.role, message.content, now);
+    insertMessage.run(sessionId, message.role, message.content, now, message.model || null);
   }
 
   db.close();
@@ -166,11 +168,11 @@ export function appendMessagesToSession(
 
   // メッセージを一括追加
   const insertMessage = db.prepare(
-    'INSERT INTO messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)'
+    'INSERT INTO messages (session_id, role, content, created_at, model) VALUES (?, ?, ?, ?, ?)'
   );
 
   for (const message of messages) {
-    insertMessage.run(sessionId, message.role, message.content, now);
+    insertMessage.run(sessionId, message.role, message.content, now, message.model || null);
   }
 
   // セッションの更新日時を更新
@@ -257,7 +259,7 @@ export function getSession(sessionId: number): {
   const messages = db
     .prepare(
       `
-      SELECT role, content
+      SELECT role, content, model
       FROM messages
       WHERE session_id = ?
       ORDER BY id ASC
