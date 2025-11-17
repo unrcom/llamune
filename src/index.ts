@@ -277,6 +277,161 @@ program
           return;
         }
 
+        // スラッシュコマンド処理
+        if (userInput.startsWith('/')) {
+          const parts = userInput.split(/\s+/);
+          const command = parts[0].toLowerCase();
+          const args = parts.slice(1);
+
+          switch (command) {
+            case '/help':
+              console.log('');
+              console.log('📖 コマンド一覧:');
+              console.log('');
+              console.log('  /retry <model>  - 最後の質問を別のモデルで再実行');
+              console.log('  /switch <model> - モデルを切り替え');
+              console.log('  /models         - 利用可能なモデル一覧');
+              console.log('  /current        - 現在のモデルを表示');
+              console.log('  /help           - このヘルプを表示');
+              console.log('  exit, quit      - チャットを終了');
+              console.log('');
+              rl.prompt();
+              return;
+
+            case '/current':
+              console.log('');
+              console.log(`📦 現在のモデル: ${selectedModel}`);
+              console.log('');
+              rl.prompt();
+              return;
+
+            case '/models':
+              console.log('');
+              console.log('📦 利用可能なモデル:');
+              models.forEach((m) => {
+                const current = m.name === selectedModel ? ' ⭐' : '';
+                console.log(`  - ${m.name}${current}`);
+              });
+              console.log('');
+              rl.prompt();
+              return;
+
+            case '/switch':
+              if (args.length === 0) {
+                console.log('');
+                console.log('❌ モデル名を指定してください: /switch <model>');
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              const newModel = args[0];
+              const modelExists = models.some((m) => m.name === newModel);
+              if (!modelExists) {
+                console.log('');
+                console.log(`❌ モデル "${newModel}" が見つかりません`);
+                console.log('');
+                console.log('利用可能なモデル:');
+                models.forEach((m) => console.log(`  - ${m.name}`));
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              selectedModel = newModel;
+              saveLastUsedModel(selectedModel);
+              console.log('');
+              console.log(`✅ モデルを ${selectedModel} に切り替えました`);
+              console.log('');
+              rl.prompt();
+              return;
+
+            case '/retry':
+              if (messages.length === 0) {
+                console.log('');
+                console.log('❌ 再実行する質問がありません');
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              if (args.length === 0) {
+                console.log('');
+                console.log('❌ モデル名を指定してください: /retry <model>');
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              const retryModel = args[0];
+              const retryModelExists = models.some((m) => m.name === retryModel);
+              if (!retryModelExists) {
+                console.log('');
+                console.log(`❌ モデル "${retryModel}" が見つかりません`);
+                console.log('');
+                console.log('利用可能なモデル:');
+                models.forEach((m) => console.log(`  - ${m.name}`));
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              // 最後のアシスタントの応答を削除
+              if (messages[messages.length - 1].role === 'assistant') {
+                messages.pop();
+              }
+
+              console.log('');
+              console.log(`🔄 ${retryModel} で再実行します...`);
+              console.log('');
+
+              const retrySpinner = showSpinner();
+              let retryResponse = '';
+              let retryFirstChunk = true;
+
+              try {
+                await chatWithModel(retryModel, messages, (chunk) => {
+                  if (retryFirstChunk) {
+                    stopSpinner(retrySpinner);
+                    process.stdout.write(`AI (${retryModel}): `);
+                    retryFirstChunk = false;
+                  }
+                  retryResponse += chunk;
+                  process.stdout.write(chunk);
+                });
+
+                messages.push({
+                  role: 'assistant',
+                  content: retryResponse,
+                  model: retryModel,
+                });
+
+                process.stdout.write('\n\n');
+              } catch (error) {
+                stopSpinner(retrySpinner);
+                console.error('\n');
+                if (error instanceof OllamaError) {
+                  console.error('❌ エラー:', error.message);
+                } else {
+                  console.error('❌ 予期しないエラーが発生しました');
+                }
+                console.log('');
+              }
+
+              rl.prompt();
+              return;
+
+            default:
+              console.log('');
+              console.log(`❌ 不明なコマンド: ${command}`);
+              console.log('ヘルプを表示するには /help と入力してください');
+              console.log('');
+              rl.prompt();
+              return;
+          }
+        }
+
+        // 通常のメッセージ処理
         // ユーザーメッセージを追加
         messages.push({
           role: 'user',
@@ -302,10 +457,11 @@ program
             process.stdout.write(chunk);
           });
 
-          // アシスタントの応答を履歴に追加
+          // アシスタントの応答を履歴に追加（モデル名も記録）
           messages.push({
             role: 'assistant',
             content: fullResponse,
+            model: selectedModel,
           });
 
           process.stdout.write('\n\n');
