@@ -401,13 +401,41 @@ curl -X DELETE \
 
 ---
 
+### 5. チャット機能
+
+チャット機能の詳細なエンドポイント仕様は、別ドキュメントを参照してください：
+
+**📄 [チャット機能エンドポイント仕様](./API_CHAT_ENDPOINTS.md)**
+
+#### エンドポイント一覧
+
+| メソッド | エンドポイント | 説明 |
+|---------|--------------|------|
+| `POST` | `/api/chat/messages` | メッセージ送信（ストリーミング） |
+| `POST` | `/api/chat/retry` | 再実行（モデル切り替え） |
+| `GET` | `/api/chat/sessions` | セッション一覧 |
+| `GET` | `/api/chat/sessions/:id` | セッション詳細 |
+| `DELETE` | `/api/chat/sessions/:id/rewind` | 巻き戻し |
+| `PUT` | `/api/chat/sessions/:id/model` | モデル切り替え |
+
+**特徴:**
+- Server-Sent Events (SSE) によるストリーミング対応
+- セッション管理（会話履歴の保存・復元）
+- モデル切り替えとリトライ機能
+- 会話の巻き戻し機能
+
+---
+
 ## エラーコード一覧
 
 | コード | HTTPステータス | 説明 |
 |--------|---------------|------|
 | `UNAUTHORIZED` | 401 | 認証エラー（APIキー不正または未提供） |
 | `INVALID_REQUEST` | 400 | リクエストパラメータ不正 |
+| `NOT_FOUND` | 404 | リソースが見つからない（セッション等） |
 | `OLLAMA_ERROR` | 500 | Ollama関連のエラー |
+| `STREAM_ERROR` | 500 | ストリーミングエラー |
+| `RETRY_ERROR` | 500 | リトライ失敗 |
 | `INTERNAL_ERROR` | 500 | サーバー内部エラー |
 
 ---

@@ -4,6 +4,7 @@ import { authenticate } from './middleware/auth.js';
 import modelsRouter from './routes/models.js';
 import presetsRouter from './routes/presets.js';
 import systemRouter from './routes/system.js';
+import chatRouter from './routes/chat.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,6 +20,7 @@ app.use('/api', authenticate);
 app.use('/api/models', modelsRouter);
 app.use('/api/presets', presetsRouter);
 app.use('/api/system', systemRouter);
+app.use('/api/chat', chatRouter);
 
 // ヘルスチェック（認証不要）
 app.get('/health', (req, res) => {

@@ -531,3 +531,51 @@ export function getParameterPresetById(id: number): ParameterPreset | null {
   db.close();
   return preset || null;
 }
+
+/**
+ * すべてのセッションを取得（プレビュー付き）
+ */
+export function getAllSessions(): ChatSession[] {
+  const db = initDatabase();
+
+  const sessions = db
+    .prepare(
+      `
+      SELECT
+        s.id,
+        s.model,
+        s.created_at,
+        COUNT(m.id) as message_count,
+        (SELECT content FROM messages WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL ORDER BY id ASC LIMIT 1) as preview
+      FROM sessions s
+      LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
+      GROUP BY s.id
+      ORDER BY s.created_at DESC
+    `
+    )
+    .all() as ChatSession[];
+
+  db.close();
+  return sessions;
+}
+
+/**
+ * セッションを削除
+ */
+export function deleteSession(sessionId: number): boolean {
+  const db = initDatabase();
+
+  try {
+    // メッセージを削除
+    db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+
+    // セッションを削除
+    const result = db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+
+    db.close();
+    return result.changes > 0;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
