@@ -162,6 +162,9 @@ program
       let sessionId: number | null = null;
       let selectedModel: string;
 
+      // /retry で保留中の回答
+      let pendingRetry: { response: string; model: string; previousResponse: ChatMessage } | null = null;
+
       // --continue オプションで過去の会話を再開
       if (options.continue) {
         const sid = parseInt(options.continue, 10);
@@ -205,7 +208,8 @@ program
           if (msg.role === 'user') {
             console.log(`You: ${msg.content}`);
           } else {
-            console.log(`AI: ${msg.content}`);
+            const modelName = msg.model || selectedModel;
+            console.log(`AI (${modelName}): ${msg.content}`);
           }
           console.log('');
         });
@@ -289,6 +293,8 @@ program
               console.log('📖 コマンド一覧:');
               console.log('');
               console.log('  /retry <model>  - 最後の質問を別のモデルで再実行');
+              console.log('  /yes            - retry の回答を採用');
+              console.log('  /no             - retry の回答を破棄');
               console.log('  /switch <model> - モデルを切り替え');
               console.log('  /models         - 利用可能なモデル一覧');
               console.log('  /current        - 現在のモデルを表示');
@@ -355,6 +361,15 @@ program
                 return;
               }
 
+              // 最後のメッセージがアシスタントでない場合
+              if (messages[messages.length - 1].role !== 'assistant') {
+                console.log('');
+                console.log('❌ 再実行する回答がありません');
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
               if (args.length === 0) {
                 console.log('');
                 console.log('❌ モデル名を指定してください: /retry <model>');
@@ -376,11 +391,6 @@ program
                 return;
               }
 
-              // 最後のアシスタントの応答を削除
-              if (messages[messages.length - 1].role === 'assistant') {
-                messages.pop();
-              }
-
               console.log('');
               console.log(`🔄 ${retryModel} で再実行します...`);
               console.log('');
@@ -388,6 +398,12 @@ program
               const retrySpinner = showSpinner();
               let retryResponse = '';
               let retryFirstChunk = true;
+
+              // 最後のアシスタントの応答を保存（後で復元できるように）
+              const previousResponse = messages[messages.length - 1];
+
+              // 一時的にアシスタントの応答を削除して再実行
+              messages.pop();
 
               try {
                 await chatWithModel(retryModel, messages, (chunk) => {
@@ -400,13 +416,19 @@ program
                   process.stdout.write(chunk);
                 });
 
-                messages.push({
-                  role: 'assistant',
-                  content: retryResponse,
-                  model: retryModel,
-                });
-
                 process.stdout.write('\n\n');
+
+                // 保留中の回答として保存（まだmessagesには追加しない）
+                pendingRetry = {
+                  response: retryResponse,
+                  model: retryModel,
+                  previousResponse: previousResponse,
+                };
+
+                console.log('💡 この回答を採用しますか？');
+                console.log('  /yes - 採用（前の回答を置き換え）');
+                console.log('  /no  - 破棄（前の回答を維持）');
+                console.log('');
               } catch (error) {
                 stopSpinner(retrySpinner);
                 console.error('\n');
@@ -416,7 +438,58 @@ program
                   console.error('❌ 予期しないエラーが発生しました');
                 }
                 console.log('');
+                // エラーの場合は元の応答を復元
+                messages.push(previousResponse);
               }
+
+              rl.prompt();
+              return;
+
+            case '/yes':
+              if (!pendingRetry) {
+                console.log('');
+                console.log('❌ 採用する回答がありません');
+                console.log('まず /retry <model> で別のモデルの回答を取得してください');
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              // 新しい回答を採用
+              messages.push({
+                role: 'assistant',
+                content: pendingRetry.response,
+                model: pendingRetry.model,
+              });
+
+              console.log('');
+              console.log(`✅ ${pendingRetry.model} の回答を採用しました`);
+              console.log('');
+
+              // 保留中の回答をクリア
+              pendingRetry = null;
+
+              rl.prompt();
+              return;
+
+            case '/no':
+              if (!pendingRetry) {
+                console.log('');
+                console.log('❌ 破棄する回答がありません');
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              // 前の回答を復元
+              messages.push(pendingRetry.previousResponse);
+
+              console.log('');
+              console.log(`✅ ${pendingRetry.previousResponse.model || 'previous'} の回答を維持しました`);
+              console.log('');
+
+              // 保留中の回答をクリア
+              pendingRetry = null;
 
               rl.prompt();
               return;
@@ -432,6 +505,15 @@ program
         }
 
         // 通常のメッセージ処理
+        // もし保留中の回答がある場合は、元の回答を復元
+        if (pendingRetry) {
+          messages.push(pendingRetry.previousResponse);
+          console.log('');
+          console.log(`ℹ️  保留中の回答を破棄し、${pendingRetry.previousResponse.model || 'previous'} の回答を維持しました`);
+          console.log('');
+          pendingRetry = null;
+        }
+
         // ユーザーメッセージを追加
         messages.push({
           role: 'user',
@@ -450,7 +532,7 @@ program
             // 最初のチャンクでスピナーを停止
             if (isFirstChunk) {
               stopSpinner(spinner);
-              process.stdout.write('AI: ');
+              process.stdout.write(`AI (${selectedModel}): `);
               isFirstChunk = false;
             }
             fullResponse += chunk;
