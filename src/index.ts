@@ -29,6 +29,8 @@ import {
   listSessions,
   getSession,
   appendMessagesToSession,
+  getSessionMessagesWithTurns,
+  logicalDeleteMessagesAfterTurn,
 } from './utils/database.js';
 import * as readline from 'readline';
 
@@ -165,6 +167,9 @@ program
       // /retry で保留中の回答
       let pendingRetry: { response: string; model: string; previousResponse: ChatMessage } | null = null;
 
+      // /rewind で保留中の巻き戻し
+      let pendingRewind: { sessionId: number; turnNumber: number } | null = null;
+
       // --continue オプションで過去の会話を再開
       if (options.continue) {
         const sid = parseInt(options.continue, 10);
@@ -298,6 +303,8 @@ program
               console.log('  /switch <model> - モデルを切り替え');
               console.log('  /models         - 利用可能なモデル一覧');
               console.log('  /current        - 現在のモデルを表示');
+              console.log('  /history        - 現在の会話履歴を表示');
+              console.log('  /rewind <番号>  - 指定した往復まで巻き戻し');
               console.log('  /help           - このヘルプを表示');
               console.log('  exit, quit      - チャットを終了');
               console.log('');
@@ -447,50 +454,177 @@ program
               return;
 
             case '/yes':
-              if (!pendingRetry) {
+              // /retry の採用
+              if (pendingRetry) {
+                // 新しい回答を採用
+                messages.push({
+                  role: 'assistant',
+                  content: pendingRetry.response,
+                  model: pendingRetry.model,
+                });
+
                 console.log('');
-                console.log('❌ 採用する回答がありません');
-                console.log('まず /retry <model> で別のモデルの回答を取得してください');
+                console.log(`✅ ${pendingRetry.model} の回答を採用しました`);
                 console.log('');
+
+                // 保留中の回答をクリア
+                pendingRetry = null;
+
                 rl.prompt();
                 return;
               }
 
-              // 新しい回答を採用
-              messages.push({
-                role: 'assistant',
-                content: pendingRetry.response,
-                model: pendingRetry.model,
-              });
+              // /rewind の実行
+              if (pendingRewind) {
+                const deletedCount = logicalDeleteMessagesAfterTurn(
+                  pendingRewind.sessionId,
+                  pendingRewind.turnNumber
+                );
+
+                console.log('');
+                console.log(`✅ 会話 #${pendingRewind.turnNumber} まで巻き戻しました`);
+                console.log(`削除されたメッセージ: ${deletedCount}件`);
+                console.log('');
+
+                // メモリ上の messages 配列も更新
+                const keepCount = pendingRewind.turnNumber * 2;
+                messages = messages.slice(0, keepCount);
+
+                // 保留中の巻き戻しをクリア
+                pendingRewind = null;
+
+                rl.prompt();
+                return;
+              }
 
               console.log('');
-              console.log(`✅ ${pendingRetry.model} の回答を採用しました`);
+              console.log('❌ 実行する操作がありません');
               console.log('');
-
-              // 保留中の回答をクリア
-              pendingRetry = null;
-
               rl.prompt();
               return;
 
             case '/no':
-              if (!pendingRetry) {
+              // /retry のキャンセル
+              if (pendingRetry) {
+                // 前の回答を復元
+                messages.push(pendingRetry.previousResponse);
+
                 console.log('');
-                console.log('❌ 破棄する回答がありません');
+                console.log(`✅ ${pendingRetry.previousResponse.model || 'previous'} の回答を維持しました`);
+                console.log('');
+
+                // 保留中の回答をクリア
+                pendingRetry = null;
+
+                rl.prompt();
+                return;
+              }
+
+              // /rewind のキャンセル
+              if (pendingRewind) {
+                console.log('');
+                console.log('✅ 巻き戻しをキャンセルしました');
+                console.log('');
+
+                // 保留中の巻き戻しをクリア
+                pendingRewind = null;
+
+                rl.prompt();
+                return;
+              }
+
+              console.log('');
+              console.log('❌ キャンセルする操作がありません');
+              console.log('');
+              rl.prompt();
+              return;
+
+            case '/history':
+              if (!sessionId) {
+                console.log('');
+                console.log('❌ セッションIDがありません');
                 console.log('');
                 rl.prompt();
                 return;
               }
 
-              // 前の回答を復元
-              messages.push(pendingRetry.previousResponse);
-
               console.log('');
-              console.log(`✅ ${pendingRetry.previousResponse.model || 'previous'} の回答を維持しました`);
+              console.log('📜 現在の会話履歴:');
               console.log('');
 
-              // 保留中の回答をクリア
-              pendingRetry = null;
+              // 往復単位でメッセージを取得して表示
+              const turns = getSessionMessagesWithTurns(sessionId);
+
+              if (turns.length === 0) {
+                console.log('  会話履歴がありません');
+              } else {
+                turns.forEach((turn) => {
+                  console.log(`[${turn.turnNumber}] You: ${turn.user.content}`);
+                  const aiModel = turn.assistant.model || selectedModel;
+                  const aiPreview = turn.assistant.content.length > 50
+                    ? turn.assistant.content.substring(0, 50) + '...'
+                    : turn.assistant.content;
+                  console.log(`    AI (${aiModel}): ${aiPreview}`);
+                  console.log('');
+                });
+              }
+
+              console.log(`合計: ${turns.length} 往復`);
+              console.log('');
+
+              rl.prompt();
+              return;
+
+            case '/rewind':
+              if (!sessionId) {
+                console.log('');
+                console.log('❌ セッションIDがありません（新規会話では使用できません）');
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              if (args.length === 0) {
+                console.log('');
+                console.log('❌ 巻き戻す往復番号を指定してください: /rewind <番号>');
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              const rewindTurn = parseInt(args[0], 10);
+              if (isNaN(rewindTurn) || rewindTurn < 1) {
+                console.log('');
+                console.log('❌ 有効な往復番号を指定してください');
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              // 現在の往復数を取得
+              const currentTurns = getSessionMessagesWithTurns(sessionId);
+              if (rewindTurn >= currentTurns.length) {
+                console.log('');
+                console.log(`❌ 往復 #${rewindTurn} は存在しません（現在: ${currentTurns.length} 往復）`);
+                console.log('');
+                rl.prompt();
+                return;
+              }
+
+              // 削除される往復数を計算
+              const deletedTurns = currentTurns.length - rewindTurn;
+
+              console.log('');
+              console.log(`⏪ 会話 #${rewindTurn} まで巻き戻します`);
+              console.log(`削除される往復: #${rewindTurn + 1}〜#${currentTurns.length} (${deletedTurns}往復)`);
+              console.log('');
+              console.log('この操作を実行しますか？');
+              console.log('  /yes - 巻き戻しを実行');
+              console.log('  /no  - キャンセル');
+              console.log('');
+
+              // 巻き戻し情報を保存
+              pendingRewind = { sessionId, turnNumber: rewindTurn };
 
               rl.prompt();
               return;
@@ -513,6 +647,14 @@ program
           console.log(`ℹ️  保留中の回答を破棄し、${pendingRetry.previousResponse.model || 'previous'} の回答を維持しました`);
           console.log('');
           pendingRetry = null;
+        }
+
+        // もし保留中の巻き戻しがある場合は、キャンセル
+        if (pendingRewind) {
+          console.log('');
+          console.log('ℹ️  巻き戻しをキャンセルしました');
+          console.log('');
+          pendingRewind = null;
         }
 
         // ユーザーメッセージを追加

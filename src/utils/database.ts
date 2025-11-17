@@ -68,6 +68,7 @@ export function initDatabase(): Database.Database {
       content TEXT NOT NULL,
       created_at TEXT NOT NULL,
       model TEXT,
+      deleted_at TEXT,
       FOREIGN KEY (session_id) REFERENCES sessions(id)
     )
   `);
@@ -199,12 +200,12 @@ export function listSessions(limit = 10): ChatSession[] {
         (
           SELECT content
           FROM messages
-          WHERE session_id = s.id AND role = 'user'
+          WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
           ORDER BY id ASC
           LIMIT 1
         ) as preview
       FROM sessions s
-      LEFT JOIN messages m ON s.id = m.session_id
+      LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
       GROUP BY s.id
       ORDER BY s.updated_at DESC
       LIMIT ?
@@ -238,12 +239,12 @@ export function getSession(sessionId: number): {
         (
           SELECT content
           FROM messages
-          WHERE session_id = s.id AND role = 'user'
+          WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
           ORDER BY id ASC
           LIMIT 1
         ) as preview
       FROM sessions s
-      LEFT JOIN messages m ON s.id = m.session_id
+      LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
       WHERE s.id = ?
       GROUP BY s.id
     `
@@ -255,13 +256,13 @@ export function getSession(sessionId: number): {
     return null;
   }
 
-  // メッセージを取得
+  // メッセージを取得（論理削除されていないもののみ）
   const messages = db
     .prepare(
       `
       SELECT role, content, model
       FROM messages
-      WHERE session_id = ?
+      WHERE session_id = ? AND deleted_at IS NULL
       ORDER BY id ASC
     `
     )
@@ -367,4 +368,90 @@ export function getAllRecommendedModels(): RecommendedModel[] {
 
   db.close();
   return models;
+}
+
+/**
+ * メッセージを往復単位で取得（IDと共に）
+ */
+export interface MessageWithId extends ChatMessage {
+  id: number;
+}
+
+export interface MessageTurn {
+  turnNumber: number;
+  user: MessageWithId;
+  assistant: MessageWithId;
+}
+
+export function getSessionMessagesWithTurns(sessionId: number): MessageTurn[] {
+  const db = initDatabase();
+
+  // 論理削除されていないメッセージを取得
+  const messages = db
+    .prepare(
+      `
+      SELECT id, role, content, model
+      FROM messages
+      WHERE session_id = ? AND deleted_at IS NULL
+      ORDER BY id ASC
+    `
+    )
+    .all(sessionId) as MessageWithId[];
+
+  db.close();
+
+  // user-assistant のペアに変換
+  const turns: MessageTurn[] = [];
+  for (let i = 0; i < messages.length; i += 2) {
+    if (i + 1 < messages.length && messages[i].role === 'user' && messages[i + 1].role === 'assistant') {
+      turns.push({
+        turnNumber: Math.floor(i / 2) + 1,
+        user: messages[i],
+        assistant: messages[i + 1],
+      });
+    }
+  }
+
+  return turns;
+}
+
+/**
+ * 指定した往復番号以降のメッセージを論理削除
+ */
+export function logicalDeleteMessagesAfterTurn(sessionId: number, turnNumber: number): number {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  // 論理削除されていないメッセージを取得
+  const messages = db
+    .prepare(
+      `
+      SELECT id
+      FROM messages
+      WHERE session_id = ? AND deleted_at IS NULL
+      ORDER BY id ASC
+    `
+    )
+    .all(sessionId) as Array<{ id: number }>;
+
+  // 削除するメッセージのIDを計算（往復番号 * 2 以降）
+  const deleteFromIndex = turnNumber * 2;
+  const messageIdsToDelete = messages.slice(deleteFromIndex).map((m) => m.id);
+
+  if (messageIdsToDelete.length === 0) {
+    db.close();
+    return 0;
+  }
+
+  // 論理削除を実行
+  const placeholders = messageIdsToDelete.map(() => '?').join(',');
+  const result = db
+    .prepare(`UPDATE messages SET deleted_at = ? WHERE id IN (${placeholders})`)
+    .run(now, ...messageIdsToDelete);
+
+  // セッションの更新日時を更新
+  db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
+
+  db.close();
+  return result.changes;
 }
