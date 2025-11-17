@@ -49,15 +49,61 @@ export class ChatSession {
 
     let fullResponse = '';
 
-    // chatWithModelを使用してストリーミング
-    await chatWithModel(
-      this.model,
-      this.messages,
-      (chunk) => {
-        fullResponse += chunk;
-      },
-      this.parameters
-    );
+    // Ollama API を直接呼び出してストリーミング
+    const OLLAMA_BASE_URL = 'http://localhost:11434';
+    const request = {
+      model: this.model,
+      messages: this.messages,
+      stream: true,
+      options: this.parameters,
+    };
+
+    try {
+      const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Chat API error: ${response.statusText}`);
+      }
+
+      if (!response.body) {
+        throw new Error('レスポンスボディがありません');
+      }
+
+      // ストリーミングレスポンスを処理
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter((line) => line.trim());
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+            if (data.message?.content) {
+              fullResponse += data.message.content;
+              yield fullResponse; // 累積的な内容を yield
+            }
+          } catch {
+            // JSON パースエラーは無視
+          }
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Chat エラー: ${error.message}`);
+      }
+      throw new Error('不明なエラーが発生しました');
+    }
 
     // アシスタントの応答を追加
     this.messages.push({
@@ -105,15 +151,61 @@ export class ChatSession {
 
     let fullResponse = '';
 
-    // 新しいモデルで実行
-    await chatWithModel(
-      modelName,
-      this.messages,
-      (chunk) => {
-        fullResponse += chunk;
-      },
-      parameters
-    );
+    // Ollama API を直接呼び出してストリーミング
+    const OLLAMA_BASE_URL = 'http://localhost:11434';
+    const request = {
+      model: modelName,
+      messages: this.messages,
+      stream: true,
+      options: parameters,
+    };
+
+    try {
+      const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Chat API error: ${response.statusText}`);
+      }
+
+      if (!response.body) {
+        throw new Error('レスポンスボディがありません');
+      }
+
+      // ストリーミングレスポンスを処理
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter((line) => line.trim());
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+            if (data.message?.content) {
+              fullResponse += data.message.content;
+              yield fullResponse; // 累積的な内容を yield
+            }
+          } catch {
+            // JSON パースエラーは無視
+          }
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Chat エラー: ${error.message}`);
+      }
+      throw new Error('不明なエラーが発生しました');
+    }
 
     // 新しい応答を追加
     this.messages.push({
