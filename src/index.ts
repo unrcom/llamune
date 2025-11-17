@@ -27,6 +27,8 @@ import {
 import {
   saveConversation,
   listSessions,
+  getSession,
+  appendMessagesToSession,
 } from './utils/database.js';
 import * as readline from 'readline';
 
@@ -131,7 +133,8 @@ program
   .command('chat')
   .description('チャットを開始')
   .option('-m, --model <model>', 'モデルを指定')
-  .action(async (options: { model?: string }) => {
+  .option('-c, --continue <session-id>', '過去の会話を再開')
+  .action(async (options: { model?: string; continue?: string }) => {
     try {
       // Ollama の起動確認・自動起動
       const isRunning = await ensureOllamaRunning();
@@ -154,44 +157,101 @@ program
         process.exit(1);
       }
 
-      // モデルを選択
+      // 会話履歴とセッションID
+      let messages: ChatMessage[] = [];
+      let sessionId: number | null = null;
       let selectedModel: string;
 
-      if (options.model) {
-        // -m オプションで指定された場合
-        const modelExists = models.some((m) => m.name === options.model);
-        if (!modelExists) {
-          console.log(`❌ モデル "${options.model}" が見つかりません`);
+      // --continue オプションで過去の会話を再開
+      if (options.continue) {
+        const sid = parseInt(options.continue, 10);
+        const sessionData = getSession(sid);
+
+        if (!sessionData) {
+          console.log(`❌ セッションID ${sid} が見つかりません`);
           console.log('');
-          console.log('利用可能なモデル:');
-          models.forEach((m) => console.log(`  - ${m.name}`));
+          console.log('履歴を確認してください:');
+          console.log('  llamune history');
+          console.log('  llmn history');
           process.exit(1);
         }
-        selectedModel = options.model;
+
+        // 過去の会話を復元
+        sessionId = sid;
+        messages = sessionData.messages;
+        selectedModel = sessionData.session.model;
+
+        // モデルが存在するか確認
+        const modelExists = models.some((m) => m.name === selectedModel);
+        if (!modelExists) {
+          console.log(`❌ セッションのモデル "${selectedModel}" が見つかりません`);
+          console.log('');
+          console.log('モデルをインストールしてください:');
+          console.log(`  llamune pull ${selectedModel}`);
+          console.log(`  llmn pull ${selectedModel}`);
+          process.exit(1);
+        }
+
+        console.log('');
+        console.log('💬 Chat モード（会話を再開）');
+        console.log(`セッションID: ${sessionId}`);
+        console.log(`モデル: ${selectedModel}`);
+        console.log('');
+        console.log('--- 過去の会話 ---');
+        console.log('');
+
+        // 過去の会話を表示
+        messages.forEach((msg) => {
+          if (msg.role === 'user') {
+            console.log(`You: ${msg.content}`);
+          } else {
+            console.log(`AI: ${msg.content}`);
+          }
+          console.log('');
+        });
+
+        console.log('--- 会話の続きを開始 ---');
+        console.log('');
       } else {
-        // オプション未指定の場合、インタラクティブに選択
-        try {
-          const lastUsedModel = getLastUsedModel();
-          selectedModel = await selectModel(models, lastUsedModel);
-        } catch {
-          // 無効な選択の場合は終了
-          process.exit(1);
+        // 新規会話
+        // モデルを選択
+        if (options.model) {
+          // -m オプションで指定された場合
+          const modelExists = models.some((m) => m.name === options.model);
+          if (!modelExists) {
+            console.log(`❌ モデル "${options.model}" が見つかりません`);
+            console.log('');
+            console.log('利用可能なモデル:');
+            models.forEach((m) => console.log(`  - ${m.name}`));
+            process.exit(1);
+          }
+          selectedModel = options.model;
+        } else {
+          // オプション未指定の場合、インタラクティブに選択
+          try {
+            const lastUsedModel = getLastUsedModel();
+            selectedModel = await selectModel(models, lastUsedModel);
+          } catch {
+            // 無効な選択の場合は終了
+            process.exit(1);
+          }
         }
+
+        // 選択したモデルを保存
+        saveLastUsedModel(selectedModel);
+
+        console.log('');
+        console.log('💬 Chat モード');
+        console.log(`モデル: ${selectedModel}`);
+        console.log('');
       }
 
-      // 選択したモデルを保存
-      saveLastUsedModel(selectedModel);
-
-      console.log('');
-      console.log('💬 Chat モード');
-      console.log(`モデル: ${selectedModel}`);
-      console.log('');
       console.log('終了するには "exit" または "quit" と入力してください');
       console.log('---');
       console.log('');
 
-      // 会話履歴
-      const messages: ChatMessage[] = [];
+      // 初期のメッセージ数を記録（会話再開の場合）
+      const initialMessageCount = messages.length;
 
       // Readline インターフェース
       const rl = readline.createInterface({
@@ -266,11 +326,19 @@ program
       rl.on('close', () => {
         console.log('');
 
-        // 会話を保存（メッセージがある場合のみ）
-        if (messages.length > 0) {
+        // 新しいメッセージがある場合のみ保存
+        const newMessages = messages.slice(initialMessageCount);
+        if (newMessages.length > 0) {
           try {
-            const sessionId = saveConversation(selectedModel, messages);
-            console.log(`💾 会話を保存しました (ID: ${sessionId})`);
+            if (sessionId !== null) {
+              // 既存セッションに追加
+              appendMessagesToSession(sessionId, newMessages);
+              console.log(`💾 会話を保存しました (ID: ${sessionId})`);
+            } else {
+              // 新規セッション作成
+              const newSessionId = saveConversation(selectedModel, messages);
+              console.log(`💾 会話を保存しました (ID: ${newSessionId})`);
+            }
           } catch (error) {
             console.log('⚠️  会話の保存に失敗しました');
           }

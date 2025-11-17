@@ -128,6 +128,31 @@ export function saveConversation(
 }
 
 /**
+ * 既存セッションにメッセージを追加
+ */
+export function appendMessagesToSession(
+  sessionId: number,
+  messages: ChatMessage[]
+): void {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  // メッセージを一括追加
+  const insertMessage = db.prepare(
+    'INSERT INTO messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)'
+  );
+
+  for (const message of messages) {
+    insertMessage.run(sessionId, message.role, message.content, now);
+  }
+
+  // セッションの更新日時を更新
+  db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
+
+  db.close();
+}
+
+/**
  * セッション一覧を取得
  */
 export function listSessions(limit = 10): ChatSession[] {
