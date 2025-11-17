@@ -425,9 +425,10 @@ program
                   previousResponse: previousResponse,
                 };
 
+                const previousModelName = previousResponse.model || 'previous model';
                 console.log('💡 この回答を採用しますか？');
-                console.log('  /yes - 採用（前の回答を置き換え）');
-                console.log('  /no  - 破棄（前の回答を維持）');
+                console.log(`  /yes - 採用 (${retryModel} の回答を採用する)`);
+                console.log(`  /no  - 破棄 (${previousModelName} の回答を採用する)`);
                 console.log('');
               } catch (error) {
                 stopSpinner(retrySpinner);
