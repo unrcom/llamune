@@ -13,6 +13,7 @@ import {
   chatWithModel,
   OllamaError,
   type ChatMessage,
+  type ChatParameters,
 } from './utils/ollama.js';
 import {
   getSystemSpec,
@@ -31,6 +32,8 @@ import {
   appendMessagesToSession,
   getSessionMessagesWithTurns,
   logicalDeleteMessagesAfterTurn,
+  getAllParameterPresets,
+  type ParameterPreset,
 } from './utils/database.js';
 import * as readline from 'readline';
 
@@ -110,6 +113,41 @@ async function selectModel(
 }
 
 /**
+ * パラメータプリセットを選択（インタラクティブ）
+ */
+async function selectPreset(presets: ParameterPreset[]): Promise<ParameterPreset> {
+  return new Promise((resolve, reject) => {
+    console.log('パラメータプリセットを選択:');
+    console.log('');
+
+    presets.forEach((preset, index) => {
+      const description = preset.description ? ` - ${preset.description}` : '';
+      console.log(`  ${index + 1}. ${preset.display_name}${description}`);
+    });
+
+    console.log('');
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    rl.question('プリセットを選択してください (番号): ', (answer) => {
+      rl.close();
+
+      const num = parseInt(answer.trim(), 10);
+      if (num >= 1 && num <= presets.length) {
+        resolve(presets[num - 1]);
+      } else {
+        console.log('');
+        console.log('❌ 無効な番号です');
+        reject(new Error('Invalid preset selection'));
+      }
+    });
+  });
+}
+
+/**
  * スピナーを表示
  */
 function showSpinner(): NodeJS.Timeout {
@@ -163,6 +201,7 @@ program
       let messages: ChatMessage[] = [];
       let sessionId: number | null = null;
       let selectedModel: string;
+      let selectedParameters: ChatParameters | undefined = undefined;
 
       // /retry で保留中の回答
       let pendingRetry: { response: string; model: string; previousResponse: ChatMessage } | null = null;
@@ -201,6 +240,27 @@ program
           console.log(`  llamune pull ${selectedModel}`);
           console.log(`  llmn pull ${selectedModel}`);
           process.exit(1);
+        }
+
+        // プリセットを選択
+        const presets = getAllParameterPresets();
+        if (presets.length > 0) {
+          try {
+            const selectedPreset = await selectPreset(presets);
+            console.log('');
+            console.log(`✅ プリセット: ${selectedPreset.display_name}`);
+
+            // パラメータを設定（nullでないものだけ）
+            selectedParameters = {};
+            if (selectedPreset.temperature !== null) selectedParameters.temperature = selectedPreset.temperature;
+            if (selectedPreset.top_p !== null) selectedParameters.top_p = selectedPreset.top_p;
+            if (selectedPreset.top_k !== null) selectedParameters.top_k = selectedPreset.top_k;
+            if (selectedPreset.repeat_penalty !== null) selectedParameters.repeat_penalty = selectedPreset.repeat_penalty;
+            if (selectedPreset.num_ctx !== null) selectedParameters.num_ctx = selectedPreset.num_ctx;
+          } catch {
+            // プリセット選択失敗の場合は終了
+            process.exit(1);
+          }
         }
 
         console.log('');
@@ -251,6 +311,28 @@ program
 
         // 選択したモデルを保存
         saveLastUsedModel(selectedModel);
+
+        // プリセットを選択
+        const presets = getAllParameterPresets();
+        if (presets.length > 0) {
+          console.log('');
+          try {
+            const selectedPreset = await selectPreset(presets);
+            console.log('');
+            console.log(`✅ プリセット: ${selectedPreset.display_name}`);
+
+            // パラメータを設定（nullでないものだけ）
+            selectedParameters = {};
+            if (selectedPreset.temperature !== null) selectedParameters.temperature = selectedPreset.temperature;
+            if (selectedPreset.top_p !== null) selectedParameters.top_p = selectedPreset.top_p;
+            if (selectedPreset.top_k !== null) selectedParameters.top_k = selectedPreset.top_k;
+            if (selectedPreset.repeat_penalty !== null) selectedParameters.repeat_penalty = selectedPreset.repeat_penalty;
+            if (selectedPreset.num_ctx !== null) selectedParameters.num_ctx = selectedPreset.num_ctx;
+          } catch {
+            // プリセット選択失敗の場合は終了
+            process.exit(1);
+          }
+        }
 
         console.log('');
         console.log('💬 Chat モード');
@@ -336,7 +418,7 @@ program
               }
               retryResponse += chunk;
               process.stdout.write(chunk);
-            });
+            }, selectedParameters);
 
             process.stdout.write('\n\n');
 
@@ -482,6 +564,7 @@ program
               console.log('  /switch <model> - モデルを切り替え');
               console.log('  /models         - 利用可能なモデル一覧');
               console.log('  /current        - 現在のモデルを表示');
+              console.log('  /params         - パラメータを表示・調整');
               console.log('  /history        - 現在の会話履歴を表示');
               console.log('  /rewind <番号>  - 指定した往復まで巻き戻し');
               console.log('  /help           - このヘルプを表示');
@@ -493,6 +576,36 @@ program
             case '/current':
               console.log('');
               console.log(`📦 現在のモデル: ${selectedModel}`);
+              console.log('');
+              rl.prompt();
+              return;
+
+            case '/params':
+              console.log('');
+              console.log('⚙️  現在のパラメータ設定:');
+              console.log('');
+              console.log(`  temperature:     ${selectedParameters?.temperature ?? 'デフォルト'}`);
+              console.log(`  top_p:           ${selectedParameters?.top_p ?? 'デフォルト'}`);
+              console.log(`  top_k:           ${selectedParameters?.top_k ?? 'デフォルト'}`);
+              console.log(`  repeat_penalty:  ${selectedParameters?.repeat_penalty ?? 'デフォルト'}`);
+              console.log(`  num_ctx:         ${selectedParameters?.num_ctx ?? 'デフォルト'}`);
+              console.log('');
+              console.log('💡 パラメータの説明:');
+              console.log('  temperature     - ランダム性 (0.0-2.0, 低いほど決定的)');
+              console.log('  top_p           - 確率しきい値 (0.0-1.0)');
+              console.log('  top_k           - 候補数の制限 (1-100)');
+              console.log('  repeat_penalty  - 繰り返し抑制 (1.0-2.0)');
+              console.log('  num_ctx         - コンテキスト長 (512-8192)');
+              console.log('');
+              console.log('変更するには、次のように入力してください:');
+              console.log('  temperature=0.5');
+              console.log('  top_p=0.9');
+              console.log('');
+              console.log('プリセットから選択するには:');
+              const allPresets = getAllParameterPresets();
+              allPresets.forEach((p, i) => {
+                console.log(`  preset=${i + 1}  - ${p.display_name}`);
+              });
               console.log('');
               rl.prompt();
               return;
@@ -613,7 +726,7 @@ program
                   }
                   retryResponse += chunk;
                   process.stdout.write(chunk);
-                });
+                }, selectedParameters);
 
                 process.stdout.write('\n\n');
 
@@ -858,6 +971,107 @@ program
           }
         }
 
+        // パラメータ変更処理（key=value 形式）
+        if (userInput.includes('=')) {
+          const [key, value] = userInput.split('=').map((s) => s.trim());
+
+          // プリセット選択
+          if (key === 'preset') {
+            const presetNum = parseInt(value, 10);
+            const allPresets = getAllParameterPresets();
+
+            if (isNaN(presetNum) || presetNum < 1 || presetNum > allPresets.length) {
+              console.log('');
+              console.log('❌ 無効なプリセット番号です');
+              console.log('');
+              rl.prompt();
+              return;
+            }
+
+            const preset = allPresets[presetNum - 1];
+            selectedParameters = {};
+            if (preset.temperature !== null) selectedParameters.temperature = preset.temperature;
+            if (preset.top_p !== null) selectedParameters.top_p = preset.top_p;
+            if (preset.top_k !== null) selectedParameters.top_k = preset.top_k;
+            if (preset.repeat_penalty !== null) selectedParameters.repeat_penalty = preset.repeat_penalty;
+            if (preset.num_ctx !== null) selectedParameters.num_ctx = preset.num_ctx;
+
+            console.log('');
+            console.log(`✅ プリセット「${preset.display_name}」を適用しました`);
+            console.log('');
+            rl.prompt();
+            return;
+          }
+
+          // 個別パラメータ変更
+          const validParams = ['temperature', 'top_p', 'top_k', 'repeat_penalty', 'num_ctx'];
+          if (validParams.includes(key)) {
+            const numValue = parseFloat(value);
+
+            if (isNaN(numValue)) {
+              console.log('');
+              console.log('❌ 無効な値です（数値を入力してください）');
+              console.log('');
+              rl.prompt();
+              return;
+            }
+
+            // バリデーション
+            if (key === 'temperature' && (numValue < 0 || numValue > 2)) {
+              console.log('');
+              console.log('❌ temperature は 0.0 〜 2.0 の範囲で指定してください');
+              console.log('');
+              rl.prompt();
+              return;
+            }
+
+            if (key === 'top_p' && (numValue < 0 || numValue > 1)) {
+              console.log('');
+              console.log('❌ top_p は 0.0 〜 1.0 の範囲で指定してください');
+              console.log('');
+              rl.prompt();
+              return;
+            }
+
+            if (key === 'top_k' && (numValue < 1 || numValue > 100)) {
+              console.log('');
+              console.log('❌ top_k は 1 〜 100 の範囲で指定してください');
+              console.log('');
+              rl.prompt();
+              return;
+            }
+
+            if (key === 'repeat_penalty' && (numValue < 1 || numValue > 2)) {
+              console.log('');
+              console.log('❌ repeat_penalty は 1.0 〜 2.0 の範囲で指定してください');
+              console.log('');
+              rl.prompt();
+              return;
+            }
+
+            if (key === 'num_ctx' && (numValue < 512 || numValue > 8192)) {
+              console.log('');
+              console.log('❌ num_ctx は 512 〜 8192 の範囲で指定してください');
+              console.log('');
+              rl.prompt();
+              return;
+            }
+
+            // パラメータを更新
+            if (!selectedParameters) {
+              selectedParameters = {};
+            }
+
+            (selectedParameters as any)[key] = numValue;
+
+            console.log('');
+            console.log(`✅ ${key} を ${numValue} に設定しました`);
+            console.log('');
+            rl.prompt();
+            return;
+          }
+        }
+
         // 通常のメッセージ処理
         // もしモデル選択待ち状態の場合は、キャンセル
         if (pendingRetryModelSelection) {
@@ -907,7 +1121,7 @@ program
             }
             fullResponse += chunk;
             process.stdout.write(chunk);
-          });
+          }, selectedParameters);
 
           // アシスタントの応答を履歴に追加（モデル名も記録）
           messages.push({

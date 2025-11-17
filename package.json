@@ -18,7 +18,8 @@
     "check-db": "tsx scripts/check-db.ts",
     "update-models": "tsx scripts/update-recommended-models.ts",
     "migrate": "tsx scripts/migrate-add-model-column.ts",
-    "migrate:deleted-at": "tsx scripts/migrate-add-deleted-at.ts"
+    "migrate:deleted-at": "tsx scripts/migrate-add-deleted-at.ts",
+    "migrate:presets": "tsx scripts/migrate-add-parameter-presets.ts"
   },
   "keywords": [
     "llm",

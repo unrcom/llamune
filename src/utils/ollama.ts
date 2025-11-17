@@ -234,12 +234,25 @@ export interface ChatMessage {
 }
 
 /**
+ * Chat パラメータの型定義
+ */
+export interface ChatParameters {
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  repeat_penalty?: number;
+  num_ctx?: number;
+  seed?: number;
+}
+
+/**
  * Chat リクエストの型定義
  */
 export interface ChatRequest {
   model: string;
   messages: ChatMessage[];
   stream?: boolean;
+  options?: ChatParameters;
 }
 
 /**
@@ -257,17 +270,24 @@ export interface ChatResponse {
  * @param modelName モデル名
  * @param messages 会話履歴
  * @param onChunk ストリーミングチャンクを受信したときのコールバック
+ * @param parameters オプションのチャットパラメータ
  */
 export async function chatWithModel(
   modelName: string,
   messages: ChatMessage[],
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  parameters?: ChatParameters
 ): Promise<void> {
   const request: ChatRequest = {
     model: modelName,
     messages,
     stream: true,
   };
+
+  // パラメータが指定されている場合は追加
+  if (parameters) {
+    request.options = parameters;
+  }
 
   try {
     const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {

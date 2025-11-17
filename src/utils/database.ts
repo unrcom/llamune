@@ -39,6 +39,22 @@ export interface RecommendedModel {
 }
 
 /**
+ * パラメータプリセットの型定義
+ */
+export interface ParameterPreset {
+  id: number;
+  name: string;
+  display_name: string;
+  description: string | null;
+  temperature: number | null;
+  top_p: number | null;
+  top_k: number | null;
+  repeat_penalty: number | null;
+  num_ctx: number | null;
+  created_at: string;
+}
+
+/**
  * データベースを初期化
  */
 export function initDatabase(): Database.Database {
@@ -454,4 +470,64 @@ export function logicalDeleteMessagesAfterTurn(sessionId: number, turnNumber: nu
 
   db.close();
   return result.changes;
+}
+
+/**
+ * すべてのパラメータプリセットを取得
+ */
+export function getAllParameterPresets(): ParameterPreset[] {
+  const db = initDatabase();
+
+  const presets = db
+    .prepare(
+      `
+      SELECT *
+      FROM parameter_presets
+      ORDER BY id ASC
+    `
+    )
+    .all() as ParameterPreset[];
+
+  db.close();
+  return presets;
+}
+
+/**
+ * 名前でパラメータプリセットを取得
+ */
+export function getParameterPresetByName(name: string): ParameterPreset | null {
+  const db = initDatabase();
+
+  const preset = db
+    .prepare(
+      `
+      SELECT *
+      FROM parameter_presets
+      WHERE name = ?
+    `
+    )
+    .get(name) as ParameterPreset | undefined;
+
+  db.close();
+  return preset || null;
+}
+
+/**
+ * IDでパラメータプリセットを取得
+ */
+export function getParameterPresetById(id: number): ParameterPreset | null {
+  const db = initDatabase();
+
+  const preset = db
+    .prepare(
+      `
+      SELECT *
+      FROM parameter_presets
+      WHERE id = ?
+    `
+    )
+    .get(id) as ParameterPreset | undefined;
+
+  db.close();
+  return preset || null;
 }
