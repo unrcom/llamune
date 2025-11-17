@@ -556,5 +556,28 @@ program
     }
   });
 
+// recommend コマンド
+program
+  .command('recommend')
+  .description('推奨モデルを表示')
+  .action(() => {
+    try {
+      console.log('🎯 推奨モデル');
+      console.log('');
+
+      // システムスペックを取得
+      const spec = getSystemSpec();
+      displaySystemSpec(spec);
+
+      // 推奨モデルを表示
+      const recommended = getRecommendedModels(spec);
+      displayRecommendedModels(recommended);
+    } catch (error) {
+      console.error('❌ 推奨モデルの取得に失敗しました');
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
 // コマンドをパース
 program.parse(process.argv);

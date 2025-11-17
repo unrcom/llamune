@@ -26,6 +26,19 @@ export interface ChatSession {
 }
 
 /**
+ * 推奨モデルの型定義
+ */
+export interface RecommendedModel {
+  id: number;
+  min_memory_gb: number;
+  max_memory_gb: number | null;
+  model_name: string;
+  model_size: string;
+  description: string;
+  priority: number;
+}
+
+/**
  * データベースを初期化
  */
 export function initDatabase(): Database.Database {
@@ -55,6 +68,20 @@ export function initDatabase(): Database.Database {
       content TEXT NOT NULL,
       created_at TEXT NOT NULL,
       FOREIGN KEY (session_id) REFERENCES sessions(id)
+    )
+  `);
+
+  // 推奨モデルテーブル
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS recommended_models (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      min_memory_gb INTEGER NOT NULL,
+      max_memory_gb INTEGER,
+      model_name TEXT NOT NULL,
+      model_size TEXT NOT NULL,
+      description TEXT NOT NULL,
+      priority INTEGER NOT NULL,
+      created_at TEXT NOT NULL
     )
   `);
 
@@ -244,4 +271,98 @@ export function getSession(sessionId: number): {
     session,
     messages,
   };
+}
+
+/**
+ * デフォルトの推奨モデルを初期化
+ */
+export function initializeDefaultRecommendedModels(): void {
+  const db = initDatabase();
+
+  // 既にデータがあるかチェック
+  const count = db
+    .prepare('SELECT COUNT(*) as count FROM recommended_models')
+    .get() as { count: number };
+
+  if (count.count > 0) {
+    // 既にデータがあれば何もしない
+    db.close();
+    return;
+  }
+
+  const now = new Date().toISOString();
+
+  // デフォルトの推奨モデルデータ
+  const defaultModels = [
+    // 8GB以下
+    { min: 0, max: 8, name: 'gemma2:2b', size: '1.6 GB', desc: '軽量で高速。低スペックPCに最適', priority: 1 },
+    { min: 0, max: 8, name: 'qwen2.5:3b', size: '2.0 GB', desc: 'コンパクトながら高性能', priority: 2 },
+    // 9-16GB
+    { min: 9, max: 16, name: 'gemma2:9b', size: '5.4 GB', desc: 'バランス型。品質と速度を両立', priority: 1 },
+    { min: 9, max: 16, name: 'qwen2.5:7b', size: '4.7 GB', desc: '日本語性能が高い', priority: 2 },
+    // 17GB以上
+    { min: 17, max: null, name: 'gemma2:27b', size: '16 GB', desc: '最高性能。複雑なタスクを高精度で処理', priority: 1 },
+    { min: 17, max: null, name: 'qwen2.5:14b', size: '8.5 GB', desc: '高性能。日本語処理に優れる', priority: 2 },
+    { min: 17, max: null, name: 'deepseek-r1:7b', size: '4.7 GB', desc: '推論特化。思考プロセスを表示', priority: 3 },
+  ];
+
+  const insert = db.prepare(
+    'INSERT INTO recommended_models (min_memory_gb, max_memory_gb, model_name, model_size, description, priority, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  );
+
+  for (const model of defaultModels) {
+    insert.run(
+      model.min,
+      model.max,
+      model.name,
+      model.size,
+      model.desc,
+      model.priority,
+      now
+    );
+  }
+
+  db.close();
+}
+
+/**
+ * システムメモリに基づいて推奨モデルを取得
+ */
+export function getRecommendedModelsByMemory(memoryGB: number): RecommendedModel[] {
+  const db = initDatabase();
+
+  const models = db
+    .prepare(
+      `
+      SELECT *
+      FROM recommended_models
+      WHERE min_memory_gb <= ?
+        AND (max_memory_gb IS NULL OR max_memory_gb >= ?)
+      ORDER BY priority ASC
+    `
+    )
+    .all(memoryGB, memoryGB) as RecommendedModel[];
+
+  db.close();
+  return models;
+}
+
+/**
+ * すべての推奨モデルを取得
+ */
+export function getAllRecommendedModels(): RecommendedModel[] {
+  const db = initDatabase();
+
+  const models = db
+    .prepare(
+      `
+      SELECT *
+      FROM recommended_models
+      ORDER BY min_memory_gb ASC, priority ASC
+    `
+    )
+    .all() as RecommendedModel[];
+
+  db.close();
+  return models;
 }

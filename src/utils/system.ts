@@ -3,6 +3,11 @@
  */
 
 import os from 'os';
+import {
+  getRecommendedModelsByMemory,
+  initializeDefaultRecommendedModels,
+  type RecommendedModel as DBRecommendedModel,
+} from './database.js';
 
 /**
  * システムスペック情報
@@ -15,13 +20,13 @@ export interface SystemSpec {
 }
 
 /**
- * 推奨モデル情報
+ * 推奨モデル情報（表示用）
  */
 export interface RecommendedModel {
   name: string;
   size: string;
   description: string;
-  priority: number; // 1が最優先
+  priority: number;
 }
 
 /**
@@ -43,68 +48,24 @@ export function getSystemSpec(): SystemSpec {
 }
 
 /**
- * スペックに応じた推奨モデルを取得
+ * スペックに応じた推奨モデルを取得（データベースから）
  */
 export function getRecommendedModels(spec: SystemSpec): RecommendedModel[] {
   const { totalMemoryGB } = spec;
 
-  // RAM 8GB以下
-  if (totalMemoryGB <= 8) {
-    return [
-      {
-        name: 'gemma2:2b',
-        size: '1.6 GB',
-        description: '軽量で高速。低スペックPCに最適',
-        priority: 1,
-      },
-      {
-        name: 'qwen2.5:3b',
-        size: '2.0 GB',
-        description: 'コンパクトながら高性能',
-        priority: 2,
-      },
-    ];
-  }
+  // データベースが未初期化の場合は初期化
+  initializeDefaultRecommendedModels();
 
-  // RAM 16GB
-  if (totalMemoryGB <= 16) {
-    return [
-      {
-        name: 'gemma2:9b',
-        size: '5.4 GB',
-        description: 'バランス型。品質と速度を両立',
-        priority: 1,
-      },
-      {
-        name: 'qwen2.5:7b',
-        size: '4.7 GB',
-        description: '日本語性能が高い',
-        priority: 2,
-      },
-    ];
-  }
+  // データベースから推奨モデルを取得
+  const dbModels = getRecommendedModelsByMemory(totalMemoryGB);
 
-  // RAM 32GB以上
-  return [
-    {
-      name: 'gemma2:27b',
-      size: '16 GB',
-      description: '最高性能。複雑なタスクを高精度で処理',
-      priority: 1,
-    },
-    {
-      name: 'qwen2.5:14b',
-      size: '8.5 GB',
-      description: '高性能。日本語処理に優れる',
-      priority: 2,
-    },
-    {
-      name: 'deepseek-r1:7b',
-      size: '4.7 GB',
-      description: '推論特化。思考プロセスを表示',
-      priority: 3,
-    },
-  ];
+  // 表示用の形式に変換
+  return dbModels.map((model) => ({
+    name: model.model_name,
+    size: model.model_size,
+    description: model.description,
+    priority: model.priority,
+  }));
 }
 
 /**
