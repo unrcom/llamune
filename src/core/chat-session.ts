@@ -14,6 +14,7 @@ import {
   logicalDeleteMessagesAfterTurn,
   getParameterPresetById,
   getAllParameterPresets,
+  updateSessionModel,
 } from '../utils/database.js';
 
 /**
@@ -218,6 +219,11 @@ export class ChatSession {
     this.model = modelName;
     this.parameters = parameters;
 
+    // セッションがある場合はデータベースも更新
+    if (this.sessionId) {
+      updateSessionModel(this.sessionId, modelName);
+    }
+
     return fullResponse;
   }
 
@@ -242,6 +248,11 @@ export class ChatSession {
    */
   switchModel(modelName: string): void {
     this.model = modelName;
+
+    // セッションがある場合はデータベースも更新
+    if (this.sessionId) {
+      updateSessionModel(this.sessionId, modelName);
+    }
   }
 
   /**

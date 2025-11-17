@@ -560,6 +560,26 @@ export function getAllSessions(): ChatSession[] {
 }
 
 /**
+ * セッションのモデルを更新
+ */
+export function updateSessionModel(sessionId: number, modelName: string): boolean {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare('UPDATE sessions SET model = ?, updated_at = ? WHERE id = ?')
+      .run(modelName, now, sessionId);
+
+    db.close();
+    return result.changes > 0;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
  * セッションを削除
  */
 export function deleteSession(sessionId: number): boolean {
