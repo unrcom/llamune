@@ -170,6 +170,9 @@ program
       // /rewind で保留中の巻き戻し
       let pendingRewind: { sessionId: number; turnNumber: number } | null = null;
 
+      // /retry のモデル選択待ち
+      let pendingRetryModelSelection = false;
+
       // --continue オプションで過去の会話を再開
       if (options.continue) {
         const sid = parseInt(options.continue, 10);
@@ -286,6 +289,89 @@ program
           return;
         }
 
+        // /retry のモデル選択待ち処理
+        if (pendingRetryModelSelection) {
+          const modelNumber = parseInt(userInput, 10);
+
+          if (isNaN(modelNumber) || modelNumber < 1 || modelNumber > models.length) {
+            console.log('');
+            console.log('❌ 有効な番号を入力してください');
+            console.log('');
+            rl.prompt();
+            return;
+          }
+
+          const retryModel = models[modelNumber - 1].name;
+
+          // 最後のメッセージがアシスタントでない場合
+          if (messages.length === 0 || messages[messages.length - 1].role !== 'assistant') {
+            console.log('');
+            console.log('❌ 再実行する回答がありません');
+            console.log('');
+            pendingRetryModelSelection = false;
+            rl.prompt();
+            return;
+          }
+
+          console.log('');
+          console.log(`🔄 ${retryModel} で再実行します...`);
+          console.log('');
+
+          const retrySpinner = showSpinner();
+          let retryResponse = '';
+          let retryFirstChunk = true;
+
+          // 最後のアシスタントの応答を保存（後で復元できるように）
+          const previousResponse = messages[messages.length - 1];
+
+          // 一時的にアシスタントの応答を削除して再実行
+          messages.pop();
+
+          try {
+            await chatWithModel(retryModel, messages, (chunk) => {
+              if (retryFirstChunk) {
+                stopSpinner(retrySpinner);
+                process.stdout.write(`AI (${retryModel}): `);
+                retryFirstChunk = false;
+              }
+              retryResponse += chunk;
+              process.stdout.write(chunk);
+            });
+
+            process.stdout.write('\n\n');
+
+            // 保留中の回答として保存（まだmessagesには追加しない）
+            pendingRetry = {
+              response: retryResponse,
+              model: retryModel,
+              previousResponse: previousResponse,
+            };
+
+            const previousModelName = previousResponse.model || 'previous model';
+            console.log('💡 この回答を採用しますか？');
+            console.log(`  yes, y  - 採用 (${retryModel} の回答を採用する)`);
+            console.log(`  no, n   - 破棄 (${previousModelName} の回答を採用する)`);
+            console.log('');
+          } catch (error) {
+            stopSpinner(retrySpinner);
+            console.error('\n');
+            if (error instanceof OllamaError) {
+              console.error('❌ エラー:', error.message);
+            } else {
+              console.error('❌ 予期しないエラーが発生しました');
+            }
+            console.log('');
+            // エラーの場合は元の応答を復元
+            messages.push(previousResponse);
+          }
+
+          // モデル選択待ち状態を解除
+          pendingRetryModelSelection = false;
+
+          rl.prompt();
+          return;
+        }
+
         // yes/no の簡易入力処理（スラッシュなしでも認識）
         const lowerInput = userInput.toLowerCase();
         if (lowerInput === 'yes' || lowerInput === 'y') {
@@ -381,7 +467,7 @@ program
               console.log('');
               console.log('📖 コマンド一覧:');
               console.log('');
-              console.log('  /retry <model>  - 最後の質問を別のモデルで再実行');
+              console.log('  /retry          - 最後の質問を別のモデルで再実行（対話的選択）');
               console.log('  yes, y, /yes    - retry の回答を採用');
               console.log('  no, n, /no      - retry の回答を破棄');
               console.log('  /switch <model> - モデルを切り替え');
@@ -462,9 +548,22 @@ program
               }
 
               if (args.length === 0) {
+                // 引数なしの場合、モデル選択画面を表示
                 console.log('');
-                console.log('❌ モデル名を指定してください: /retry <model>');
+                console.log('利用可能なモデル:');
                 console.log('');
+                models.forEach((model, index) => {
+                  const isLast = model.name === selectedModel;
+                  const prefix = isLast ? '⭐' : '  ';
+                  const suffix = isLast ? ' (現在使用中)' : '';
+                  console.log(`${prefix} ${index + 1}. ${model.name}${suffix}`);
+                });
+                console.log('');
+                console.log('モデルを選択してください (番号): ');
+
+                // モデル選択待ち状態にする
+                pendingRetryModelSelection = true;
+
                 rl.prompt();
                 return;
               }
@@ -733,6 +832,14 @@ program
         }
 
         // 通常のメッセージ処理
+        // もしモデル選択待ち状態の場合は、キャンセル
+        if (pendingRetryModelSelection) {
+          console.log('');
+          console.log('ℹ️  モデル選択をキャンセルしました');
+          console.log('');
+          pendingRetryModelSelection = false;
+        }
+
         // もし保留中の回答がある場合は、元の回答を復元
         if (pendingRetry) {
           messages.push(pendingRetry.previousResponse);
