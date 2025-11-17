@@ -168,7 +168,7 @@ program
       let pendingRetry: { response: string; model: string; previousResponse: ChatMessage } | null = null;
 
       // /rewind で保留中の巻き戻し
-      let pendingRewind: { sessionId: number; turnNumber: number } | null = null;
+      let pendingRewind: { sessionId: number | null; turnNumber: number } | null = null;
 
       // /retry のモデル選択待ち
       let pendingRetryModelSelection = false;
@@ -398,19 +398,28 @@ program
 
           // /rewind の実行
           if (pendingRewind) {
-            const deletedCount = logicalDeleteMessagesAfterTurn(
-              pendingRewind.sessionId,
-              pendingRewind.turnNumber
-            );
+            let deletedCount = 0;
+
+            // セッションがある場合は DB も更新
+            if (pendingRewind.sessionId !== null) {
+              deletedCount = logicalDeleteMessagesAfterTurn(
+                pendingRewind.sessionId,
+                pendingRewind.turnNumber
+              );
+            } else {
+              // 新規会話の場合は削除されるメッセージ数を計算
+              const keepCount = pendingRewind.turnNumber * 2;
+              deletedCount = messages.length - keepCount;
+            }
+
+            // メモリ上の messages 配列も更新
+            const keepCount = pendingRewind.turnNumber * 2;
+            messages = messages.slice(0, keepCount);
 
             console.log('');
             console.log(`✅ 会話 #${pendingRewind.turnNumber} まで巻き戻しました`);
             console.log(`削除されたメッセージ: ${deletedCount}件`);
             console.log('');
-
-            // メモリ上の messages 配列も更新
-            const keepCount = pendingRewind.turnNumber * 2;
-            messages = messages.slice(0, keepCount);
 
             // 保留中の巻き戻しをクリア
             pendingRewind = null;
@@ -659,19 +668,28 @@ program
 
               // /rewind の実行
               if (pendingRewind) {
-                const deletedCount = logicalDeleteMessagesAfterTurn(
-                  pendingRewind.sessionId,
-                  pendingRewind.turnNumber
-                );
+                let yesDeletedCount = 0;
 
-                console.log('');
-                console.log(`✅ 会話 #${pendingRewind.turnNumber} まで巻き戻しました`);
-                console.log(`削除されたメッセージ: ${deletedCount}件`);
-                console.log('');
+                // セッションがある場合は DB も更新
+                if (pendingRewind.sessionId !== null) {
+                  yesDeletedCount = logicalDeleteMessagesAfterTurn(
+                    pendingRewind.sessionId,
+                    pendingRewind.turnNumber
+                  );
+                } else {
+                  // 新規会話の場合は削除されるメッセージ数を計算
+                  const yesKeepCount = pendingRewind.turnNumber * 2;
+                  yesDeletedCount = messages.length - yesKeepCount;
+                }
 
                 // メモリ上の messages 配列も更新
                 const keepCount = pendingRewind.turnNumber * 2;
                 messages = messages.slice(0, keepCount);
+
+                console.log('');
+                console.log(`✅ 会話 #${pendingRewind.turnNumber} まで巻き戻しました`);
+                console.log(`削除されたメッセージ: ${yesDeletedCount}件`);
+                console.log('');
 
                 // 保留中の巻き戻しをクリア
                 pendingRewind = null;
@@ -768,14 +786,6 @@ program
               return;
 
             case '/rewind':
-              if (!sessionId) {
-                console.log('');
-                console.log('❌ セッションIDがありません（新規会話では使用できません）');
-                console.log('');
-                rl.prompt();
-                return;
-              }
-
               if (args.length === 0) {
                 console.log('');
                 console.log('❌ 巻き戻す往復番号を指定してください: /rewind <番号>');
@@ -794,21 +804,38 @@ program
               }
 
               // 現在の往復数を取得
-              const currentTurns = getSessionMessagesWithTurns(sessionId);
-              if (rewindTurn >= currentTurns.length) {
+              let rewindCurrentTurns;
+              if (sessionId) {
+                // セッションがある場合は DB から取得
+                rewindCurrentTurns = getSessionMessagesWithTurns(sessionId);
+              } else {
+                // 新規会話の場合はメモリから往復を作成
+                rewindCurrentTurns = [];
+                for (let i = 0; i < messages.length; i += 2) {
+                  if (i + 1 < messages.length && messages[i].role === 'user' && messages[i + 1].role === 'assistant') {
+                    rewindCurrentTurns.push({
+                      turnNumber: Math.floor(i / 2) + 1,
+                      user: messages[i],
+                      assistant: messages[i + 1],
+                    });
+                  }
+                }
+              }
+
+              if (rewindTurn >= rewindCurrentTurns.length) {
                 console.log('');
-                console.log(`❌ 往復 #${rewindTurn} は存在しません（現在: ${currentTurns.length} 往復）`);
+                console.log(`❌ 往復 #${rewindTurn} は存在しません（現在: ${rewindCurrentTurns.length} 往復）`);
                 console.log('');
                 rl.prompt();
                 return;
               }
 
               // 削除される往復数を計算
-              const deletedTurns = currentTurns.length - rewindTurn;
+              const deletedTurns = rewindCurrentTurns.length - rewindTurn;
 
               console.log('');
               console.log(`⏪ 会話 #${rewindTurn} まで巻き戻します`);
-              console.log(`削除される往復: #${rewindTurn + 1}〜#${currentTurns.length} (${deletedTurns}往復)`);
+              console.log(`削除される往復: #${rewindTurn + 1}〜#${rewindCurrentTurns.length} (${deletedTurns}往復)`);
               console.log('');
               console.log('この操作を実行しますか？');
               console.log('  yes, y - 巻き戻しを実行');
