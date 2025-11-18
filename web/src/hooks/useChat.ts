@@ -35,7 +35,7 @@ export function useChat() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer your-api-key-here',
+          'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
         },
         body: JSON.stringify({
           sessionId: currentSessionId,
