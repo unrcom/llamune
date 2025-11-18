@@ -72,7 +72,7 @@ export function RetryModal({
                       {model.name}
                     </span>
                     <span className="text-gray-600 dark:text-gray-400">
-                      ({preset?.name ?? 'デフォルト'})
+                      ({preset ? 'creative' : 'default'})
                     </span>
                   </div>
                 </button>
