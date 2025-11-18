@@ -35,6 +35,13 @@ export function SessionList() {
     loadSessions();
   }, []);
 
+  // currentSessionIdが変更されたら（新しいセッションが作成されたら）一覧を更新
+  useEffect(() => {
+    if (currentSessionId) {
+      loadSessions();
+    }
+  }, [currentSessionId]);
+
   const handleNewChat = () => {
     resetChat();
   };
