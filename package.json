@@ -22,7 +22,8 @@
     "migrate": "tsx scripts/migrate-add-model-column.ts",
     "migrate:deleted-at": "tsx scripts/migrate-add-deleted-at.ts",
     "migrate:presets": "tsx scripts/migrate-add-parameter-presets.ts",
-    "migrate:remove-precise": "tsx scripts/migrate-remove-precise-preset.ts"
+    "migrate:remove-precise": "tsx scripts/migrate-remove-precise-preset.ts",
+    "migrate:default-preset": "tsx scripts/migrate-update-default-preset.ts"
   },
   "keywords": [
     "llm",
