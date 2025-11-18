@@ -1,34 +1,19 @@
-/**
- * Vitest global setup
- */
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
-// Set test environment variables
-process.env.NODE_ENV = 'test';
-
-// Global test configuration
-export const TEST_API_BASE = 'http://localhost:3000';
-export const TEST_API_KEY = 'sk_llamune_default_key_change_this';
-
-// Wait for API server to be ready
-export async function waitForApiServer(maxAttempts = 10): Promise<boolean> {
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      const response = await fetch(`${TEST_API_BASE}/health`);
-      if (response.ok) {
-        return true;
-      }
-    } catch {
-      // Server not ready yet
+// Load API key from config file
+function loadApiKey(): string {
+  try {
+    const configPath = join(process.cwd(), 'config/api-keys.json');
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    if (config.keys && config.keys.length > 0) {
+      return config.keys[0].key;
     }
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  } catch (error) {
+    console.error('Failed to load API key from config/api-keys.json:', error);
   }
-  return false;
+  throw new Error('No API key found in config/api-keys.json');
 }
 
-// Verify API server is running before tests
-beforeAll(async () => {
-  const isReady = await waitForApiServer();
-  if (!isReady) {
-    throw new Error('API server is not running. Please start it with: npm run api');
-  }
-});
+export const TEST_API_BASE = 'http://localhost:3000';
+export const TEST_API_KEY = loadApiKey();
