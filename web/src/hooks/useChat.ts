@@ -81,7 +81,6 @@ export function useChat() {
             if (parsed.content) {
               fullContent = parsed.content;
               setStreamingContent(fullContent);
-              console.log('📝 Streaming content updated:', fullContent.substring(0, 50));
             } else if (parsed.sessionId) {
               setCurrentSession(parsed.sessionId);
               fullContent = parsed.fullContent;
