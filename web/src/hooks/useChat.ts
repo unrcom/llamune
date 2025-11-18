@@ -15,6 +15,7 @@ export function useChat() {
     setCurrentSession,
     setIsStreaming,
     setError,
+    setRetryPending,
   } = useChatStore();
 
   const [streamingContent, setStreamingContent] = useState('');
@@ -112,8 +113,8 @@ export function useChat() {
   };
 
   const retryMessage = async (retryModel?: string, retryPresetId?: number | null) => {
-    // 最後のアシスタントメッセージを削除
-    removeLastAssistantMessage();
+    // 最後のアシスタントメッセージを削除して保存
+    const originalMessage = removeLastAssistantMessage();
     setIsStreaming(true);
     setError(null);
     setStreamingContent('');
@@ -177,9 +178,16 @@ export function useChat() {
       };
       addMessage(assistantMessage);
       setStreamingContent('');
+
+      // Retry確認待ち状態にする（元のメッセージを保存）
+      setRetryPending(true, originalMessage);
     } catch (error) {
       console.error('Retry message error:', error);
       setError(error instanceof Error ? error.message : 'Unknown error');
+      // エラーの場合は元のメッセージを復元
+      if (originalMessage) {
+        addMessage(originalMessage);
+      }
     } finally {
       setIsStreaming(false);
     }
