@@ -58,6 +58,19 @@ export function MessageList({ messages, streamingContent, onRetry, isStreaming }
         );
       })}
 
+      {/* 生成中スピナー（ストリーミング開始前） */}
+      {isStreaming && !streamingContent && (
+        <div className="flex justify-start">
+          <div className="max-w-3xl rounded-lg px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+              <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+              <span className="text-sm">生成中...</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ストリーミング中のコンテンツ */}
       {streamingContent && (
         <div className="flex justify-start">
           <div className="max-w-3xl rounded-lg px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
