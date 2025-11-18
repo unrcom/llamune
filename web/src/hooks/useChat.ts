@@ -70,13 +70,11 @@ export function useChat() {
           if (!line.trim() || !line.startsWith('data: ')) continue;
 
           const data = line.slice(6);
-          console.log('📥 SSE data:', data);
 
           try {
             if (data === '[DONE]') break;
 
             const parsed = JSON.parse(data);
-            console.log('📦 Parsed SSE:', parsed);
 
             if (parsed.content) {
               fullContent = parsed.content;
