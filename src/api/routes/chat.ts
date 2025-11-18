@@ -161,8 +161,8 @@ router.post('/retry', async (req: Request, res: Response) => {
         res.write(`data: ${JSON.stringify(data)}\n\n`);
       }
 
-      // セッションを保存
-      const newSessionId = session.save();
+      // セッションを保存（retry後なので isRetry=true）
+      const newSessionId = session.save(true);
 
       // 完了イベントを送信
       const doneData: ChatDoneResponse = {

@@ -257,8 +257,9 @@ export class ChatSession {
 
   /**
    * セッションを保存
+   * @param isRetry リトライ後の保存の場合は true
    */
-  save(): number {
+  save(isRetry: boolean = false): number {
     if (this.messages.length === 0) {
       if (this.sessionId) {
         return this.sessionId;
@@ -267,8 +268,10 @@ export class ChatSession {
     }
 
     if (this.sessionId) {
-      // 既存セッションの場合、最後の2つのメッセージ（user + assistant）のみを追加
-      const newMessages = this.messages.slice(-2);
+      // retryの場合は最後のassistantメッセージのみ、通常は最後の2つ（user + assistant）
+      const newMessages = isRetry
+        ? this.messages.slice(-1)  // assistantのみ
+        : this.messages.slice(-2); // user + assistant
       appendMessagesToSession(this.sessionId, newMessages);
       return this.sessionId;
     } else {
