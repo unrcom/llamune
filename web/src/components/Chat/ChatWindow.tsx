@@ -5,7 +5,7 @@ import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 
 export function ChatWindow() {
-  const { messages, currentModel, error } = useChatStore();
+  const { messages, currentModel, models, error, setCurrentModel } = useChatStore();
   const { sendMessage, streamingContent, isStreaming } = useChat();
 
   return (
@@ -13,13 +13,24 @@ export function ChatWindow() {
       {/* Header */}
       <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
               Llamune Chat
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Model: {currentModel}
-            </p>
+            {models.length > 0 && (
+              <select
+                value={currentModel}
+                onChange={(e) => setCurrentModel(e.target.value)}
+                disabled={isStreaming}
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {models.map((model) => (
+                  <option key={model.name} value={model.name}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           {isStreaming && (
             <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
