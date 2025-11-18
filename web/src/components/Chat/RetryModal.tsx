@@ -30,10 +30,10 @@ export function RetryModal({
     // デフォルト（プリセットなし）
     combinations.push({ model, preset: null, index: index++ });
 
-    // 各プリセット
-    presets.forEach((preset) => {
-      combinations.push({ model, preset, index: index++ });
-    });
+    // 最初のプリセットのみ
+    if (presets.length > 0) {
+      combinations.push({ model, preset: presets[0], index: index++ });
+    }
   });
 
   const handleSelect = (modelName: string, presetId: number | null) => {

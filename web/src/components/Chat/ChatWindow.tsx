@@ -4,9 +4,10 @@ import { useChat } from '../../hooks/useChat';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { RetryModal } from './RetryModal';
+import { RetryConfirmation } from './RetryConfirmation';
 
 export function ChatWindow() {
-  const { messages, currentModel, currentPresetId, models, presets, error, setCurrentModel } = useChatStore();
+  const { messages, currentModel, currentPresetId, models, presets, error, isRetryPending, setCurrentModel, acceptRetry, rejectRetry } = useChatStore();
   const { sendMessage, retryMessage, streamingContent, isStreaming } = useChat();
   const [isRetryModalOpen, setIsRetryModalOpen] = useState(false);
 
@@ -59,12 +60,20 @@ export function ChatWindow() {
       <MessageList
         messages={messages}
         streamingContent={streamingContent}
-        onRetry={() => setIsRetryModalOpen(true)}
+        onRetry={!isRetryPending ? () => setIsRetryModalOpen(true) : undefined}
         isStreaming={isStreaming}
       />
 
+      {/* Retry Confirmation */}
+      {isRetryPending && (
+        <RetryConfirmation
+          onAccept={acceptRetry}
+          onReject={rejectRetry}
+        />
+      )}
+
       {/* Input */}
-      <MessageInput onSend={sendMessage} disabled={isStreaming} />
+      <MessageInput onSend={sendMessage} disabled={isStreaming || isRetryPending} />
 
       {/* Retry Modal */}
       <RetryModal

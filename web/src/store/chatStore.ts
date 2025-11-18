@@ -23,6 +23,8 @@ interface ChatState {
   // UI状態
   isStreaming: boolean;
   error: string | null;
+  isRetryPending: boolean;
+  retryOriginalMessage: Message | null;
 
   // アクション
   setCurrentSession: (sessionId: number | null) => void;
@@ -30,13 +32,16 @@ interface ChatState {
   setCurrentPresetId: (presetId: number | null) => void;
   addMessage: (message: Message) => void;
   setMessages: (messages: Message[]) => void;
-  removeLastAssistantMessage: () => void;
+  removeLastAssistantMessage: () => Message | null;
   setSessions: (sessions: Session[]) => void;
   setModels: (models: Model[]) => void;
   setPresets: (presets: ParameterPreset[]) => void;
   setParameters: (parameters: ChatParameters) => void;
   setIsStreaming: (isStreaming: boolean) => void;
   setError: (error: string | null) => void;
+  setRetryPending: (isPending: boolean, originalMessage?: Message | null) => void;
+  acceptRetry: () => void;
+  rejectRetry: () => void;
   resetChat: () => void;
 }
 
@@ -58,6 +63,8 @@ export const useChatStore = create<ChatState>((set) => ({
   },
   isStreaming: false,
   error: null,
+  isRetryPending: false,
+  retryOriginalMessage: null,
 
   // アクション
   setCurrentSession: (sessionId) => set({ currentSessionId: sessionId }),
@@ -67,17 +74,22 @@ export const useChatStore = create<ChatState>((set) => ({
     messages: [...state.messages, message]
   })),
   setMessages: (messages) => set({ messages }),
-  removeLastAssistantMessage: () => set((state) => {
-    // 最後のアシスタントメッセージを削除
-    const messages = [...state.messages];
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'assistant') {
-        messages.splice(i, 1);
-        break;
+  removeLastAssistantMessage: () => {
+    let removedMessage: Message | null = null;
+    set((state) => {
+      // 最後のアシスタントメッセージを削除
+      const messages = [...state.messages];
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'assistant') {
+          removedMessage = messages[i];
+          messages.splice(i, 1);
+          break;
+        }
       }
-    }
-    return { messages };
-  }),
+      return { messages };
+    });
+    return removedMessage;
+  },
   setSessions: (sessions) => set({ sessions }),
   setModels: (models) => set((state) => ({
     models,
@@ -88,9 +100,32 @@ export const useChatStore = create<ChatState>((set) => ({
   setParameters: (parameters) => set({ parameters }),
   setIsStreaming: (isStreaming) => set({ isStreaming }),
   setError: (error) => set({ error }),
+  setRetryPending: (isPending, originalMessage) => set({
+    isRetryPending: isPending,
+    retryOriginalMessage: originalMessage ?? null,
+  }),
+  acceptRetry: () => set({
+    isRetryPending: false,
+    retryOriginalMessage: null,
+  }),
+  rejectRetry: () => set((state) => {
+    // 最後のメッセージを削除して元のメッセージを復元
+    const messages = [...state.messages];
+    messages.pop(); // 新しい回答を削除
+    if (state.retryOriginalMessage) {
+      messages.push(state.retryOriginalMessage); // 元の回答を復元
+    }
+    return {
+      messages,
+      isRetryPending: false,
+      retryOriginalMessage: null,
+    };
+  }),
   resetChat: () => set({
     currentSessionId: null,
     messages: [],
     error: null,
+    isRetryPending: false,
+    retryOriginalMessage: null,
   }),
 }));
