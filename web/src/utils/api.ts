@@ -12,7 +12,7 @@ const API_BASE_URL = '/api';
 export async function fetchSessions(): Promise<SessionsResponse> {
   const response = await fetch(`${API_BASE_URL}/chat/sessions`, {
     headers: {
-      'Authorization': 'Bearer your-api-key-here',
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
     },
   });
 
@@ -27,7 +27,7 @@ export async function fetchSessions(): Promise<SessionsResponse> {
 export async function fetchSession(sessionId: number): Promise<SessionDetailResponse> {
   const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
     headers: {
-      'Authorization': 'Bearer your-api-key-here',
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
     },
   });
 
@@ -42,7 +42,7 @@ export async function fetchSession(sessionId: number): Promise<SessionDetailResp
 export async function fetchModels(): Promise<{ models: Model[] }> {
   const response = await fetch(`${API_BASE_URL}/models`, {
     headers: {
-      'Authorization': 'Bearer your-api-key-here',
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
     },
   });
 
@@ -57,7 +57,7 @@ export async function fetchModels(): Promise<{ models: Model[] }> {
 export async function fetchPresets(): Promise<{ presets: ParameterPreset[] }> {
   const response = await fetch(`${API_BASE_URL}/presets`, {
     headers: {
-      'Authorization': 'Bearer your-api-key-here',
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
     },
   });
 
