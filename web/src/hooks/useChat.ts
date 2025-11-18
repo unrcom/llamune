@@ -70,18 +70,22 @@ export function useChat() {
           if (!line.trim() || !line.startsWith('data: ')) continue;
 
           const data = line.slice(6);
+          console.log('📥 SSE data:', data);
 
           try {
             if (data === '[DONE]') break;
 
             const parsed = JSON.parse(data);
+            console.log('📦 Parsed SSE:', parsed);
 
             if (parsed.content) {
               fullContent = parsed.content;
               setStreamingContent(fullContent);
+              console.log('📝 Streaming content updated:', fullContent.substring(0, 50));
             } else if (parsed.sessionId) {
               setCurrentSession(parsed.sessionId);
               fullContent = parsed.fullContent;
+              console.log('✅ Done! Session:', parsed.sessionId, 'Full content length:', fullContent?.length);
             } else if (parsed.error) {
               throw new Error(parsed.error);
             }
@@ -92,6 +96,7 @@ export function useChat() {
       }
 
       // アシスタントメッセージを追加
+      console.log('💬 Adding assistant message, content length:', fullContent?.length);
       const assistantMessage: Message = {
         role: 'assistant',
         content: fullContent,
