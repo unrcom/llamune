@@ -26,3 +26,6 @@ Thumbs.db
 # SQLite
 *.db
 *.sqlite
+
+# API Keys (sensitive)
+config/api-keys.json
