@@ -67,3 +67,48 @@ export async function fetchPresets(): Promise<{ presets: ParameterPreset[] }> {
 
   return response.json();
 }
+
+// Retry - 最後のメッセージを再実行
+export async function retryLastMessage(
+  sessionId: number | null,
+  modelName: string,
+  history?: Message[]
+): Promise<Response> {
+  const response = await fetch(`${API_BASE_URL}/chat/retry`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+    },
+    body: JSON.stringify({
+      sessionId,
+      modelName,
+      history,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to retry message');
+  }
+
+  return response;
+}
+
+// Rewind - 指定したターンまで巻き戻し
+export async function rewindSession(
+  sessionId: number,
+  turnNumber: number
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/rewind`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+    },
+    body: JSON.stringify({ turnNumber }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to rewind session');
+  }
+}

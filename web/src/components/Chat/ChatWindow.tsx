@@ -6,7 +6,7 @@ import { MessageInput } from './MessageInput';
 
 export function ChatWindow() {
   const { messages, currentModel, models, error, setCurrentModel } = useChatStore();
-  const { sendMessage, streamingContent, isStreaming } = useChat();
+  const { sendMessage, retryMessage, streamingContent, isStreaming } = useChat();
 
   return (
     <div className="flex flex-col h-full">
@@ -50,7 +50,12 @@ export function ChatWindow() {
       )}
 
       {/* Messages */}
-      <MessageList messages={messages} streamingContent={streamingContent} />
+      <MessageList
+        messages={messages}
+        streamingContent={streamingContent}
+        onRetry={() => retryMessage()}
+        isStreaming={isStreaming}
+      />
 
       {/* Input */}
       <MessageInput onSend={sendMessage} disabled={isStreaming} />

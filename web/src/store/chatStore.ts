@@ -25,6 +25,7 @@ interface ChatState {
   setCurrentModel: (model: string) => void;
   addMessage: (message: Message) => void;
   setMessages: (messages: Message[]) => void;
+  removeLastAssistantMessage: () => void;
   setSessions: (sessions: Session[]) => void;
   setModels: (models: Model[]) => void;
   setParameters: (parameters: ChatParameters) => void;
@@ -57,6 +58,17 @@ export const useChatStore = create<ChatState>((set) => ({
     messages: [...state.messages, message]
   })),
   setMessages: (messages) => set({ messages }),
+  removeLastAssistantMessage: () => set((state) => {
+    // 最後のアシスタントメッセージを削除
+    const messages = [...state.messages];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') {
+        messages.splice(i, 1);
+        break;
+      }
+    }
+    return { messages };
+  }),
   setSessions: (sessions) => set({ sessions }),
   setModels: (models) => set((state) => ({
     models,

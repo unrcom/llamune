@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useChatStore } from '../store/chatStore';
+import { retryLastMessage } from '../utils/api';
 import type { Message } from '../types';
 
 const API_BASE_URL = '/api';
@@ -10,6 +11,7 @@ export function useChat() {
     currentModel,
     messages,
     addMessage,
+    removeLastAssistantMessage,
     setCurrentSession,
     setIsStreaming,
     setError,
@@ -110,8 +112,82 @@ export function useChat() {
     }
   };
 
+  const retryMessage = async (retryModel?: string) => {
+    // 最後のアシスタントメッセージを削除
+    removeLastAssistantMessage();
+    setIsStreaming(true);
+    setError(null);
+    setStreamingContent('');
+
+    try {
+      const modelToUse = retryModel || currentModel;
+      const response = await retryLastMessage(
+        currentSessionId,
+        modelToUse,
+        currentSessionId ? undefined : messages
+      );
+
+      if (!response.body) {
+        throw new Error('No response body');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith('data: ')) continue;
+
+          const data = line.slice(6);
+
+          try {
+            if (data === '[DONE]') break;
+
+            const parsed = JSON.parse(data);
+
+            if (parsed.content) {
+              fullContent = parsed.content;
+              setStreamingContent(fullContent);
+            } else if (parsed.sessionId) {
+              setCurrentSession(parsed.sessionId);
+              fullContent = parsed.fullContent;
+            } else if (parsed.error) {
+              throw new Error(parsed.error);
+            }
+          } catch (e) {
+            console.warn('Failed to parse SSE data:', e);
+          }
+        }
+      }
+
+      // アシスタントメッセージを追加
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: fullContent,
+        model: modelToUse,
+      };
+      addMessage(assistantMessage);
+      setStreamingContent('');
+    } catch (error) {
+      console.error('Retry message error:', error);
+      setError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
   return {
     sendMessage,
+    retryMessage,
     streamingContent,
     isStreaming: useChatStore((state) => state.isStreaming),
   };
