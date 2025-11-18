@@ -1,10 +1,11 @@
 import { create } from 'zustand';
-import type { Message, Session, ChatParameters, Model } from '../types';
+import type { Message, Session, ChatParameters, Model, ParameterPreset } from '../types';
 
 interface ChatState {
   // 現在のセッション
   currentSessionId: number | null;
   currentModel: string;
+  currentPresetId: number | null;
   messages: Message[];
 
   // セッション一覧
@@ -12,6 +13,9 @@ interface ChatState {
 
   // モデル一覧
   models: Model[];
+
+  // プリセット一覧
+  presets: ParameterPreset[];
 
   // パラメータ
   parameters: ChatParameters;
@@ -23,11 +27,13 @@ interface ChatState {
   // アクション
   setCurrentSession: (sessionId: number | null) => void;
   setCurrentModel: (model: string) => void;
+  setCurrentPresetId: (presetId: number | null) => void;
   addMessage: (message: Message) => void;
   setMessages: (messages: Message[]) => void;
   removeLastAssistantMessage: () => void;
   setSessions: (sessions: Session[]) => void;
   setModels: (models: Model[]) => void;
+  setPresets: (presets: ParameterPreset[]) => void;
   setParameters: (parameters: ChatParameters) => void;
   setIsStreaming: (isStreaming: boolean) => void;
   setError: (error: string | null) => void;
@@ -38,9 +44,11 @@ export const useChatStore = create<ChatState>((set) => ({
   // 初期状態
   currentSessionId: null,
   currentModel: '',
+  currentPresetId: null,
   messages: [],
   sessions: [],
   models: [],
+  presets: [],
   parameters: {
     temperature: 0.8,
     top_p: 0.9,
@@ -54,6 +62,7 @@ export const useChatStore = create<ChatState>((set) => ({
   // アクション
   setCurrentSession: (sessionId) => set({ currentSessionId: sessionId }),
   setCurrentModel: (model) => set({ currentModel: model }),
+  setCurrentPresetId: (presetId) => set({ currentPresetId: presetId }),
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, message]
   })),
@@ -75,6 +84,7 @@ export const useChatStore = create<ChatState>((set) => ({
     // モデル一覧が設定されたときに、currentModel が空なら最初のモデルを設定
     currentModel: state.currentModel || (models.length > 0 ? models[0].name : ''),
   })),
+  setPresets: (presets) => set({ presets }),
   setParameters: (parameters) => set({ parameters }),
   setIsStreaming: (isStreaming) => set({ isStreaming }),
   setError: (error) => set({ error }),

@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useChatStore } from '../../store/chatStore';
 import { useChat } from '../../hooks/useChat';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
+import { RetryModal } from './RetryModal';
 
 export function ChatWindow() {
-  const { messages, currentModel, models, error, setCurrentModel } = useChatStore();
+  const { messages, currentModel, currentPresetId, models, presets, error, setCurrentModel } = useChatStore();
   const { sendMessage, retryMessage, streamingContent, isStreaming } = useChat();
+  const [isRetryModalOpen, setIsRetryModalOpen] = useState(false);
+
+  const handleRetry = (modelName: string, presetId: number | null) => {
+    retryMessage(modelName, presetId);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -53,12 +59,23 @@ export function ChatWindow() {
       <MessageList
         messages={messages}
         streamingContent={streamingContent}
-        onRetry={() => retryMessage()}
+        onRetry={() => setIsRetryModalOpen(true)}
         isStreaming={isStreaming}
       />
 
       {/* Input */}
       <MessageInput onSend={sendMessage} disabled={isStreaming} />
+
+      {/* Retry Modal */}
+      <RetryModal
+        isOpen={isRetryModalOpen}
+        onClose={() => setIsRetryModalOpen(false)}
+        models={models}
+        presets={presets}
+        currentModel={currentModel}
+        currentPresetId={currentPresetId}
+        onRetry={handleRetry}
+      />
     </div>
   );
 }

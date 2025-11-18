@@ -72,6 +72,7 @@ export async function fetchPresets(): Promise<{ presets: ParameterPreset[] }> {
 export async function retryLastMessage(
   sessionId: number | null,
   modelName: string,
+  presetId?: number | null,
   history?: Message[]
 ): Promise<Response> {
   const response = await fetch(`${API_BASE_URL}/chat/retry`, {
@@ -83,6 +84,7 @@ export async function retryLastMessage(
     body: JSON.stringify({
       sessionId,
       modelName,
+      presetId,
       history,
     }),
   });

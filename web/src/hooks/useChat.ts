@@ -111,7 +111,7 @@ export function useChat() {
     }
   };
 
-  const retryMessage = async (retryModel?: string) => {
+  const retryMessage = async (retryModel?: string, retryPresetId?: number | null) => {
     // 最後のアシスタントメッセージを削除
     removeLastAssistantMessage();
     setIsStreaming(true);
@@ -123,6 +123,7 @@ export function useChat() {
       const response = await retryLastMessage(
         currentSessionId,
         modelToUse,
+        retryPresetId,
         currentSessionId ? undefined : messages
       );
 
