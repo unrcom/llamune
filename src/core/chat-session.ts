@@ -259,11 +259,7 @@ export class ChatSession {
    * セッションを保存
    */
   save(): number {
-    const newMessages = this.sessionId
-      ? this.messages.slice(0) // 既存セッションの場合
-      : this.messages;
-
-    if (newMessages.length === 0) {
+    if (this.messages.length === 0) {
       if (this.sessionId) {
         return this.sessionId;
       }
@@ -271,7 +267,8 @@ export class ChatSession {
     }
 
     if (this.sessionId) {
-      // 既存セッションに追加
+      // 既存セッションの場合、最後の2つのメッセージ（user + assistant）のみを追加
+      const newMessages = this.messages.slice(-2);
       appendMessagesToSession(this.sessionId, newMessages);
       return this.sessionId;
     } else {
