@@ -23,6 +23,7 @@ export interface ChatSession {
   updated_at: string;
   message_count: number;
   preview: string; // 最初のユーザーメッセージのプレビュー
+  title: string | null; // セッションのタイトル
 }
 
 /**
@@ -71,9 +72,17 @@ export function initDatabase(): Database.Database {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       model TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      title TEXT
     )
   `);
+
+  // 既存のテーブルにtitleカラムがなければ追加
+  const tableInfo = db.pragma('table_info(sessions)');
+  const hasTitleColumn = tableInfo.some((col: { name: string }) => col.name === 'title');
+  if (!hasTitleColumn) {
+    db.exec('ALTER TABLE sessions ADD COLUMN title TEXT');
+  }
 
   // メッセージテーブル
   db.exec(`
@@ -139,6 +148,19 @@ export function saveMessage(
 
   // セッションの更新日時を更新
   db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
+
+  // 最初のユーザーメッセージの場合、タイトルを自動設定
+  if (role === 'user') {
+    const session = db
+      .prepare('SELECT title FROM sessions WHERE id = ?')
+      .get(sessionId) as { title: string | null } | undefined;
+
+    if (session && !session.title) {
+      const title =
+        content.length > 30 ? content.substring(0, 30) + '...' : content;
+      db.prepare('UPDATE sessions SET title = ? WHERE id = ?').run(title, sessionId);
+    }
+  }
 
   db.close();
 }
@@ -212,6 +234,7 @@ export function listSessions(limit = 10): ChatSession[] {
         s.model,
         s.created_at,
         s.updated_at,
+        s.title,
         COUNT(m.id) as message_count,
         (
           SELECT content

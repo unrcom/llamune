@@ -1171,18 +1171,14 @@ program
           minute: '2-digit',
         });
 
-        // プレビューを最大50文字に制限
-        const preview = session.preview
-          ? session.preview.length > 50
-            ? session.preview.substring(0, 50) + '...'
-            : session.preview
-          : '(空の会話)';
+        // タイトルを表示（なければ「(タイトルなし)」）
+        const title = session.title || '(タイトルなし)';
 
         console.log(`  ID: ${session.id}`);
         console.log(`  日時: ${formattedDate}`);
         console.log(`  モデル: ${session.model}`);
         console.log(`  メッセージ数: ${session.message_count}`);
-        console.log(`  内容: ${preview}`);
+        console.log(`  タイトル: ${title}`);
         console.log('');
       });
 

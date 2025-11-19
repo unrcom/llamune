@@ -23,7 +23,8 @@
     "migrate:deleted-at": "tsx scripts/migrate-add-deleted-at.ts",
     "migrate:presets": "tsx scripts/migrate-add-parameter-presets.ts",
     "migrate:remove-precise": "tsx scripts/migrate-remove-precise-preset.ts",
-    "migrate:default-preset": "tsx scripts/migrate-update-default-preset.ts"
+    "migrate:default-preset": "tsx scripts/migrate-update-default-preset.ts",
+    "migrate:session-title": "tsx scripts/migrate-add-session-title.ts"
   },
   "keywords": [
     "llm",
