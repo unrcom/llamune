@@ -195,7 +195,10 @@ export function SessionList() {
                   </div>
                 ) : (
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium truncate flex-1">
+                    <div
+                      className="text-sm font-medium truncate flex-1"
+                      title={`${session.model} • ${session.message_count} messages`}
+                    >
                       {session.title || session.preview || 'New Chat'}
                     </div>
                     <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -220,9 +223,6 @@ export function SessionList() {
                     </div>
                   </div>
                 )}
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {session.message_count} messages • {session.model}
-                </div>
               </div>
             ))}
           </div>
