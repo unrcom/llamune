@@ -135,3 +135,21 @@ export async function updateSessionTitle(
 
   return response.json();
 }
+
+// セッションを削除
+export async function deleteSessionApi(
+  sessionId: number
+): Promise<{ success: boolean; sessionId: number }> {
+  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete session');
+  }
+
+  return response.json();
+}

@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useChatStore } from '../../store/chatStore';
-import { fetchSessions, fetchSession, updateSessionTitle } from '../../utils/api';
+import { fetchSessions, fetchSession, updateSessionTitle, deleteSessionApi } from '../../utils/api';
 import type { Session } from '../../types';
 
 export function SessionList() {
@@ -9,7 +9,16 @@ export function SessionList() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const sortedSessions = useMemo(() => {
+    return [...sessions].sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+    });
+  }, [sessions, sortOrder]);
 
   const loadSessions = async () => {
     try {
@@ -86,6 +95,27 @@ export function SessionList() {
     }
   };
 
+  const handleDelete = async (sessionId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('このセッションを削除しますか？')) return;
+
+    try {
+      await deleteSessionApi(sessionId);
+      const newSessions = sessions.filter(s => s.id !== sessionId);
+      setLocalSessions(newSessions);
+      setSessions(newSessions);
+      if (currentSessionId === sessionId) {
+        resetChat();
+      }
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+    }
+  };
+
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+  };
+
   return (
     <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex flex-col h-full">
       {/* Header */}
@@ -95,6 +125,20 @@ export function SessionList() {
           className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
         >
           + 新しいチャット
+        </button>
+        <button
+          onClick={toggleSortOrder}
+          className="w-full mt-2 px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors flex items-center justify-center gap-1"
+          title={sortOrder === 'desc' ? '新しい順' : '古い順'}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            {sortOrder === 'desc' ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+            )}
+          </svg>
+          {sortOrder === 'desc' ? '新しい順' : '古い順'}
         </button>
       </div>
 
@@ -110,7 +154,7 @@ export function SessionList() {
           </div>
         ) : (
           <div className="space-y-1">
-            {sessions.map((session) => (
+            {sortedSessions.map((session) => (
               <div
                 key={session.id}
                 onClick={() => editingId !== session.id && loadSession(session.id)}
@@ -154,15 +198,26 @@ export function SessionList() {
                     <div className="text-sm font-medium truncate flex-1">
                       {session.title || session.preview || 'New Chat'}
                     </div>
-                    <button
-                      onClick={(e) => startEditing(session, e)}
-                      className="opacity-0 group-hover:opacity-100 ml-1 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-opacity"
-                      title="タイトルを編集"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                    </button>
+                    <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => startEditing(session, e)}
+                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        title="タイトルを編集"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(session.id, e)}
+                        className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                        title="削除"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 )}
                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
