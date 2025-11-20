@@ -49,20 +49,24 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Sidebar - モバイルではビューに応じて表示切り替え */}
-      {(!isMobile || mobileView === 'list') && <SessionList />}
+      {/* Left Sidebar - デスクトップではSessionList/ModelManagerを切り替え、モバイルではビューに応じて表示 */}
+      {isMobile ? (
+        // モバイル：ビューに応じて表示切り替え
+        <>
+          {mobileView === 'list' && <SessionList />}
+          {mobileView === 'models' && <ModelManager />}
+        </>
+      ) : (
+        // デスクトップ：SessionListまたはModelManagerを左側に表示
+        <>
+          {mobileView === 'models' ? <ModelManager /> : <SessionList />}
+        </>
+      )}
 
-      {/* Main Chat Area - モバイルではビューに応じて表示切り替え */}
+      {/* Main Chat Area - デスクトップでは常に表示、モバイルではchatビューの時のみ表示 */}
       {(!isMobile || mobileView === 'chat') && (
         <div className="flex-1 flex flex-col">
           <ChatWindow />
-        </div>
-      )}
-
-      {/* Model Manager - モバイルではビューに応じて表示切り替え */}
-      {(!isMobile || mobileView === 'models') && mobileView === 'models' && (
-        <div className="flex-1 flex flex-col">
-          <ModelManager />
         </div>
       )}
     </div>
