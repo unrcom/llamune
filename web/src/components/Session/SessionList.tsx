@@ -10,6 +10,7 @@ export function SessionList() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showInfoId, setShowInfoId] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const sortedSessions = useMemo(() => {
@@ -116,6 +117,11 @@ export function SessionList() {
     setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
   };
 
+  const toggleInfo = (sessionId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowInfoId(showInfoId === sessionId ? null : sessionId);
+  };
+
   return (
     <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex flex-col h-full">
       {/* Header */}
@@ -194,33 +200,46 @@ export function SessionList() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between">
-                    <div
-                      className="text-sm font-medium truncate flex-1"
-                      title={`${session.model} • ${session.message_count} messages`}
-                    >
-                      {session.title || session.preview || 'New Chat'}
+                  <div className="relative">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium truncate flex-1">
+                        {session.title || session.preview || 'New Chat'}
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          onClick={(e) => toggleInfo(session.id, e)}
+                          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          title="詳細"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => startEditing(session, e)}
+                          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="タイトルを編集"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(session.id, e)}
+                          className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="削除"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => startEditing(session, e)}
-                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        title="タイトルを編集"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={(e) => handleDelete(session.id, e)}
-                        className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                        title="削除"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
+                    {showInfoId === session.id && (
+                      <div className="mt-1 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-900 dark:text-blue-200 rounded px-2 py-1 border border-blue-200 dark:border-blue-800">
+                        {session.model} • {session.message_count} messages
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
