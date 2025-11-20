@@ -582,6 +582,7 @@ export function getAllSessions(): ChatSession[] {
         s.id,
         s.model,
         s.created_at,
+        s.title,
         COUNT(m.id) as message_count,
         (SELECT content FROM messages WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL ORDER BY id ASC LIMIT 1) as preview
       FROM sessions s
