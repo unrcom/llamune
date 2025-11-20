@@ -5,9 +5,9 @@ import { checkOllamaStatus } from '../../utils/ollama.js';
 const router = Router();
 
 // GET /api/system/spec - システムスペック
-router.get('/spec', (req: Request, res: Response) => {
+router.get('/spec', async (req: Request, res: Response) => {
   try {
-    const spec = getSystemSpec();
+    const spec = await getSystemSpec();
     res.json(spec);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error', code: 'INTERNAL_ERROR', statusCode: 500 });

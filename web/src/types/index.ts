@@ -64,6 +64,11 @@ export interface SystemSpec {
   cpuCores: number;
   platform: string;
   arch: string;
+  gpu?: {
+    vendor: string;
+    model: string;
+    vram?: number; // MB
+  }[];
 }
 
 // APIリクエスト型

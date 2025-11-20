@@ -1011,7 +1011,7 @@ async function showModelList() {
       console.log('');
 
       // システムスペックを取得して表示
-      const spec = getSystemSpec();
+      const spec = await getSystemSpec();
       displaySystemSpec(spec);
 
       // 推奨モデルを表示

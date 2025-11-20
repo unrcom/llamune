@@ -178,6 +178,17 @@ export function ModelManager() {
                   <div>メモリ: {systemSpec.totalMemoryGB} GB</div>
                   <div>CPU: {systemSpec.cpuCores} コア</div>
                 </div>
+                {systemSpec.gpu && systemSpec.gpu.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">GPU:</div>
+                    {systemSpec.gpu.map((gpu, index) => (
+                      <div key={index} className="text-sm text-gray-600 dark:text-gray-400 ml-2">
+                        {index + 1}. {gpu.vendor} {gpu.model}
+                        {gpu.vram && ` (VRAM: ${(gpu.vram / 1024).toFixed(1)} GB)`}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
