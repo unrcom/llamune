@@ -79,6 +79,7 @@ export interface SessionsResponse {
     created_at: string;
     message_count: number;
     preview: string | null;
+    title: string | null;
   }>;
 }
 

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { ChatSession } from '../../core/chat-session.js';
-import { getAllSessions, getSession, deleteSession } from '../../utils/database.js';
+import { getAllSessions, getSession, deleteSession, updateSessionTitle } from '../../utils/database.js';
 import type {
   ApiError,
   ChatMessagesRequest,
@@ -206,6 +206,7 @@ router.get('/sessions', (req: Request, res: Response) => {
         created_at: s.created_at,
         message_count: s.message_count,
         preview: s.preview,
+        title: s.title,
       })),
     };
     res.json(response);
@@ -354,6 +355,55 @@ router.put('/sessions/:id/model', (req: Request, res: Response) => {
   } catch (error) {
     const apiError: ApiError = {
       error: error instanceof Error ? error.message : 'Model switch failed',
+      code: 'INTERNAL_ERROR',
+      statusCode: 500,
+    };
+    res.status(500).json(apiError);
+  }
+});
+
+/**
+ * PUT /api/chat/sessions/:id/title - タイトル更新
+ */
+router.put('/sessions/:id/title', (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    if (isNaN(sessionId)) {
+      const error: ApiError = {
+        error: 'Invalid session ID',
+        code: 'INVALID_REQUEST',
+        statusCode: 400,
+      };
+      res.status(400).json(error);
+      return;
+    }
+
+    const { title } = req.body as { title: string };
+    if (!title || typeof title !== 'string') {
+      const error: ApiError = {
+        error: 'title is required',
+        code: 'INVALID_REQUEST',
+        statusCode: 400,
+      };
+      res.status(400).json(error);
+      return;
+    }
+
+    const success = updateSessionTitle(sessionId, title);
+    if (!success) {
+      const error: ApiError = {
+        error: 'Session not found',
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      };
+      res.status(404).json(error);
+      return;
+    }
+
+    res.json({ success: true, sessionId, title });
+  } catch (error) {
+    const apiError: ApiError = {
+      error: error instanceof Error ? error.message : 'Title update failed',
       code: 'INTERNAL_ERROR',
       statusCode: 500,
     };
