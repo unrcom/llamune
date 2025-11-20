@@ -246,7 +246,7 @@ export function listSessions(limit = 10): ChatSession[] {
       FROM sessions s
       LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
       GROUP BY s.id
-      ORDER BY s.updated_at DESC
+      ORDER BY s.created_at ASC
       LIMIT ?
     `
     )
