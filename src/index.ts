@@ -34,6 +34,7 @@ import {
   getSessionMessagesWithTurns,
   logicalDeleteMessagesAfterTurn,
   getAllParameterPresets,
+  updateSessionTitle,
   type ParameterPreset,
 } from './utils/database.js';
 import * as readline from 'readline';
@@ -1141,11 +1142,36 @@ program
 
 // history コマンド
 program
-  .command('history')
-  .description('会話履歴を表示')
+  .command('history [action] [sessionId] [title]')
+  .description('会話履歴を表示・編集 (edit <id> <title> でタイトル変更)')
   .option('-n, --limit <number>', '表示する履歴数', '10')
-  .action((options) => {
+  .action((action, sessionId, title, options) => {
     try {
+      // edit サブコマンドの処理
+      if (action === 'edit') {
+        if (!sessionId || !title) {
+          console.error('❌ 使い方: llmn history edit <session_id> <new_title>');
+          console.error('例: llmn history edit 5 "新しいタイトル"');
+          process.exit(1);
+        }
+
+        const id = parseInt(sessionId, 10);
+        if (isNaN(id)) {
+          console.error('❌ セッションIDは数値で指定してください');
+          process.exit(1);
+        }
+
+        const success = updateSessionTitle(id, title);
+        if (success) {
+          console.log(`✅ セッション ${id} のタイトルを更新しました`);
+          console.log(`   新しいタイトル: ${title}`);
+        } else {
+          console.error(`❌ セッション ${id} が見つかりません`);
+          process.exit(1);
+        }
+        return;
+      }
+
       const limit = parseInt(options.limit, 10);
       const sessions = listSessions(limit);
 

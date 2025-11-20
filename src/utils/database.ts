@@ -257,6 +257,20 @@ export function listSessions(limit = 10): ChatSession[] {
 }
 
 /**
+ * セッションのタイトルを更新
+ */
+export function updateSessionTitle(sessionId: number, title: string): boolean {
+  const db = initDatabase();
+
+  const result = db
+    .prepare('UPDATE sessions SET title = ? WHERE id = ?')
+    .run(title, sessionId);
+
+  db.close();
+  return result.changes > 0;
+}
+
+/**
  * セッションの詳細を取得
  */
 export function getSession(sessionId: number): {
