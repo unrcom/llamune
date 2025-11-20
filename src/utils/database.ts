@@ -223,31 +223,33 @@ export function appendMessagesToSession(
 /**
  * セッション一覧を取得
  */
-export function listSessions(limit = 10): ChatSession[] {
+export function listSessions(limit = 200): ChatSession[] {
   const db = initDatabase();
 
   const sessions = db
     .prepare(
       `
-      SELECT
-        s.id,
-        s.model,
-        s.created_at,
-        s.updated_at,
-        s.title,
-        COUNT(m.id) as message_count,
-        (
-          SELECT content
-          FROM messages
-          WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
-          ORDER BY id ASC
-          LIMIT 1
-        ) as preview
-      FROM sessions s
-      LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
-      GROUP BY s.id
-      ORDER BY s.created_at ASC
-      LIMIT ?
+      SELECT * FROM (
+        SELECT
+          s.id,
+          s.model,
+          s.created_at,
+          s.updated_at,
+          s.title,
+          COUNT(m.id) as message_count,
+          (
+            SELECT content
+            FROM messages
+            WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
+            ORDER BY id ASC
+            LIMIT 1
+          ) as preview
+        FROM sessions s
+        LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
+        GROUP BY s.id
+        ORDER BY s.created_at DESC
+        LIMIT ?
+      ) ORDER BY created_at ASC
     `
     )
     .all(limit) as ChatSession[];
