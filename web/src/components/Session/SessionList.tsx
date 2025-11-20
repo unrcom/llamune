@@ -11,6 +11,7 @@ export function SessionList() {
   const [editingTitle, setEditingTitle] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showInfoId, setShowInfoId] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const sortedSessions = useMemo(() => {
@@ -55,6 +56,15 @@ export function SessionList() {
       loadSessions();
     }
   }, [currentSessionId]);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleNewChat = () => {
     resetChat();
@@ -124,7 +134,7 @@ export function SessionList() {
   };
 
   return (
-    <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex flex-col h-full">
+    <div className={`${isMobile ? 'w-full' : 'w-64'} border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex flex-col h-full`}>
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <button
