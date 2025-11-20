@@ -78,8 +78,8 @@ export function initDatabase(): Database.Database {
   `);
 
   // 既存のテーブルにtitleカラムがなければ追加
-  const tableInfo = db.pragma('table_info(sessions)');
-  const hasTitleColumn = tableInfo.some((col: { name: string }) => col.name === 'title');
+  const tableInfo = db.pragma('table_info(sessions)') as { name: string }[];
+  const hasTitleColumn = tableInfo.some((col) => col.name === 'title');
   if (!hasTitleColumn) {
     db.exec('ALTER TABLE sessions ADD COLUMN title TEXT');
   }
