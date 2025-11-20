@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { SessionList } from './components/Session/SessionList';
 import { ChatWindow } from './components/Chat/ChatWindow';
 import { useChatStore } from './store/chatStore';
@@ -7,6 +7,8 @@ import { fetchModels, fetchPresets } from './utils/api';
 function App() {
   const setModels = useChatStore((state) => state.setModels);
   const setPresets = useChatStore((state) => state.setPresets);
+  const mobileView = useChatStore((state) => state.mobileView);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     // モデル一覧を取得
@@ -33,15 +35,28 @@ function App() {
     loadPresets();
   }, [setModels, setPresets]);
 
+  useEffect(() => {
+    // モバイル判定
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Sidebar */}
-      <SessionList />
+      {/* Sidebar - モバイルではビューに応じて表示切り替え */}
+      {(!isMobile || mobileView === 'list') && <SessionList />}
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        <ChatWindow />
-      </div>
+      {/* Main Chat Area - モバイルではビューに応じて表示切り替え */}
+      {(!isMobile || mobileView === 'chat') && (
+        <div className="flex-1 flex flex-col">
+          <ChatWindow />
+        </div>
+      )}
     </div>
   );
 }

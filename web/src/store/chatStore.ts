@@ -25,6 +25,7 @@ interface ChatState {
   error: string | null;
   isRetryPending: boolean;
   retryOriginalMessage: Message | null;
+  mobileView: 'list' | 'chat';
 
   // アクション
   setCurrentSession: (sessionId: number | null) => void;
@@ -43,6 +44,7 @@ interface ChatState {
   acceptRetry: () => void;
   rejectRetry: () => void;
   resetChat: () => void;
+  setMobileView: (view: 'list' | 'chat') => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -65,6 +67,7 @@ export const useChatStore = create<ChatState>((set) => ({
   error: null,
   isRetryPending: false,
   retryOriginalMessage: null,
+  mobileView: 'list',
 
   // アクション
   setCurrentSession: (sessionId) => set({ currentSessionId: sessionId }),
@@ -128,4 +131,5 @@ export const useChatStore = create<ChatState>((set) => ({
     isRetryPending: false,
     retryOriginalMessage: null,
   }),
+  setMobileView: (view) => set({ mobileView: view }),
 }));

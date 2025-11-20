@@ -4,7 +4,7 @@ import { fetchSessions, fetchSession, updateSessionTitle, deleteSessionApi } fro
 import type { Session } from '../../types';
 
 export function SessionList() {
-  const { currentSessionId, setCurrentSession, setMessages, resetChat, setSessions } = useChatStore();
+  const { currentSessionId, setCurrentSession, setMessages, resetChat, setSessions, setMobileView } = useChatStore();
   const [sessions, setLocalSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -39,6 +39,7 @@ export function SessionList() {
       const response = await fetchSession(sessionId);
       setCurrentSession(sessionId);
       setMessages(response.messages);
+      setMobileView('chat'); // モバイルでチャット画面に切り替え
     } catch (error) {
       console.error('Failed to load session:', error);
     }

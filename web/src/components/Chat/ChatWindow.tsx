@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useChatStore } from '../../store/chatStore';
 import { useChat } from '../../hooks/useChat';
 import { MessageList } from './MessageList';
@@ -7,9 +7,23 @@ import { RetryModal } from './RetryModal';
 import { RetryConfirmation } from './RetryConfirmation';
 
 export function ChatWindow() {
-  const { messages, currentModel, currentPresetId, models, presets, error, isRetryPending, setCurrentModel, acceptRetry, rejectRetry } = useChatStore();
+  const { messages, currentModel, currentPresetId, models, presets, error, isRetryPending, setCurrentModel, acceptRetry, rejectRetry, setMobileView } = useChatStore();
   const { sendMessage, retryMessage, streamingContent, isStreaming } = useChat();
   const [isRetryModalOpen, setIsRetryModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const handleBackToList = () => {
+    setMobileView('list');
+  };
 
   const handleRetry = (modelName: string, presetId: number | null) => {
     retryMessage(modelName, presetId);
@@ -20,6 +34,17 @@ export function ChatWindow() {
       {/* Header */}
       <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4">
         <div className="flex items-center gap-4">
+          {isMobile && (
+            <button
+              onClick={handleBackToList}
+              className="p-2 -ml-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+              title="戻る"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
             Llamune Chat
           </h1>
