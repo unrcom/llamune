@@ -34,6 +34,8 @@ import {
   getSessionMessagesWithTurns,
   logicalDeleteMessagesAfterTurn,
   getAllParameterPresets,
+  updateSessionTitle,
+  deleteSession,
   type ParameterPreset,
 } from './utils/database.js';
 import * as readline from 'readline';
@@ -63,13 +65,14 @@ program
     console.log('  llmn [コマンド] [オプション]  # 短縮版');
     console.log('');
     console.log('利用可能なコマンド:');
-    console.log('  ls         利用可能なモデル一覧を表示');
-    console.log('  pull       モデルをダウンロード');
-    console.log('  rm         モデルを削除');
-    console.log('  chat       チャットを開始');
-    console.log('  compare    複数のLLMで比較実行');
-    console.log('  config     設定を管理');
-    console.log('  history    会話履歴を表示');
+    console.log('  ls           利用可能なモデル一覧を表示');
+    console.log('  pull         モデルをダウンロード');
+    console.log('  rm           モデルを削除');
+    console.log('  recommend    推奨モデルを表示');
+    console.log('  chat         チャットを開始');
+    console.log('  compare      複数のLLMで比較実行');
+    console.log('  history      会話履歴を表示・編集・削除');
+    console.log('  config       設定を管理');
     console.log('');
     console.log('ヘルプを表示: llamune --help');
   });
@@ -1009,7 +1012,7 @@ async function showModelList() {
       console.log('');
 
       // システムスペックを取得して表示
-      const spec = getSystemSpec();
+      const spec = await getSystemSpec();
       displaySystemSpec(spec);
 
       // 推奨モデルを表示
@@ -1066,7 +1069,7 @@ program
         console.log('📥 モデルをダウンロードします');
         console.log('');
 
-        const spec = getSystemSpec();
+        const spec = await getSystemSpec();
         displaySystemSpec(spec);
 
         const recommended = getRecommendedModels(spec);
@@ -1141,11 +1144,60 @@ program
 
 // history コマンド
 program
-  .command('history')
-  .description('会話履歴を表示')
+  .command('history [action] [sessionId] [title]')
+  .description('会話履歴を表示・編集・削除')
   .option('-n, --limit <number>', '表示する履歴数', '10')
-  .action((options) => {
+  .action((action, sessionId, title, options) => {
     try {
+      // edit サブコマンドの処理
+      if (action === 'edit') {
+        if (!sessionId || !title) {
+          console.error('❌ 使い方: llmn history edit <session_id> <new_title>');
+          console.error('例: llmn history edit 5 "新しいタイトル"');
+          process.exit(1);
+        }
+
+        const id = parseInt(sessionId, 10);
+        if (isNaN(id)) {
+          console.error('❌ セッションIDは数値で指定してください');
+          process.exit(1);
+        }
+
+        const success = updateSessionTitle(id, title);
+        if (success) {
+          console.log(`✅ セッション ${id} のタイトルを更新しました`);
+          console.log(`   新しいタイトル: ${title}`);
+        } else {
+          console.error(`❌ セッション ${id} が見つかりません`);
+          process.exit(1);
+        }
+        return;
+      }
+
+      // delete サブコマンドの処理
+      if (action === 'delete') {
+        if (!sessionId) {
+          console.error('❌ 使い方: llmn history delete <session_id>');
+          console.error('例: llmn history delete 5');
+          process.exit(1);
+        }
+
+        const id = parseInt(sessionId, 10);
+        if (isNaN(id)) {
+          console.error('❌ セッションIDは数値で指定してください');
+          process.exit(1);
+        }
+
+        const success = deleteSession(id);
+        if (success) {
+          console.log(`✅ セッション ${id} を削除しました`);
+        } else {
+          console.error(`❌ セッション ${id} が見つかりません`);
+          process.exit(1);
+        }
+        return;
+      }
+
       const limit = parseInt(options.limit, 10);
       const sessions = listSessions(limit);
 
@@ -1171,18 +1223,14 @@ program
           minute: '2-digit',
         });
 
-        // プレビューを最大50文字に制限
-        const preview = session.preview
-          ? session.preview.length > 50
-            ? session.preview.substring(0, 50) + '...'
-            : session.preview
-          : '(空の会話)';
+        // タイトルを表示（なければ「(タイトルなし)」）
+        const title = session.title || '(タイトルなし)';
 
         console.log(`  ID: ${session.id}`);
         console.log(`  日時: ${formattedDate}`);
         console.log(`  モデル: ${session.model}`);
         console.log(`  メッセージ数: ${session.message_count}`);
-        console.log(`  内容: ${preview}`);
+        console.log(`  タイトル: ${title}`);
         console.log('');
       });
 
@@ -1204,13 +1252,13 @@ program
 program
   .command('recommend')
   .description('推奨モデルを表示')
-  .action(() => {
+  .action(async () => {
     try {
       console.log('🎯 推奨モデル');
       console.log('');
 
       // システムスペックを取得
-      const spec = getSystemSpec();
+      const spec = await getSystemSpec();
       displaySystemSpec(spec);
 
       // 推奨モデルを表示

@@ -3,11 +3,21 @@
  */
 
 import os from 'os';
+import si from 'systeminformation';
 import {
   getRecommendedModelsByMemory,
   initializeDefaultRecommendedModels,
   type RecommendedModel as DBRecommendedModel,
 } from './database.js';
+
+/**
+ * GPU情報
+ */
+export interface GpuInfo {
+  vendor: string;
+  model: string;
+  vram?: number; // MB
+}
 
 /**
  * システムスペック情報
@@ -17,6 +27,7 @@ export interface SystemSpec {
   cpuCores: number;
   platform: string;
   arch: string;
+  gpu?: GpuInfo[];
 }
 
 /**
@@ -30,20 +41,37 @@ export interface RecommendedModel {
 }
 
 /**
- * システムスペックを取得
+ * システムスペックを取得（非同期）
  */
-export function getSystemSpec(): SystemSpec {
+export async function getSystemSpec(): Promise<SystemSpec> {
   const totalMemoryBytes = os.totalmem();
   const totalMemoryGB = Math.round(totalMemoryBytes / (1024 ** 3));
   const cpuCores = os.cpus().length;
   const platform = os.platform();
   const arch = os.arch();
 
+  // GPU情報を取得
+  let gpu: GpuInfo[] | undefined;
+  try {
+    const graphics = await si.graphics();
+    if (graphics.controllers && graphics.controllers.length > 0) {
+      gpu = graphics.controllers.map((controller) => ({
+        vendor: controller.vendor || 'Unknown',
+        model: controller.model || 'Unknown',
+        vram: controller.vram || undefined,
+      }));
+    }
+  } catch (error) {
+    // GPU情報取得失敗時はスキップ
+    console.error('Failed to get GPU info:', error);
+  }
+
   return {
     totalMemoryGB,
     cpuCores,
     platform,
     arch,
+    gpu,
   };
 }
 
@@ -76,6 +104,15 @@ export function displaySystemSpec(spec: SystemSpec): void {
   console.log(`  メモリ: ${spec.totalMemoryGB} GB`);
   console.log(`  CPU: ${spec.cpuCores} コア`);
   console.log(`  プラットフォーム: ${spec.platform} (${spec.arch})`);
+
+  if (spec.gpu && spec.gpu.length > 0) {
+    console.log(`  GPU:`);
+    spec.gpu.forEach((gpu, index) => {
+      const vramInfo = gpu.vram ? ` (VRAM: ${gpu.vram} MB)` : '';
+      console.log(`    ${index + 1}. ${gpu.vendor} ${gpu.model}${vramInfo}`);
+    });
+  }
+
   console.log('');
 }
 

@@ -23,7 +23,8 @@
     "migrate:deleted-at": "tsx scripts/migrate-add-deleted-at.ts",
     "migrate:presets": "tsx scripts/migrate-add-parameter-presets.ts",
     "migrate:remove-precise": "tsx scripts/migrate-remove-precise-preset.ts",
-    "migrate:default-preset": "tsx scripts/migrate-update-default-preset.ts"
+    "migrate:default-preset": "tsx scripts/migrate-update-default-preset.ts",
+    "migrate:session-title": "tsx scripts/migrate-add-session-title.ts"
   },
   "keywords": [
     "llm",
@@ -45,7 +46,8 @@
     "cosmiconfig": "^9.0.0",
     "express": "^5.1.0",
     "ink": "^4.4.1",
-    "react": "^18.2.0"
+    "react": "^18.2.0",
+    "systeminformation": "^5.27.11"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",

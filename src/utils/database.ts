@@ -23,6 +23,7 @@ export interface ChatSession {
   updated_at: string;
   message_count: number;
   preview: string; // 最初のユーザーメッセージのプレビュー
+  title: string | null; // セッションのタイトル
 }
 
 /**
@@ -71,9 +72,17 @@ export function initDatabase(): Database.Database {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       model TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      title TEXT
     )
   `);
+
+  // 既存のテーブルにtitleカラムがなければ追加
+  const tableInfo = db.pragma('table_info(sessions)') as { name: string }[];
+  const hasTitleColumn = tableInfo.some((col) => col.name === 'title');
+  if (!hasTitleColumn) {
+    db.exec('ALTER TABLE sessions ADD COLUMN title TEXT');
+  }
 
   // メッセージテーブル
   db.exec(`
@@ -140,6 +149,19 @@ export function saveMessage(
   // セッションの更新日時を更新
   db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
 
+  // 最初のユーザーメッセージの場合、タイトルを自動設定
+  if (role === 'user') {
+    const session = db
+      .prepare('SELECT title FROM sessions WHERE id = ?')
+      .get(sessionId) as { title: string | null } | undefined;
+
+    if (session && !session.title) {
+      const title =
+        content.length > 30 ? content.substring(0, 30) + '...' : content;
+      db.prepare('UPDATE sessions SET title = ? WHERE id = ?').run(title, sessionId);
+    }
+  }
+
   db.close();
 }
 
@@ -201,36 +223,53 @@ export function appendMessagesToSession(
 /**
  * セッション一覧を取得
  */
-export function listSessions(limit = 10): ChatSession[] {
+export function listSessions(limit = 200): ChatSession[] {
   const db = initDatabase();
 
   const sessions = db
     .prepare(
       `
-      SELECT
-        s.id,
-        s.model,
-        s.created_at,
-        s.updated_at,
-        COUNT(m.id) as message_count,
-        (
-          SELECT content
-          FROM messages
-          WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
-          ORDER BY id ASC
-          LIMIT 1
-        ) as preview
-      FROM sessions s
-      LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
-      GROUP BY s.id
-      ORDER BY s.updated_at DESC
-      LIMIT ?
+      SELECT * FROM (
+        SELECT
+          s.id,
+          s.model,
+          s.created_at,
+          s.updated_at,
+          s.title,
+          COUNT(m.id) as message_count,
+          (
+            SELECT content
+            FROM messages
+            WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
+            ORDER BY id ASC
+            LIMIT 1
+          ) as preview
+        FROM sessions s
+        LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
+        GROUP BY s.id
+        ORDER BY s.created_at DESC
+        LIMIT ?
+      ) ORDER BY created_at ASC
     `
     )
     .all(limit) as ChatSession[];
 
   db.close();
   return sessions;
+}
+
+/**
+ * セッションのタイトルを更新
+ */
+export function updateSessionTitle(sessionId: number, title: string): boolean {
+  const db = initDatabase();
+
+  const result = db
+    .prepare('UPDATE sessions SET title = ? WHERE id = ?')
+    .run(title, sessionId);
+
+  db.close();
+  return result.changes > 0;
 }
 
 /**
@@ -545,6 +584,7 @@ export function getAllSessions(): ChatSession[] {
         s.id,
         s.model,
         s.created_at,
+        s.title,
         COUNT(m.id) as message_count,
         (SELECT content FROM messages WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL ORDER BY id ASC LIMIT 1) as preview
       FROM sessions s

@@ -85,9 +85,9 @@ router.delete('/', async (req: Request, res: Response) => {
 });
 
 // GET /api/models/recommended - 推奨モデル
-router.get('/recommended', (req: Request, res: Response) => {
+router.get('/recommended', async (req: Request, res: Response) => {
   try {
-    const spec = getSystemSpec();
+    const spec = await getSystemSpec();
     const recommended = getRecommendedModels(spec);
     res.json({ spec, recommended });
   } catch (error) {
