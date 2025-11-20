@@ -35,6 +35,7 @@ import {
   logicalDeleteMessagesAfterTurn,
   getAllParameterPresets,
   updateSessionTitle,
+  deleteSession,
   type ParameterPreset,
 } from './utils/database.js';
 import * as readline from 'readline';
@@ -1143,7 +1144,7 @@ program
 // history コマンド
 program
   .command('history [action] [sessionId] [title]')
-  .description('会話履歴を表示・編集 (edit <id> <title> でタイトル変更)')
+  .description('会話履歴を表示・編集・削除')
   .option('-n, --limit <number>', '表示する履歴数', '10')
   .action((action, sessionId, title, options) => {
     try {
@@ -1165,6 +1166,30 @@ program
         if (success) {
           console.log(`✅ セッション ${id} のタイトルを更新しました`);
           console.log(`   新しいタイトル: ${title}`);
+        } else {
+          console.error(`❌ セッション ${id} が見つかりません`);
+          process.exit(1);
+        }
+        return;
+      }
+
+      // delete サブコマンドの処理
+      if (action === 'delete') {
+        if (!sessionId) {
+          console.error('❌ 使い方: llmn history delete <session_id>');
+          console.error('例: llmn history delete 5');
+          process.exit(1);
+        }
+
+        const id = parseInt(sessionId, 10);
+        if (isNaN(id)) {
+          console.error('❌ セッションIDは数値で指定してください');
+          process.exit(1);
+        }
+
+        const success = deleteSession(id);
+        if (success) {
+          console.log(`✅ セッション ${id} を削除しました`);
         } else {
           console.error(`❌ セッション ${id} が見つかりません`);
           process.exit(1);
