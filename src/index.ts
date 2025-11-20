@@ -1068,7 +1068,7 @@ program
         console.log('📥 モデルをダウンロードします');
         console.log('');
 
-        const spec = getSystemSpec();
+        const spec = await getSystemSpec();
         displaySystemSpec(spec);
 
         const recommended = getRecommendedModels(spec);
@@ -1251,13 +1251,13 @@ program
 program
   .command('recommend')
   .description('推奨モデルを表示')
-  .action(() => {
+  .action(async () => {
     try {
       console.log('🎯 推奨モデル');
       console.log('');
 
       // システムスペックを取得
-      const spec = getSystemSpec();
+      const spec = await getSystemSpec();
       displaySystemSpec(spec);
 
       // 推奨モデルを表示
