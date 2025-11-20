@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { SessionList } from './components/Session/SessionList';
 import { ChatWindow } from './components/Chat/ChatWindow';
+import { ModelManager } from './components/Models/ModelManager';
 import { useChatStore } from './store/chatStore';
 import { fetchModels, fetchPresets } from './utils/api';
 
@@ -55,6 +56,13 @@ function App() {
       {(!isMobile || mobileView === 'chat') && (
         <div className="flex-1 flex flex-col">
           <ChatWindow />
+        </div>
+      )}
+
+      {/* Model Manager - モバイルではビューに応じて表示切り替え */}
+      {(!isMobile || mobileView === 'models') && mobileView === 'models' && (
+        <div className="flex-1 flex flex-col">
+          <ModelManager />
         </div>
       )}
     </div>

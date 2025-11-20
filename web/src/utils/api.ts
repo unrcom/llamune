@@ -4,6 +4,8 @@ import type {
   SessionDetailResponse,
   Model,
   ParameterPreset,
+  RecommendedModel,
+  SystemSpec,
 } from '../types';
 
 const API_BASE_URL = '/api';
@@ -149,6 +151,60 @@ export async function deleteSessionApi(
 
   if (!response.ok) {
     throw new Error('Failed to delete session');
+  }
+
+  return response.json();
+}
+
+// 推奨モデル一覧を取得
+export async function fetchRecommendedModels(): Promise<{
+  spec: SystemSpec;
+  recommended: RecommendedModel[];
+}> {
+  const response = await fetch(`${API_BASE_URL}/models/recommended`, {
+    headers: {
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch recommended models');
+  }
+
+  return response.json();
+}
+
+// モデルをダウンロード
+export async function pullModel(modelName: string): Promise<{ success: boolean; modelName: string }> {
+  const response = await fetch(`${API_BASE_URL}/models/pull`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+    },
+    body: JSON.stringify({ modelName }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to pull model');
+  }
+
+  return response.json();
+}
+
+// モデルを削除
+export async function deleteModel(modelName: string): Promise<{ success: boolean; modelName: string }> {
+  const response = await fetch(`${API_BASE_URL}/models`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+    },
+    body: JSON.stringify({ modelName }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete model');
   }
 
   return response.json();

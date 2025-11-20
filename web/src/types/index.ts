@@ -50,6 +50,22 @@ export interface Model {
   };
 }
 
+// 推奨モデル型
+export interface RecommendedModel {
+  name: string;
+  size: string;
+  description: string;
+  priority: number;
+}
+
+// システムスペック型
+export interface SystemSpec {
+  totalMemoryGB: number;
+  cpuCores: number;
+  platform: string;
+  arch: string;
+}
+
 // APIリクエスト型
 export interface SendMessageParams {
   sessionId?: number;

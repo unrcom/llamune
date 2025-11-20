@@ -70,6 +70,10 @@ export function SessionList() {
     resetChat();
   };
 
+  const handleOpenModels = () => {
+    setMobileView('models');
+  };
+
   const startEditing = (session: Session, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingId(session.id);
@@ -156,6 +160,16 @@ export function SessionList() {
             )}
           </svg>
           {sortOrder === 'desc' ? '新しい順' : '古い順'}
+        </button>
+        <button
+          onClick={handleOpenModels}
+          className="w-full mt-2 px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors flex items-center justify-center gap-1"
+          title="モデル管理"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+          </svg>
+          モデル管理
         </button>
       </div>
 
