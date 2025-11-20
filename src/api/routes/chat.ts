@@ -411,4 +411,42 @@ router.put('/sessions/:id/title', (req: Request, res: Response) => {
   }
 });
 
+/**
+ * DELETE /api/chat/sessions/:id - セッション削除
+ */
+router.delete('/sessions/:id', (req: Request, res: Response) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    if (isNaN(sessionId)) {
+      const error: ApiError = {
+        error: 'Invalid session ID',
+        code: 'INVALID_REQUEST',
+        statusCode: 400,
+      };
+      res.status(400).json(error);
+      return;
+    }
+
+    const success = deleteSession(sessionId);
+    if (!success) {
+      const error: ApiError = {
+        error: 'Session not found',
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      };
+      res.status(404).json(error);
+      return;
+    }
+
+    res.json({ success: true, sessionId });
+  } catch (error) {
+    const apiError: ApiError = {
+      error: error instanceof Error ? error.message : 'Delete failed',
+      code: 'INTERNAL_ERROR',
+      statusCode: 500,
+    };
+    res.status(500).json(apiError);
+  }
+});
+
 export default router;
