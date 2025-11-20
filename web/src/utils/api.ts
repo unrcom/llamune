@@ -114,3 +114,24 @@ export async function rewindSession(
     throw new Error('Failed to rewind session');
   }
 }
+
+// セッションタイトルを更新
+export async function updateSessionTitle(
+  sessionId: number,
+  title: string
+): Promise<{ success: boolean; sessionId: number; title: string }> {
+  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/title`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+    },
+    body: JSON.stringify({ title }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to update session title');
+  }
+
+  return response.json();
+}

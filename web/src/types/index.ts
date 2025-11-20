@@ -12,6 +12,7 @@ export interface Session {
   created_at: string;
   message_count: number;
   preview: string;
+  title: string | null;
 }
 
 // チャットパラメータ型
