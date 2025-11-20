@@ -81,10 +81,7 @@ export function SessionList() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      saveTitle();
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Escape') {
       cancelEditing();
     }
   };
@@ -124,15 +121,34 @@ export function SessionList() {
                 }`}
               >
                 {editingId === session.id ? (
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={editingTitle}
-                    onChange={(e) => setEditingTitle(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    onBlur={saveTitle}
-                    className="w-full text-sm font-medium bg-white dark:bg-gray-800 border border-blue-500 rounded px-1 py-0.5 focus:outline-none"
-                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      className="flex-1 text-sm font-medium bg-white dark:bg-gray-800 border border-blue-500 rounded px-1 py-0.5 focus:outline-none"
+                    />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); saveTitle(); }}
+                      className="p-1 text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400"
+                      title="保存"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); cancelEditing(); }}
+                      className="p-1 text-red-600 hover:text-red-700 dark:text-red-500 dark:hover:text-red-400"
+                      title="キャンセル"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium truncate flex-1">
