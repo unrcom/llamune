@@ -247,36 +247,45 @@ export function appendMessagesToSession(
 /**
  * セッション一覧を取得
  */
-export function listSessions(limit = 200): ChatSession[] {
+export function listSessions(limit = 200, userId?: number): ChatSession[] {
   const db = initDatabase();
 
-  const sessions = db
-    .prepare(
-      `
-      SELECT * FROM (
-        SELECT
-          s.id,
-          s.model,
-          s.created_at,
-          s.updated_at,
-          s.title,
-          COUNT(m.id) as message_count,
-          (
-            SELECT content
-            FROM messages
-            WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
-            ORDER BY id ASC
-            LIMIT 1
-          ) as preview
-        FROM sessions s
-        LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
-        GROUP BY s.id
-        ORDER BY s.created_at DESC
-        LIMIT ?
-      ) ORDER BY created_at ASC
-    `
-    )
-    .all(limit) as ChatSession[];
+  let query = `
+    SELECT * FROM (
+      SELECT
+        s.id,
+        s.model,
+        s.created_at,
+        s.updated_at,
+        s.title,
+        COUNT(m.id) as message_count,
+        (
+          SELECT content
+          FROM messages
+          WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
+          ORDER BY id ASC
+          LIMIT 1
+        ) as preview
+      FROM sessions s
+      LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
+  `;
+
+  if (userId !== undefined) {
+    query += `
+      WHERE s.user_id = ?
+    `;
+  }
+
+  query += `
+      GROUP BY s.id
+      ORDER BY s.created_at DESC
+      LIMIT ?
+    ) ORDER BY created_at ASC
+  `;
+
+  const sessions = userId !== undefined
+    ? db.prepare(query).all(userId, limit) as ChatSession[]
+    : db.prepare(query).all(limit) as ChatSession[];
 
   db.close();
   return sessions;
@@ -285,12 +294,18 @@ export function listSessions(limit = 200): ChatSession[] {
 /**
  * セッションのタイトルを更新
  */
-export function updateSessionTitle(sessionId: number, title: string): boolean {
+export function updateSessionTitle(sessionId: number, title: string, userId?: number): boolean {
   const db = initDatabase();
 
-  const result = db
-    .prepare('UPDATE sessions SET title = ? WHERE id = ?')
-    .run(title, sessionId);
+  let query = 'UPDATE sessions SET title = ? WHERE id = ?';
+  let params: any[] = [title, sessionId];
+
+  if (userId !== undefined) {
+    query = 'UPDATE sessions SET title = ? WHERE id = ? AND user_id = ?';
+    params = [title, sessionId, userId];
+  }
+
+  const result = db.prepare(query).run(...params);
 
   db.close();
   return result.changes > 0;
@@ -663,10 +678,22 @@ export function updateSessionModel(sessionId: number, modelName: string): boolea
 /**
  * セッションを削除
  */
-export function deleteSession(sessionId: number): boolean {
+export function deleteSession(sessionId: number, userId?: number): boolean {
   const db = initDatabase();
 
   try {
+    // ユーザー所有権チェック
+    if (userId !== undefined) {
+      const session = db
+        .prepare('SELECT user_id FROM sessions WHERE id = ?')
+        .get(sessionId) as { user_id?: number } | undefined;
+
+      if (!session || session.user_id !== userId) {
+        db.close();
+        return false; // セッションが存在しないか、所有者ではない
+      }
+    }
+
     // メッセージを削除
     db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
 

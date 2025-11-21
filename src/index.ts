@@ -31,6 +31,7 @@ import {
   loginCommand,
   logoutCommand,
   whoamiCommand,
+  getCurrentUserId,
 } from './commands/auth.js';
 import {
   saveConversation,
@@ -191,6 +192,9 @@ program
   .option('-c, --continue <session-id>', '過去の会話を再開')
   .action(async (options: { model?: string; continue?: string }) => {
     try {
+      // 現在のユーザーIDを取得
+      const userId = getCurrentUserId();
+
       // Ollama の起動確認・自動起動
       const isRunning = await ensureOllamaRunning();
       if (!isRunning) {
@@ -231,10 +235,10 @@ program
       // --continue オプションで過去の会話を再開
       if (options.continue) {
         const sid = parseInt(options.continue, 10);
-        const sessionData = getSession(sid);
+        const sessionData = getSession(sid, userId);
 
         if (!sessionData) {
-          console.log(`❌ セッションID ${sid} が見つかりません`);
+          console.log(`❌ セッションID ${sid} が見つかりません（または、あなたのセッションではありません）`);
           console.log('');
           console.log('履歴を確認してください:');
           console.log('  llamune history');
@@ -949,7 +953,7 @@ program
               console.log(`💾 会話を保存しました (ID: ${sessionId})`);
             } else {
               // 新規セッション作成
-              const newSessionId = saveConversation(selectedModel, messages);
+              const newSessionId = saveConversation(selectedModel, messages, userId);
               console.log(`💾 会話を保存しました (ID: ${newSessionId})`);
             }
           } catch (error) {
@@ -1159,6 +1163,8 @@ program
   .option('-n, --limit <number>', '表示する履歴数', '10')
   .action((action, sessionId, title, options) => {
     try {
+      const userId = getCurrentUserId();
+
       // edit サブコマンドの処理
       if (action === 'edit') {
         if (!sessionId || !title) {
@@ -1173,12 +1179,12 @@ program
           process.exit(1);
         }
 
-        const success = updateSessionTitle(id, title);
+        const success = updateSessionTitle(id, title, userId);
         if (success) {
           console.log(`✅ セッション ${id} のタイトルを更新しました`);
           console.log(`   新しいタイトル: ${title}`);
         } else {
-          console.error(`❌ セッション ${id} が見つかりません`);
+          console.error(`❌ セッション ${id} が見つかりません（または、あなたのセッションではありません）`);
           process.exit(1);
         }
         return;
@@ -1198,18 +1204,18 @@ program
           process.exit(1);
         }
 
-        const success = deleteSession(id);
+        const success = deleteSession(id, userId);
         if (success) {
           console.log(`✅ セッション ${id} を削除しました`);
         } else {
-          console.error(`❌ セッション ${id} が見つかりません`);
+          console.error(`❌ セッション ${id} が見つかりません（または、あなたのセッションではありません）`);
           process.exit(1);
         }
         return;
       }
 
       const limit = parseInt(options.limit, 10);
-      const sessions = listSessions(limit);
+      const sessions = listSessions(limit, userId);
 
       if (sessions.length === 0) {
         console.log('📜 会話履歴がありません');
