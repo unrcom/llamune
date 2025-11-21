@@ -8,6 +8,7 @@ import {
   loadAuthTokens,
   deleteAuthTokens,
   isLoggedIn,
+  registerApi,
   loginApi,
   logoutApi,
   getMeApi,
@@ -126,6 +127,82 @@ export async function loginCommand(): Promise<void> {
       console.error(`❌ Login failed: ${error.message}`);
     } else {
       console.error('❌ Login failed');
+    }
+    process.exit(1);
+  }
+}
+
+/**
+ * ユーザー登録コマンド
+ */
+export async function registerCommand(): Promise<void> {
+  try {
+    // 既にログイン済みかチェック
+    if (isLoggedIn()) {
+      const tokens = loadAuthTokens();
+      console.log(`⚠️  Already logged in as ${tokens?.user.username}`);
+      console.log('');
+      console.log('新しいユーザーを登録する前にログアウトしてください: llamune logout');
+      return;
+    }
+
+    console.log('📝 Llamune User Registration');
+    console.log('');
+
+    // ユーザー名入力
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    const username = await new Promise<string>((resolve) => {
+      rl.question('Username: ', (answer) => {
+        resolve(answer.trim());
+      });
+    });
+
+    if (!username) {
+      rl.close();
+      console.error('❌ Username is required');
+      process.exit(1);
+    }
+
+    // パスワード入力
+    const password = await readPassword('Password: ');
+    rl.close();
+
+    if (!password) {
+      console.error('❌ Password is required');
+      process.exit(1);
+    }
+
+    // パスワード確認
+    const passwordConfirm = await readPassword('Confirm Password: ');
+
+    if (password !== passwordConfirm) {
+      console.error('❌ Passwords do not match');
+      process.exit(1);
+    }
+
+    console.log('');
+    console.log('🔄 Creating user...');
+
+    // ユーザー登録API呼び出し（デフォルトで'user'ロール）
+    const tokens = await registerApi(username, password, 'user');
+
+    // トークンを保存
+    saveAuthTokens(tokens);
+
+    console.log('✅ User registered successfully');
+    console.log('');
+    console.log(`👤 User: ${tokens.user.username} (${tokens.user.role})`);
+    console.log('');
+    console.log('これで llamune コマンドが使用できます。');
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(`❌ Registration failed: ${error.message}`);
+    } else {
+      console.error('❌ Registration failed');
     }
     process.exit(1);
   }

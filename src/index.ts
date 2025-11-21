@@ -27,6 +27,7 @@ import {
   saveLastUsedModel,
 } from './utils/config.js';
 import {
+  registerCommand,
   loginCommand,
   logoutCommand,
   whoamiCommand,
@@ -70,6 +71,7 @@ program
     console.log('  llmn [コマンド] [オプション]  # 短縮版');
     console.log('');
     console.log('利用可能なコマンド:');
+    console.log('  register     ユーザー登録');
     console.log('  login        ログイン');
     console.log('  logout       ログアウト');
     console.log('  whoami       現在のユーザー情報を表示');
@@ -1282,6 +1284,14 @@ program
 // ========================================
 // 認証コマンド
 // ========================================
+
+// register コマンド
+program
+  .command('register')
+  .description('ユーザー登録')
+  .action(async () => {
+    await registerCommand();
+  });
 
 // login コマンド
 program

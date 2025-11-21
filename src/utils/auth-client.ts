@@ -83,6 +83,42 @@ export function getAuthHeaders(): Record<string, string> {
 }
 
 /**
+ * ユーザー登録API呼び出し
+ */
+export async function registerApi(
+  username: string,
+  password: string,
+  role: 'admin' | 'user' = 'user'
+): Promise<AuthTokens> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, password, role }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Registration failed');
+    }
+
+    const data = await response.json();
+    return {
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      user: data.user,
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to connect to API server');
+  }
+}
+
+/**
  * ログインAPI呼び出し
  */
 export async function loginApi(username: string, password: string): Promise<AuthTokens> {
