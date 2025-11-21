@@ -19,10 +19,7 @@ export const loginLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // IPアドレスベースで制限
-  keyGenerator: (req) => {
-    return req.ip || 'unknown';
-  },
+  // デフォルトでreq.ipを使用（IPv6対応）
 });
 
 /**
@@ -39,9 +36,6 @@ export const registerLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.ip || 'unknown';
-  },
 });
 
 /**
@@ -58,9 +52,6 @@ export const passwordChangeLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.ip || 'unknown';
-  },
 });
 
 /**
@@ -77,7 +68,4 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.ip || 'unknown';
-  },
 });
