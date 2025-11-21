@@ -1,9 +1,27 @@
 import { useState } from 'react';
 import { useChatStore } from '../store/chatStore';
+import { useAuthStore } from '../store/authStore';
 import { retryLastMessage } from '../utils/api';
 import type { Message } from '../types';
 
 const API_BASE_URL = '/api';
+
+// 認証ヘッダーを取得
+function getAuthHeaders(): HeadersInit {
+  const tokens = useAuthStore.getState().tokens;
+  if (tokens?.accessToken) {
+    return {
+      'Authorization': `Bearer ${tokens.accessToken}`,
+    };
+  }
+  // フォールバック: 環境変数のAPIキー（後方互換性のため）
+  if (import.meta.env.VITE_API_KEY) {
+    return {
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+    };
+  }
+  return {};
+}
 
 export function useChat() {
   const {
@@ -38,7 +56,7 @@ export function useChat() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           sessionId: currentSessionId,

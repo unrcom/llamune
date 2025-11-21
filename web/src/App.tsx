@@ -2,16 +2,22 @@ import { useEffect, useState } from 'react';
 import { SessionList } from './components/Session/SessionList';
 import { ChatWindow } from './components/Chat/ChatWindow';
 import { ModelManager } from './components/Models/ModelManager';
+import { Login } from './components/Auth/Login';
 import { useChatStore } from './store/chatStore';
+import { useAuthStore } from './store/authStore';
 import { fetchModels, fetchPresets } from './utils/api';
 
 function App() {
   const setModels = useChatStore((state) => state.setModels);
   const setPresets = useChatStore((state) => state.setPresets);
   const mobileView = useChatStore((state) => state.mobileView);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    // 認証済みの場合のみデータを読み込む
+    if (!isAuthenticated) return;
+
     // モデル一覧を取得
     const loadModels = async () => {
       try {
@@ -34,7 +40,7 @@ function App() {
 
     loadModels();
     loadPresets();
-  }, [setModels, setPresets]);
+  }, [isAuthenticated, setModels, setPresets]);
 
   useEffect(() => {
     // モバイル判定
@@ -47,6 +53,12 @@ function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // 未認証の場合はログイン画面を表示
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  // 認証済みの場合はメインアプリを表示
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       {/* Left Sidebar - デスクトップではSessionList/ModelManagerを切り替え、モバイルではビューに応じて表示 */}
