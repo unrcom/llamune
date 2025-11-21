@@ -27,6 +27,11 @@ import {
   saveLastUsedModel,
 } from './utils/config.js';
 import {
+  loginCommand,
+  logoutCommand,
+  whoamiCommand,
+} from './commands/auth.js';
+import {
   saveConversation,
   listSessions,
   getSession,
@@ -65,6 +70,9 @@ program
     console.log('  llmn [コマンド] [オプション]  # 短縮版');
     console.log('');
     console.log('利用可能なコマンド:');
+    console.log('  login        ログイン');
+    console.log('  logout       ログアウト');
+    console.log('  whoami       現在のユーザー情報を表示');
     console.log('  ls           利用可能なモデル一覧を表示');
     console.log('  pull         モデルをダウンロード');
     console.log('  rm           モデルを削除');
@@ -1269,6 +1277,34 @@ program
       console.error(error);
       process.exit(1);
     }
+  });
+
+// ========================================
+// 認証コマンド
+// ========================================
+
+// login コマンド
+program
+  .command('login')
+  .description('ログイン')
+  .action(async () => {
+    await loginCommand();
+  });
+
+// logout コマンド
+program
+  .command('logout')
+  .description('ログアウト')
+  .action(async () => {
+    await logoutCommand();
+  });
+
+// whoami コマンド
+program
+  .command('whoami')
+  .description('現在のユーザー情報を表示')
+  .action(async () => {
+    await whoamiCommand();
   });
 
 // コマンドをパース
