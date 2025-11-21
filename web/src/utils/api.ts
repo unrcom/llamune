@@ -126,6 +126,8 @@ export async function logout(): Promise<void> {
     }
   }
   useAuthStore.getState().clearAuth();
+  // Zustand persist は state を空にしても localStorage キーを削除しないため、明示的に削除
+  localStorage.removeItem('llamune-auth');
 }
 
 export async function getCurrentUser(): Promise<User> {
