@@ -45,6 +45,21 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'llamune-auth',
       // トークンは localStorage に保存（XSS対策として本番環境ではhttpOnly cookieが推奨）
+
+      // 復元時に整合性をチェック
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // user と tokens が存在する場合のみ isAuthenticated を true にする
+          if (state.user && state.tokens) {
+            state.isAuthenticated = true;
+          } else {
+            // どちらかが欠けている場合は強制的にログアウト状態にする
+            state.user = null;
+            state.tokens = null;
+            state.isAuthenticated = false;
+          }
+        }
+      },
     }
   )
 );
