@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useChatStore } from '../../store/chatStore';
+import { useAuthStore } from '../../store/authStore';
 import { fetchSessions, fetchSession, updateSessionTitle, deleteSessionApi } from '../../utils/api';
 import type { Session } from '../../types';
 
 export function SessionList() {
   const { currentSessionId, setCurrentSession, setMessages, resetChat, setSessions, setMobileView } = useChatStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [sessions, setLocalSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -23,6 +25,8 @@ export function SessionList() {
   }, [sessions, sortOrder]);
 
   const loadSessions = async () => {
+    if (!isAuthenticated) return; // 認証されていない場合はスキップ
+
     try {
       setLoading(true);
       const response = await fetchSessions();
@@ -48,7 +52,8 @@ export function SessionList() {
 
   useEffect(() => {
     loadSessions();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   // currentSessionIdが変更されたら（新しいセッションが作成されたら）一覧を更新
   useEffect(() => {
