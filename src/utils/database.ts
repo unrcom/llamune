@@ -193,15 +193,16 @@ export function saveMessage(
  */
 export function saveConversation(
   model: string,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  userId?: number
 ): number {
   const db = initDatabase();
   const now = new Date().toISOString();
 
   // セッションを作成
   const sessionResult = db
-    .prepare('INSERT INTO sessions (model, created_at, updated_at) VALUES (?, ?, ?)')
-    .run(model, now, now);
+    .prepare('INSERT INTO sessions (model, user_id, created_at, updated_at) VALUES (?, ?, ?, ?)')
+    .run(model, userId || null, now, now);
 
   const sessionId = sessionResult.lastInsertRowid as number;
 
@@ -297,9 +298,11 @@ export function updateSessionTitle(sessionId: number, title: string): boolean {
 
 /**
  * セッションの詳細を取得
+ * @param sessionId - セッションID
+ * @param userId - ユーザーID（指定された場合、所有者チェックを行う）
  */
-export function getSession(sessionId: number): {
-  session: ChatSession;
+export function getSession(sessionId: number, userId?: number): {
+  session: ChatSession & { user_id?: number };
   messages: ChatMessage[];
 } | null {
   const db = initDatabase();
@@ -311,6 +314,7 @@ export function getSession(sessionId: number): {
       SELECT
         s.id,
         s.model,
+        s.user_id,
         s.created_at,
         s.updated_at,
         COUNT(m.id) as message_count,
@@ -327,9 +331,15 @@ export function getSession(sessionId: number): {
       GROUP BY s.id
     `
     )
-    .get(sessionId) as ChatSession | undefined;
+    .get(sessionId) as (ChatSession & { user_id?: number }) | undefined;
 
   if (!session) {
+    db.close();
+    return null;
+  }
+
+  // 所有者チェック（userIdが指定されている場合）
+  if (userId !== undefined && session.user_id !== userId) {
     db.close();
     return null;
   }
@@ -596,27 +606,35 @@ export function getParameterPresetById(id: number): ParameterPreset | null {
 
 /**
  * すべてのセッションを取得（プレビュー付き）
+ * @param userId - ユーザーID（指定された場合、そのユーザーのセッションのみ取得）
  */
-export function getAllSessions(): ChatSession[] {
+export function getAllSessions(userId?: number): ChatSession[] {
   const db = initDatabase();
 
-  const sessions = db
-    .prepare(
-      `
-      SELECT
-        s.id,
-        s.model,
-        s.created_at,
-        s.title,
-        COUNT(m.id) as message_count,
-        (SELECT content FROM messages WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL ORDER BY id ASC LIMIT 1) as preview
-      FROM sessions s
-      LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
-      GROUP BY s.id
-      ORDER BY s.created_at DESC
-    `
-    )
-    .all() as ChatSession[];
+  let query = `
+    SELECT
+      s.id,
+      s.model,
+      s.created_at,
+      s.title,
+      COUNT(m.id) as message_count,
+      (SELECT content FROM messages WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL ORDER BY id ASC LIMIT 1) as preview
+    FROM sessions s
+    LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
+  `;
+
+  if (userId !== undefined) {
+    query += ` WHERE s.user_id = ?`;
+  }
+
+  query += `
+    GROUP BY s.id
+    ORDER BY s.created_at DESC
+  `;
+
+  const sessions = userId !== undefined
+    ? db.prepare(query).all(userId) as ChatSession[]
+    : db.prepare(query).all() as ChatSession[];
 
   db.close();
   return sessions;

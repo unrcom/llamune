@@ -33,12 +33,14 @@ router.post('/messages', async (req: Request, res: Response) => {
     }
 
     // セッションを作成または復元
+    const userId = req.user?.userId;
     let session: ChatSession;
     if (sessionId) {
-      const existing = ChatSession.fromSessionId(sessionId);
+      // 既存セッションの所有者チェック
+      const existing = ChatSession.fromSessionId(sessionId, userId);
       if (!existing) {
         const error: ApiError = {
-          error: 'Session not found',
+          error: 'Session not found or access denied',
           code: 'NOT_FOUND',
           statusCode: 404,
         };
@@ -47,9 +49,9 @@ router.post('/messages', async (req: Request, res: Response) => {
       }
       session = existing;
     } else {
-      // 新規セッション
+      // 新規セッション（user_idを設定）
       const model = modelName || 'gemma2:9b';
-      session = new ChatSession(model, null, history);
+      session = new ChatSession(model, null, history, undefined, userId);
     }
 
     // SSEヘッダーを設定
@@ -118,12 +120,14 @@ router.post('/retry', async (req: Request, res: Response) => {
     }
 
     // セッションを復元
+    const userId = req.user?.userId;
     let session: ChatSession;
     if (sessionId) {
-      const existing = ChatSession.fromSessionId(sessionId);
+      // 既存セッションの所有者チェック
+      const existing = ChatSession.fromSessionId(sessionId, userId);
       if (!existing) {
         const error: ApiError = {
-          error: 'Session not found',
+          error: 'Session not found or access denied',
           code: 'NOT_FOUND',
           statusCode: 404,
         };
@@ -142,7 +146,7 @@ router.post('/retry', async (req: Request, res: Response) => {
         res.status(400).json(error);
         return;
       }
-      session = new ChatSession(modelName, null, history);
+      session = new ChatSession(modelName, null, history, undefined, userId);
     }
 
     // SSEヘッダーを設定
@@ -198,7 +202,9 @@ router.post('/retry', async (req: Request, res: Response) => {
  */
 router.get('/sessions', (req: Request, res: Response) => {
   try {
-    const sessions = getAllSessions();
+    // ログインユーザーのセッションのみ取得
+    const userId = req.user?.userId;
+    const sessions = getAllSessions(userId);
     const response: SessionsResponse = {
       sessions: sessions.map((s) => ({
         id: s.id,
@@ -236,10 +242,12 @@ router.get('/sessions/:id', (req: Request, res: Response) => {
       return;
     }
 
-    const sessionData = getSession(sessionId);
+    // ログインユーザーのセッションのみ取得（所有者チェック）
+    const userId = req.user?.userId;
+    const sessionData = getSession(sessionId, userId);
     if (!sessionData) {
       const error: ApiError = {
-        error: 'Session not found',
+        error: 'Session not found or access denied',
         code: 'NOT_FOUND',
         statusCode: 404,
       };
@@ -289,10 +297,12 @@ router.delete('/sessions/:id/rewind', (req: Request, res: Response) => {
       return;
     }
 
-    const session = ChatSession.fromSessionId(sessionId);
+    // 所有者チェック
+    const userId = req.user?.userId;
+    const session = ChatSession.fromSessionId(sessionId, userId);
     if (!session) {
       const error: ApiError = {
-        error: 'Session not found',
+        error: 'Session not found or access denied',
         code: 'NOT_FOUND',
         statusCode: 404,
       };
@@ -339,10 +349,12 @@ router.put('/sessions/:id/model', (req: Request, res: Response) => {
       return;
     }
 
-    const session = ChatSession.fromSessionId(sessionId);
+    // 所有者チェック
+    const userId = req.user?.userId;
+    const session = ChatSession.fromSessionId(sessionId, userId);
     if (!session) {
       const error: ApiError = {
-        error: 'Session not found',
+        error: 'Session not found or access denied',
         code: 'NOT_FOUND',
         statusCode: 404,
       };
@@ -389,14 +401,27 @@ router.put('/sessions/:id/title', (req: Request, res: Response) => {
       return;
     }
 
-    const success = updateSessionTitle(sessionId, title);
-    if (!success) {
+    // 所有者チェック
+    const userId = req.user?.userId;
+    const sessionData = getSession(sessionId, userId);
+    if (!sessionData) {
       const error: ApiError = {
-        error: 'Session not found',
+        error: 'Session not found or access denied',
         code: 'NOT_FOUND',
         statusCode: 404,
       };
       res.status(404).json(error);
+      return;
+    }
+
+    const success = updateSessionTitle(sessionId, title);
+    if (!success) {
+      const error: ApiError = {
+        error: 'Failed to update title',
+        code: 'INTERNAL_ERROR',
+        statusCode: 500,
+      };
+      res.status(500).json(error);
       return;
     }
 
@@ -427,14 +452,27 @@ router.delete('/sessions/:id', (req: Request, res: Response) => {
       return;
     }
 
-    const success = deleteSession(sessionId);
-    if (!success) {
+    // 所有者チェック
+    const userId = req.user?.userId;
+    const sessionData = getSession(sessionId, userId);
+    if (!sessionData) {
       const error: ApiError = {
-        error: 'Session not found',
+        error: 'Session not found or access denied',
         code: 'NOT_FOUND',
         statusCode: 404,
       };
       res.status(404).json(error);
+      return;
+    }
+
+    const success = deleteSession(sessionId);
+    if (!success) {
+      const error: ApiError = {
+        error: 'Failed to delete session',
+        code: 'INTERNAL_ERROR',
+        statusCode: 500,
+      };
+      res.status(500).json(error);
       return;
     }
 
