@@ -24,7 +24,8 @@
     "migrate:presets": "tsx scripts/migrate-add-parameter-presets.ts",
     "migrate:remove-precise": "tsx scripts/migrate-remove-precise-preset.ts",
     "migrate:default-preset": "tsx scripts/migrate-update-default-preset.ts",
-    "migrate:session-title": "tsx scripts/migrate-add-session-title.ts"
+    "migrate:session-title": "tsx scripts/migrate-add-session-title.ts",
+    "migrate:auth": "tsx scripts/migrate-add-auth.ts"
   },
   "keywords": [
     "llm",
@@ -39,20 +40,25 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "better-sqlite3": "^9.2.2",
     "chalk": "^5.3.0",
     "commander": "^11.1.0",
     "cors": "^2.8.5",
     "cosmiconfig": "^9.0.0",
+    "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "ink": "^4.4.1",
+    "jsonwebtoken": "^9.0.2",
     "react": "^18.2.0",
     "systeminformation": "^5.27.11"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^7.6.8",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.5",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.10.6",
     "@types/react": "^18.2.46",
     "@typescript-eslint/eslint-plugin": "^6.16.0",

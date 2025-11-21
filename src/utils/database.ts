@@ -56,6 +56,29 @@ export interface ParameterPreset {
 }
 
 /**
+ * ユーザーの型定義
+ */
+export interface User {
+  id: number;
+  username: string;
+  password_hash: string;
+  role: 'admin' | 'user';
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * リフレッシュトークンの型定義
+ */
+export interface RefreshToken {
+  id: number;
+  user_id: number;
+  token: string;
+  expires_at: string;
+  created_at: string;
+}
+
+/**
  * データベースを初期化
  */
 export function initDatabase(): Database.Database {
@@ -634,6 +657,236 @@ export function deleteSession(sessionId: number): boolean {
 
     db.close();
     return result.changes > 0;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+// ========================================
+// ユーザー管理
+// ========================================
+
+/**
+ * ユーザーを作成
+ */
+export function createUser(
+  username: string,
+  passwordHash: string,
+  role: 'admin' | 'user' = 'user'
+): number {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare(
+        'INSERT INTO users (username, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(username, passwordHash, role, now, now);
+
+    db.close();
+    return result.lastInsertRowid as number;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ユーザー名でユーザーを取得
+ */
+export function getUserByUsername(username: string): User | null {
+  const db = initDatabase();
+
+  try {
+    const user = db
+      .prepare('SELECT * FROM users WHERE username = ?')
+      .get(username) as User | undefined;
+
+    db.close();
+    return user || null;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * IDでユーザーを取得
+ */
+export function getUserById(userId: number): User | null {
+  const db = initDatabase();
+
+  try {
+    const user = db
+      .prepare('SELECT * FROM users WHERE id = ?')
+      .get(userId) as User | undefined;
+
+    db.close();
+    return user || null;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * すべてのユーザーを取得（管理者用）
+ */
+export function getAllUsers(): User[] {
+  const db = initDatabase();
+
+  try {
+    const users = db
+      .prepare('SELECT id, username, role, created_at, updated_at FROM users ORDER BY created_at DESC')
+      .all() as User[];
+
+    db.close();
+    return users;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ユーザーのパスワードを更新
+ */
+export function updateUserPassword(userId: number, newPasswordHash: string): boolean {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
+      .run(newPasswordHash, now, userId);
+
+    db.close();
+    return result.changes > 0;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ユーザーを削除
+ */
+export function deleteUser(userId: number): boolean {
+  const db = initDatabase();
+
+  try {
+    // カスケード削除により、関連するsessions, refresh_tokensも削除される
+    const result = db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+
+    db.close();
+    return result.changes > 0;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+// ========================================
+// リフレッシュトークン管理
+// ========================================
+
+/**
+ * リフレッシュトークンを保存
+ */
+export function saveRefreshToken(
+  userId: number,
+  token: string,
+  expiresAt: string
+): number {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare(
+        'INSERT INTO refresh_tokens (user_id, token, expires_at, created_at) VALUES (?, ?, ?, ?)'
+      )
+      .run(userId, token, expiresAt, now);
+
+    db.close();
+    return result.lastInsertRowid as number;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * リフレッシュトークンを取得
+ */
+export function getRefreshToken(token: string): RefreshToken | null {
+  const db = initDatabase();
+
+  try {
+    const refreshToken = db
+      .prepare('SELECT * FROM refresh_tokens WHERE token = ?')
+      .get(token) as RefreshToken | undefined;
+
+    db.close();
+    return refreshToken || null;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ユーザーのリフレッシュトークンを削除
+ */
+export function deleteRefreshToken(token: string): boolean {
+  const db = initDatabase();
+
+  try {
+    const result = db.prepare('DELETE FROM refresh_tokens WHERE token = ?').run(token);
+
+    db.close();
+    return result.changes > 0;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ユーザーのすべてのリフレッシュトークンを削除
+ */
+export function deleteAllRefreshTokensForUser(userId: number): number {
+  const db = initDatabase();
+
+  try {
+    const result = db
+      .prepare('DELETE FROM refresh_tokens WHERE user_id = ?')
+      .run(userId);
+
+    db.close();
+    return result.changes;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * 期限切れのリフレッシュトークンを削除
+ */
+export function cleanupExpiredRefreshTokens(): number {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare('DELETE FROM refresh_tokens WHERE expires_at < ?')
+      .run(now);
+
+    db.close();
+    return result.changes;
   } catch (error) {
     db.close();
     throw error;
