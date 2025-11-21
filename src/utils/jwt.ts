@@ -2,7 +2,7 @@
  * JWT管理ユーティリティ
  */
 
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions, VerifyOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 
 // 環境変数から取得（デフォルト値は開発用のみ）
@@ -32,9 +32,9 @@ export interface TokenPair {
  */
 export function generateAccessToken(payload: JwtPayload): string {
   return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_ACCESS_EXPIRY,
+    expiresIn: JWT_ACCESS_EXPIRY as any,
     issuer: 'llamune-api',
-  });
+  } as SignOptions);
 }
 
 /**
@@ -61,7 +61,7 @@ export function verifyAccessToken(token: string): JwtPayload | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: 'llamune-api',
-    }) as JwtPayload;
+    } as VerifyOptions) as JwtPayload;
     return decoded;
   } catch (error) {
     return null;
