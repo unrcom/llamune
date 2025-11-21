@@ -4,7 +4,7 @@ import cors from 'cors';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { authenticate } from './middleware/auth.js';
+import { authenticateJWT } from './middleware/jwt-auth.js';
 import { validateJwtConfig } from '../utils/jwt.js';
 import modelsRouter from './routes/models.js';
 import presetsRouter from './routes/presets.js';
@@ -97,8 +97,8 @@ app.get('/api', (req, res) => {
 // 認証ルート（認証不要）
 app.use('/api/auth', authRouter);
 
-// 旧認証ミドルウェアを他のエンドポイントに適用（後でJWTに移行）
-app.use('/api', authenticate);
+// JWT認証ミドルウェアを他のAPIエンドポイントに適用
+app.use('/api', authenticateJWT);
 
 // ルーティング
 app.use('/api/models', modelsRouter);
