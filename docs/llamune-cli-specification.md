@@ -1,54 +1,65 @@
-# Llamune CLI 版 仕様書
+# Llamune CLI版 仕様書
 
-ink による CLI/TUI アプリケーションの詳細仕様
+Node.js + Commander.js + readline による CLI アプリケーションの実装仕様
+
+**ステータス**: ✅ Phase 1 完了  
+**バージョン**: 0.1.0  
+**最終更新**: 2025-11-15
 
 ---
 
 ## 目次
 
 1. [概要](#概要)
-2. [コマンド設計](#コマンド設計)
-3. [UI 設計](#ui設計)
-4. [データ構造](#データ構造)
-5. [技術アーキテクチャ](#技術アーキテクチャ)
-6. [開発タスク](#開発タスク)
-7. [テスト計画](#テスト計画)
+2. [実装済み機能](#実装済み機能)
+3. [コマンド設計](#コマンド設計)
+4. [チャット特殊コマンド](#チャット特殊コマンド)
+5. [データ構造](#データ構造)
+6. [技術アーキテクチャ](#技術アーキテクチャ)
+7. [開発完了タスク](#開発完了タスク)
 
 ---
 
 ## 概要
 
-### Phase 1: MVP（CLI 版のみ）
+### Phase 1: CLI版 MVP（✅ 完了）
 
 **目的:**
-最小限の機能で、複数 LLM の比較・活用の価値を検証
+複数LLMの比較・活用の価値を検証する最小限の機能を実装
 
-**スコープ:**
+**実装期間:**
+2025-12 ~ 2026-01（7週間）
 
+**実装スコープ:**
 ```
-必須機能:
-├─ 複数LLM実行（gemma2, deepseek-r1, qwen2.5）
-├─ 会話履歴管理（SQLite）
-├─ LLM選択・パラメータ調整
-├─ 結果の比較表示（テキストベース）
-└─ 設定管理（YAML/JSON）
+✅ 実装済み機能:
+├─ CLI インターフェース（llamune / llmn コマンド）
+├─ モデル管理（ダウンロード・削除・一覧表示）
+├─ チャット機能（会話履歴の保存・再開）
+├─ /retry 機能（異なるモデル・プリセットで再実行）
+├─ /rewind 機能（会話履歴の巻き戻し）
+├─ /switch 機能（モデル切り替え）
+├─ パラメータプリセット（balanced, creative, fast）
+├─ 推奨モデル表示（システムスペックに応じて）
+├─ SQLite データベース（会話履歴の永続化）
+└─ ollama 自動起動
 
-見送り機能（Phase 2以降）:
+❌ Phase 2以降に見送り:
+├─ バックグラウンド推論（並列実行）
 ├─ リッチなマークダウン描画
 ├─ アーティファクト管理
-├─ バックグラウンド推論
-├─ Web UI
-└─ RAG機能
+└─ Web UI
 ```
 
 ### 技術スタック
 
 ```typescript
+実装済み:
 - ランタイム: Node.js 18+
 - 言語: TypeScript
 - CLI Framework: Commander.js
-- TUI: ink (React for CLI)
-- DB: better-sqlite3
+- UI: readline（標準入力/出力）
+- DB: better-sqlite3 (SQLite)
 - HTTP Client: native fetch
 - Config: cosmiconfig
 - Testing: Vitest
@@ -57,17 +68,14 @@ ink による CLI/TUI アプリケーションの詳細仕様
 ### 前提条件
 
 **必須:**
-
 - Node.js 18+ インストール済み
 - ollama インストール済み
 
 **ollama の起動:**
-
-- 不要（Llamune が自動起動）
+- 不要（Llamuneが自動起動）
 - `ollama serve` を手動実行する必要なし
 
 **確認方法:**
-
 ```bash
 # ollamaがインストールされているか確認
 $ ollama --version
@@ -81,8 +89,7 @@ deepseek-r1:7b    ...            4.7 GB
 qwen2.5:14b       ...            8.5 GB
 ```
 
-**Llamune の動作:**
-
+**Llamuneの動作:**
 1. ollama の状態を確認
 2. 起動していなければ自動起動
 3. 処理開始
@@ -100,577 +107,539 @@ $ llamune chat
 
 ---
 
-## コマンド設計
+## 実装済み機能
 
-### コマンド一覧
+### 1. モデル管理
 
-```bash
-# メインコマンド
-llamune                 # インタラクティブモード起動
-
-# サブコマンド
-llamune chat            # チャット開始
-llamune compare <query> # 複数LLMで比較
-llamune config          # 設定管理
-llamune models          # モデル一覧表示
-llamune history         # 会話履歴表示
-llamune help            # ヘルプ表示
-llamune version         # バージョン表示
-```
-
-### 1. メインコマンド: llamune
+#### モデル一覧表示
 
 ```bash
-$ llamune
+$ llamune ls
+# または
+$ llmn ls
 
-# 動作:
-# 1. インタラクティブモードで起動
-# 2. メニューを表示
-# 3. ユーザーの選択を待つ
+📦 インストール済みモデル:
+
+NAME              SIZE     MODIFIED
+gemma2:9b        5.4 GB   2 days ago
+deepseek-r1:7b   4.7 GB   1 week ago
+qwen2.5:14b      8.5 GB   3 days ago
+
+合計: 3 モデル (18.6 GB)
 ```
 
-**表示例:**
+#### モデルのダウンロード
 
-```
-╔═══════════════════════════════════════╗
-║ Llamune v0.1.0 - CLI Edition          ║
-╠═══════════════════════════════════════╣
-║ 🔒 Closed Network LLM Platform        ║
-║ 📊 Network Traffic: 0 MB ✅           ║
-╚═══════════════════════════════════════╝
+```bash
+$ llamune pull gemma2:9b
+# または
+$ llmn pull gemma2:9b
 
-Available Models:
-  ✓ gemma2:9b      (9.2B params)
-  ✓ deepseek-r1:7b (7.0B params)
-  ✓ qwen2.5:14b    (14.0B params)
-
-What would you like to do?
-  › Start Chat
-    Compare Models
-    View History
-    Settings
-    Exit
-
-Use ↑↓ arrows to navigate, Enter to select
+📥 gemma2:9b をダウンロード中...
+pulling manifest
+pulling 8934d96d3f08... 100% ▕████████████████▏ 5.4 GB
+pulling 8c17c2ebb0ea... 100% ▕████████████████▏  7.0 KB
+pulling 7c23fb36d801... 100% ▕████████████████▏  4.8 KB
+pulling 2e0493f67d0c... 100% ▕████████████████▏   59 B
+pulling fa304d675061... 100% ▕████████████████▏   91 B
+pulling 42ba7f8a01dd... 100% ▕████████████████▏  557 B
+verifying sha256 digest
+writing manifest
+removing any unused layers
+success
 ```
 
-### 2. chat コマンド
+#### モデルの削除
+
+```bash
+$ llamune rm gemma2:9b
+# または
+$ llmn rm gemma2:9b
+
+⚠️  gemma2:9b を削除してもよろしいですか? (y/N): y
+🗑️  gemma2:9b を削除しました
+```
+
+#### 推奨モデルの表示
+
+```bash
+$ llamune recommend
+# または
+$ llmn recommend
+
+💻 システム仕様:
+  CPU: Apple M1
+  メモリ: 16 GB
+  OS: macOS 14.0
+
+📊 推奨モデル (16GB RAM):
+
+1. gemma2:9b (5.4 GB)
+   高品質な応答、最速の推論速度
+   ✅ インストール済み
+
+2. deepseek-r1:7b (4.7 GB)
+   Reasoning特化、思考プロセスを表示
+   ✅ インストール済み
+
+3. qwen2.5:14b (8.5 GB)
+   高性能、バランス型
+   ✅ インストール済み
+
+推奨: 最初は gemma2:9b から始めることをお勧めします
+```
+
+### 2. チャット機能
+
+#### 基本的なチャット
 
 ```bash
 $ llamune chat
+# または
+$ llmn chat
 
-# オプション
-$ llamune chat --model gemma2:9b
-$ llamune chat --temperature 0.8
-$ llamune chat --continue <session-id>
+利用可能なモデル:
+
+⭐ 1. gemma2:9b (前回使用)
+   2. deepseek-r1:7b
+   3. qwen2.5:14b
+
+モデルを選択してください (番号): 1
+
+💬 Chat モード
+モデル: gemma2:9b
+
+終了するには "exit" または "quit" と入力してください
+---
+
+You: こんにちは
+AI (gemma2:9b): こんにちは！何かお手伝いできることはありますか？
+
+You: exit
 ```
 
-**動作:**
+#### モデルを指定してチャット
 
-```typescript
-interface ChatOptions {
-  model?: string; // デフォルト: gemma2:9b
-  temperature?: number; // デフォルト: 0.7
-  continue?: string; // 会話IDを指定して継続
-}
-```
+```bash
+$ llamune chat -m gemma2:9b
+# または
+$ llmn chat -m gemma2:9b
 
-**表示例:**
+💬 Chat モード
+モデル: gemma2:9b
 
-````
-╔═══════════════════════════════════════╗
-║ Chat Mode                             ║
-║ Model: gemma2:9b                      ║
-║ Temperature: 0.7                      ║
-╚═══════════════════════════════════════╝
+終了するには "exit" または "quit" と入力してください
+---
 
 You: Pythonでクイックソートを実装して
+AI (gemma2:9b): はい、実装します...
+```
 
-AI: はい、実装します...
-
-```python
-def quick_sort(arr):
-    if len(arr) <= 1:
-        return arr
-    pivot = arr[len(arr) // 2]
-    left = [x for x in arr if x < pivot]
-    middle = [x for x in arr if x == pivot]
-    right = [x for x in arr if x > pivot]
-    return quick_sort(left) + middle + quick_sort(right)
-````
-
-[Completed in 28s]
-
-You: \_
-
-````
-
-**操作:**
-- `/help` - ヘルプ表示
-- `/model` - モデル切り替え
-- `/params` - パラメータ調整
-- `/save` - 会話を保存
-- `/exit` - チャット終了
-
-### 3. compare コマンド
+#### 過去の会話を再開
 
 ```bash
-$ llamune compare "Pythonでクイックソート"
+$ llamune chat -c 1
+# または
+$ llmn chat -c 1
 
-# オプション
-$ llamune compare "質問" --models gemma2:9b,qwen2.5:14b
-$ llamune compare "質問" --all  # 全モデルで実行
-````
+💬 Chat モード（会話を再開）
+セッションID: 1
+モデル: gemma2:9b
 
-**動作:**
+--- 過去の会話 ---
 
-```typescript
-interface CompareOptions {
-  models?: string[]; // デフォルト: 推奨3モデル
-  all?: boolean; // 全てのモデル
-  parallel?: boolean; // 並列実行（デフォルト: true）
-}
+You: こんにちは
+AI (gemma2:9b): こんにちは！何かお手伝いできることはありますか？
+
+You: Pythonでクイックソートを実装して
+AI (gemma2:9b): はい、実装します...
+
+--- 会話の続きを開始 ---
+
+You: 
 ```
 
-**表示例:**
+### 3. 会話履歴管理
 
-```
-╔═══════════════════════════════════════╗
-║ Comparing with 3 models...            ║
-╚═══════════════════════════════════════╝
-
-⏳ gemma2:9b      [████████░░] 80%
-✓  qwen2.5:14b    [28s]
-⏳ deepseek-r1:7b [████░░░░░░] 40%
-
-─────────────────────────────────────────
-
-╔═══════════════════════════════════════╗
-║ Results                               ║
-╠═══════════════════════════════════════╣
-║                                       ║
-║ Common Approach:                      ║
-║ • 再帰的実装                          ║
-║ • ピボット選択: 中央要素              ║
-║                                       ║
-║ Differences:                          ║
-║ [1] gemma2:9b    - シンプル実装       ║
-║ [2] qwen2.5:14b  - エラー処理追加     ║
-║ [3] deepseek-r1  - 最適化版           ║
-║                                       ║
-╚═══════════════════════════════════════╝
-
-View details:
-  [1] gemma2:9b
-  [2] qwen2.5:14b
-  [3] deepseek-r1:7b
-  [a] Show all
-  [s] Save comparison
-  [q] Quit
-
-> _
-```
-
-### 4. config コマンド
-
-```bash
-$ llamune config
-
-# サブコマンド
-$ llamune config list              # 設定一覧
-$ llamune config set <key> <value> # 設定変更
-$ llamune config reset             # デフォルトに戻す
-```
-
-**設定項目:**
-
-```typescript
-interface Config {
-  // デフォルトモデル
-  defaultModel: string;
-
-  // 推奨モデル設定
-  recommendedModels: string[];
-
-  // デフォルトパラメータ
-  defaultParameters: {
-    temperature: number;
-    top_p: number;
-    max_tokens: number;
-  };
-
-  // 表示設定
-  display: {
-    colors: boolean;
-    timestamps: boolean;
-    modelInfo: boolean;
-  };
-
-  // ollama接続
-  ollamaUrl: string;
-}
-```
-
-**表示例:**
-
-```
-╔═══════════════════════════════════════╗
-║ Configuration                         ║
-╠═══════════════════════════════════════╣
-║                                       ║
-║ defaultModel: gemma2:9b               ║
-║ recommendedModels:                    ║
-║   - gemma2:9b                         ║
-║   - deepseek-r1:7b                    ║
-║   - qwen2.5:14b                       ║
-║                                       ║
-║ defaultParameters:                    ║
-║   temperature: 0.7                    ║
-║   top_p: 0.9                          ║
-║   max_tokens: 500                     ║
-║                                       ║
-║ display:                              ║
-║   colors: true                        ║
-║   timestamps: true                    ║
-║   modelInfo: true                     ║
-║                                       ║
-║ ollamaUrl: http://localhost:11434    ║
-║                                       ║
-╚═══════════════════════════════════════╝
-
-[e] Edit  [r] Reset  [q] Quit
-```
-
-### 5. models コマンド
-
-```bash
-$ llamune models
-
-# サブコマンド
-$ llamune models list      # インストール済みモデル
-$ llamune models available # 利用可能なモデル
-$ llamune models info <name> # モデル詳細
-```
-
-**表示例:**
-
-```
-╔═══════════════════════════════════════╗
-║ Installed Models                      ║
-╠═══════════════════════════════════════╣
-║                                       ║
-║ ✓ gemma2:9b                           ║
-║   Size: 5.4GB                         ║
-║   Parameters: 9.2B                    ║
-║   Family: Gemma 2                     ║
-║                                       ║
-║ ✓ deepseek-r1:7b                      ║
-║   Size: 4.7GB                         ║
-║   Parameters: 7.0B                    ║
-║   Family: DeepSeek-R1                 ║
-║   Features: Reasoning, Thinking       ║
-║                                       ║
-║ ✓ qwen2.5:14b                         ║
-║   Size: 8.5GB                         ║
-║   Parameters: 14.0B                   ║
-║   Family: Qwen 2.5                    ║
-║                                       ║
-╚═══════════════════════════════════════╝
-
-Total: 3 models, 18.6GB
-```
-
-### 6. history コマンド
+#### 会話履歴一覧
 
 ```bash
 $ llamune history
+# または
+$ llmn history
 
-# オプション
-$ llamune history --limit 10
-$ llamune history --model gemma2:9b
-$ llamune history --search "クイックソート"
+📚 会話履歴:
+
+ID  モデル          メッセージ数  最終更新           プレビュー
+─────────────────────────────────────────────────────────────────
+1   gemma2:9b      4            2 hours ago        こんにちは
+2   deepseek-r1:7b 8            1 day ago          Pythonでクイックソート...
+3   qwen2.5:14b    6            3 days ago         機械学習について教えて
+
+合計: 3 セッション
 ```
 
-**表示例:**
+#### 会話の削除
 
+```bash
+$ llamune history delete 1
+# または
+$ llmn history delete 1
+
+⚠️  セッションID 1 を削除してもよろしいですか? (y/N): y
+🗑️  セッションID 1 を削除しました
 ```
-╔═══════════════════════════════════════╗
-║ Chat History                          ║
-╠═══════════════════════════════════════╣
-║                                       ║
-║ [1] 2025-11-11 18:30                  ║
-║     Model: gemma2:9b                  ║
-║     "Pythonでクイックソート..."       ║
-║     5 messages                        ║
-║                                       ║
-║ [2] 2025-11-11 15:20                  ║
-║     Model: qwen2.5:14b                ║
-║     "REST APIの実装方法..."           ║
-║     12 messages                       ║
-║                                       ║
-║ [3] 2025-11-10 10:15                  ║
-║     Comparison (3 models)             ║
-║     "認証機能の実装..."               ║
-║                                       ║
-╚═══════════════════════════════════════╝
 
-[v] View  [d] Delete  [e] Export  [q] Quit
+#### 会話のタイトル変更
+
+```bash
+$ llamune history rename 1 "クイックソートの実装"
+# または
+$ llmn history rename 1 "クイックソートの実装"
+
+✅ セッションID 1 のタイトルを変更しました
 ```
 
 ---
 
-## UI 設計
+## チャット特殊コマンド
 
-### ink コンポーネント構成
+チャット中に使用できる特殊コマンド
 
-```typescript
-src/ui/
-├── App.tsx              # ルートコンポーネント
-├── components/
-│   ├── Header.tsx       # ヘッダー
-│   ├── Menu.tsx         # メインメニュー
-│   ├── Chat.tsx         # チャット画面
-│   ├── Compare.tsx      # 比較画面
-│   ├── Config.tsx       # 設定画面
-│   ├── ModelList.tsx    # モデル一覧
-│   ├── History.tsx      # 履歴画面
-│   ├── ProgressBar.tsx  # プログレスバー
-│   └── StatusBar.tsx    # ステータスバー
-└── hooks/
-    ├── useOllama.ts     # ollama接続
-    ├── useDatabase.ts   # DB操作
-    └── useConfig.ts     # 設定管理
+### /retry - 回答の再生成
+
+最後の質問を別のモデル・プリセットで再実行し、回答を比較できます。
+
+**使い方:**
+```bash
+You: Pythonでクイックソートを実装して
+AI (gemma2:9b): はい、実装します...
+
+You: /retry
+
+モデルとプリセットの組み合わせ:
+
+⭐ 1. gemma2:9b (balanced)
+   2. gemma2:9b (creative)
+   3. gemma2:9b (fast)
+   4. deepseek-r1:7b (balanced)
+   5. deepseek-r1:7b (creative)
+   6. deepseek-r1:7b (fast)
+   7. qwen2.5:14b (balanced)
+   8. qwen2.5:14b (creative)
+   9. qwen2.5:14b (fast)
+
+組み合わせを選択してください (番号): 4
+
+🔄 deepseek-r1:7b (balanced) で再実行します...
+
+AI (deepseek-r1:7b (balanced)): Pythonでクイックソート...
+
+💡 この回答を採用しますか？
+  yes, y  - 採用 (deepseek-r1:7b (balanced) の回答を採用する)
+  no, n   - 破棄 (gemma2:9b の回答を採用する)
+
+You: yes
+✅ deepseek-r1:7b の回答を採用しました
 ```
 
-### コンポーネント例
+**機能詳細:**
+- 最後のアシスタントの回答を一時的に保留
+- 選択したモデル・プリセットで再実行
+- 新旧の回答を比較
+- `yes` / `y` で新しい回答を採用
+- `no` / `n` で元の回答を維持
 
-#### Header.tsx
+**実装上の特徴:**
+- 論理削除により元の回答もデータベースに保持
+- 会話履歴の一貫性を維持
+- プリセットのパラメータを適用
 
-```typescript
-import React from "react";
-import { Box, Text } from "ink";
+### /rewind - 会話の巻き戻し
 
-interface HeaderProps {
-  version: string;
-}
+指定した往復まで会話を巻き戻し、そこから別の展開を試せます。
 
-export const Header: React.FC<HeaderProps> = ({ version }) => (
-  <Box
-    borderStyle="double"
-    borderColor="cyan"
-    padding={1}
-    flexDirection="column"
-  >
-    <Box justifyContent="space-between">
-      <Text bold color="cyan">
-        Llamune {version}
-      </Text>
-      <Text dimColor>CLI Edition</Text>
-    </Box>
-    <Box marginTop={1}>
-      <Text>🔒 Closed Network LLM Platform</Text>
-    </Box>
-    <Box>
-      <Text>📊 Network Traffic: </Text>
-      <Text color="green" bold>
-        0 MB ✅
-      </Text>
-    </Box>
-  </Box>
-);
+**使い方:**
+```bash
+You: /history
+
+📜 現在の会話履歴:
+
+[1] You: こんにちは
+    AI (gemma2:9b): こんにちは！何かお手伝いできることは...
+
+[2] You: Pythonでクイックソートを実装して
+    AI (gemma2:9b): はい、実装します...
+
+[3] You: これを高速化できますか？
+    AI (gemma2:9b): はい、Timsortを使用すれば...
+
+合計: 3 往復
+
+You: /rewind 2
+
+⚠️  会話 #2 まで巻き戻しますか？
+  yes, y  - 実行 (往復 #3 以降を削除)
+  no, n   - キャンセル
+
+You: yes
+✅ 会話 #2 まで巻き戻しました
+削除されたメッセージ: 2件
+
+You: 別のアプローチを教えて
+AI (gemma2:9b): マージソートを使うこともできます...
 ```
 
-#### Chat.tsx
+**機能詳細:**
+- 往復番号を指定（1始まり）
+- 指定した往復以降のメッセージを論理削除
+- yes/no で確認してから実行
+- 削除されたメッセージ数を表示
 
-```typescript
-import React, { useState } from "react";
-import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+**実装上の特徴:**
+- 論理削除（`deleted_at` カラム）で実装
+- 物理削除せずデータを保持
+- セッションがある場合はDBも更新
+- 新規会話の場合はメモリ上で巻き戻し
 
-interface ChatProps {
-  model: string;
-  onMessage: (message: string) => void;
-}
+### /switch - モデル切り替え
 
-export const Chat: React.FC<ChatProps> = ({ model, onMessage }) => {
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<
-    Array<{
-      role: "user" | "assistant";
-      content: string;
-    }>
-  >([]);
+現在のモデルを別のモデルに切り替えます。
 
-  const handleSubmit = () => {
-    if (!input.trim()) return;
+**使い方:**
+```bash
+You: /switch deepseek-r1:7b
 
-    onMessage(input);
-    setMessages([...messages, { role: "user", content: input }]);
-    setInput("");
-  };
+✅ モデルを deepseek-r1:7b に切り替えました
 
-  return (
-    <Box flexDirection="column">
-      <Box borderStyle="round" padding={1} marginBottom={1}>
-        <Text>Model: </Text>
-        <Text color="cyan" bold>
-          {model}
-        </Text>
-      </Box>
-
-      <Box flexDirection="column" marginBottom={1}>
-        {messages.map((msg, i) => (
-          <Box key={i} marginBottom={1}>
-            <Text color={msg.role === "user" ? "green" : "blue"} bold>
-              {msg.role === "user" ? "You" : "AI"}:
-            </Text>
-            <Text> {msg.content}</Text>
-          </Box>
-        ))}
-      </Box>
-
-      <Box>
-        <Text color="green">You: </Text>
-        <TextInput value={input} onChange={setInput} onSubmit={handleSubmit} />
-      </Box>
-    </Box>
-  );
-};
+You: 続きをお願いします
+AI (deepseek-r1:7b): はい、続きます...
 ```
 
-### カラースキーム
+**機能詳細:**
+- モデル名を引数に指定
+- 会話履歴は引き継がれる
+- 最後に使用したモデルとして記憶
 
-```typescript
-const colors = {
-  primary: 'cyan',
-  success: 'green',
-  warning: 'yellow',
-  error: 'red',
-  info: 'blue',
-  muted: 'gray',
-};
+### /history - 会話履歴表示
 
-// 使用例
-<Text color={colors.primary}>Llamune</Text>
-<Text color={colors.success}>✓ Completed</Text>
-<Text color={colors.warning}>⚠ Warning</Text>
-<Text color={colors.error}>✗ Error</Text>
+現在の会話の履歴を往復単位で表示します。
+
+**使い方:**
+```bash
+You: /history
+
+📜 現在の会話履歴:
+
+[1] You: こんにちは
+    AI (gemma2:9b): こんにちは！何かお手伝いできることは...
+
+[2] You: Pythonでクイックソートを実装して
+    AI (gemma2:9b): はい、実装します...
+
+[3] You: これを高速化できますか？
+    AI (deepseek-r1:7b): はい、Timsortを使用すれば...
+
+合計: 3 往復
+```
+
+**機能詳細:**
+- 往復単位（User → AI）で表示
+- 各メッセージに往復番号を表示
+- 使用したモデルを表示
+- 長いメッセージはプレビュー表示
+
+### /models - モデル一覧
+
+利用可能なモデルの一覧を表示します。
+
+**使い方:**
+```bash
+You: /models
+
+📦 利用可能なモデル:
+⭐ - gemma2:9b (現在使用中)
+  - deepseek-r1:7b
+  - qwen2.5:14b
+```
+
+### /current - 現在のモデル
+
+現在使用中のモデルを表示します。
+
+**使い方:**
+```bash
+You: /current
+
+📦 現在のモデル: gemma2:9b
+```
+
+### /help - ヘルプ
+
+チャット中のコマンド一覧を表示します。
+
+**使い方:**
+```bash
+You: /help
+
+📖 コマンド一覧:
+
+  /retry          - 最後の質問を別のモデル・プリセットで再実行
+  yes, y, /yes    - retry の回答を採用
+  no, n, /no      - retry の回答を破棄
+  /switch <model> - モデルを切り替え
+  /models         - 利用可能なモデル一覧
+  /current        - 現在のモデルを表示
+  /history        - 現在の会話履歴を表示
+  /rewind <番号>  - 指定した往復まで巻き戻し
+  /help           - このヘルプを表示
+  exit, quit      - チャットを終了
 ```
 
 ---
 
 ## データ構造
 
-### SQLite スキーマ
+### データベーススキーマ
+
+**ファイルパス:** `~/.llamune/history.db`
+
+#### sessions テーブル
 
 ```sql
--- 会話セッション
 CREATE TABLE sessions (
-  id TEXT PRIMARY KEY,
-  mode TEXT NOT NULL,  -- 'chat' | 'compare'
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  model TEXT NOT NULL,              -- 使用モデル名
+  created_at TEXT NOT NULL,         -- 作成日時 (ISO 8601)
+  updated_at TEXT NOT NULL,         -- 更新日時 (ISO 8601)
+  title TEXT                        -- セッションタイトル
 );
-
--- メッセージ
-CREATE TABLE messages (
-  id TEXT PRIMARY KEY,
-  session_id TEXT NOT NULL,
-  role TEXT NOT NULL,  -- 'user' | 'assistant'
-  content TEXT NOT NULL,
-  model_name TEXT,
-  parameters TEXT,  -- JSON
-  execution_time INTEGER,
-  created_at INTEGER NOT NULL,
-  FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
-);
-
--- 比較結果
-CREATE TABLE comparisons (
-  id TEXT PRIMARY KEY,
-  session_id TEXT NOT NULL,
-  query TEXT NOT NULL,
-  models TEXT NOT NULL,  -- JSON array
-  results TEXT NOT NULL,  -- JSON
-  created_at INTEGER NOT NULL,
-  FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
-);
-
--- 設定
-CREATE TABLE config (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
--- インデックス
-CREATE INDEX idx_messages_session ON messages(session_id);
-CREATE INDEX idx_comparisons_session ON comparisons(session_id);
-CREATE INDEX idx_sessions_updated ON sessions(updated_at DESC);
 ```
 
-### TypeScript 型定義
+#### messages テーブル
+
+```sql
+CREATE TABLE messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id INTEGER NOT NULL,      -- セッションID
+  role TEXT NOT NULL,               -- 'user' or 'assistant'
+  content TEXT NOT NULL,            -- メッセージ内容
+  created_at TEXT NOT NULL,         -- 作成日時 (ISO 8601)
+  model TEXT,                       -- 使用モデル名（assistantのみ）
+  deleted_at TEXT,                  -- 論理削除日時 (ISO 8601)
+  FOREIGN KEY (session_id) REFERENCES sessions(id)
+);
+```
+
+**論理削除の仕組み:**
+- `deleted_at` が NULL: 有効なメッセージ
+- `deleted_at` が非 NULL: 削除済みメッセージ（/rewindで設定）
+- 削除済みメッセージは表示されないが、データは保持
+
+#### parameter_presets テーブル
+
+```sql
+CREATE TABLE parameter_presets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,        -- プリセット名（内部用）
+  display_name TEXT NOT NULL,       -- 表示名
+  description TEXT,                 -- 説明
+  temperature REAL,                 -- 温度パラメータ
+  top_p REAL,                       -- Top-p パラメータ
+  top_k INTEGER,                    -- Top-k パラメータ
+  repeat_penalty REAL,              -- 繰り返しペナルティ
+  num_ctx INTEGER,                  -- コンテキストサイズ
+  created_at TEXT NOT NULL          -- 作成日時
+);
+```
+
+**デフォルトプリセット:**
+
+| name     | display_name | temperature | top_p | top_k | repeat_penalty | num_ctx |
+|----------|--------------|-------------|-------|-------|----------------|---------|
+| balanced | バランス     | 0.7         | 0.9   | 40    | 1.1            | 2048    |
+| creative | 創造的       | 1.0         | 0.95  | 50    | 1.0            | 2048    |
+| fast     | 高速         | 0.3         | 0.85  | 30    | 1.2            | 1024    |
+
+#### recommended_models テーブル
+
+```sql
+CREATE TABLE recommended_models (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  min_memory_gb INTEGER NOT NULL,   -- 最小メモリ (GB)
+  max_memory_gb INTEGER,            -- 最大メモリ (GB, NULL=無制限)
+  model_name TEXT NOT NULL,         -- モデル名
+  model_size TEXT NOT NULL,         -- モデルサイズ表示
+  description TEXT NOT NULL,        -- 説明
+  priority INTEGER NOT NULL,        -- 優先順位（1が最優先）
+  created_at TEXT NOT NULL          -- 作成日時
+);
+```
+
+### TypeScript型定義
 
 ```typescript
-// セッション
-interface Session {
-  id: string;
-  mode: "chat" | "compare";
-  createdAt: number;
-  updatedAt: number;
-}
-
-// メッセージ
-interface Message {
-  id: string;
-  sessionId: string;
-  role: "user" | "assistant";
+// チャットメッセージ
+interface ChatMessage {
+  role: 'user' | 'assistant';
   content: string;
-  modelName?: string;
-  parameters?: LLMParameters;
-  executionTime?: number;
-  createdAt: number;
+  model?: string;  // assistantのみ
 }
 
-// LLMパラメータ
-interface LLMParameters {
-  temperature: number;
-  top_p: number;
-  top_k: number;
-  max_tokens: number;
-  repeat_penalty: number;
-}
-
-// 比較結果
-interface Comparison {
-  id: string;
-  sessionId: string;
-  query: string;
-  models: string[];
-  results: ComparisonResult[];
-  createdAt: number;
-}
-
-interface ComparisonResult {
+// チャットセッション
+interface ChatSession {
+  id: number;
   model: string;
-  response: string;
-  executionTime: number;
-  parameters: LLMParameters;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  preview: string;
+  title: string | null;
 }
 
-// 設定
-interface AppConfig {
-  defaultModel: string;
-  recommendedModels: string[];
-  defaultParameters: LLMParameters;
-  display: DisplayConfig;
-  ollamaUrl: string;
+// パラメータプリセット
+interface ParameterPreset {
+  id: number;
+  name: string;
+  display_name: string;
+  description: string | null;
+  temperature: number | null;
+  top_p: number | null;
+  top_k: number | null;
+  repeat_penalty: number | null;
+  num_ctx: number | null;
+  created_at: string;
 }
 
-interface DisplayConfig {
-  colors: boolean;
-  timestamps: boolean;
-  modelInfo: boolean;
+// 推奨モデル
+interface RecommendedModel {
+  id: number;
+  min_memory_gb: number;
+  max_memory_gb: number | null;
+  model_name: string;
+  model_size: string;
+  description: string;
+  priority: number;
+}
+
+// チャットパラメータ
+interface ChatParameters {
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  repeat_penalty?: number;
+  num_ctx?: number;
+}
+```
+
+### 設定ファイル
+
+**ファイルパス:** `~/.llamune/config.json`
+
+```json
+{
+  "lastUsedModel": "gemma2:9b",
+  "defaultPreset": "balanced"
 }
 ```
 
@@ -678,386 +647,353 @@ interface DisplayConfig {
 
 ## 技術アーキテクチャ
 
-### ディレクトリ構成
+### ディレクトリ構造
 
 ```
 llamune/
-├── package.json
-├── tsconfig.json
-├── README.md
-├── LICENSE
-├── .npmignore
 ├── bin/
-│   └── llamune.js          # CLI エントリーポイント
+│   ├── llamune.js          # CLIエントリーポイント
+│   └── llmn.js             # ショートカット
 ├── src/
-│   ├── index.ts            # メイン
-│   ├── commands/
-│   │   ├── chat.ts
-│   │   ├── compare.ts
-│   │   ├── config.ts
-│   │   ├── models.ts
-│   │   └── history.ts
-│   ├── ui/
-│   │   ├── App.tsx
-│   │   ├── components/
-│   │   └── hooks/
-│   ├── llm/
-│   │   ├── ollama.ts       # ollama API
-│   │   ├── executor.ts     # LLM実行
-│   │   └── comparator.ts   # 比較ロジック
-│   ├── storage/
-│   │   ├── database.ts     # SQLite操作
-│   │   └── migrations.ts   # DBマイグレーション
-│   ├── config/
-│   │   ├── defaults.ts     # デフォルト設定
-│   │   └── loader.ts       # 設定ロード
-│   └── utils/
-│       ├── logger.ts
-│       └── validators.ts
-├── test/
-│   └── ...
-└── dist/                   # ビルド成果物
+│   ├── index.ts            # メイン処理
+│   ├── core/
+│   │   └── chat-session.ts # チャットセッション管理
+│   ├── utils/
+│   │   ├── ollama.ts       # ollama連携
+│   │   ├── database.ts     # データベース処理
+│   │   ├── config.ts       # 設定管理
+│   │   └── system.ts       # システム情報取得
+│   └── api/                # API サーバー（Phase 2）
+│       ├── server.ts
+│       └── routes/
+├── scripts/
+│   ├── check-db.ts         # DB確認スクリプト
+│   └── migrate-*.ts        # マイグレーションスクリプト
+├── tests/
+│   └── api/                # APIテスト
+├── package.json
+└── tsconfig.json
 ```
 
-### ollama 連携
+### 主要モジュール
 
+#### src/index.ts
+
+CLIのメインエントリーポイント。Commander.jsを使用してコマンドを定義。
+
+**責務:**
+- コマンドライン引数の解析
+- 各コマンドのハンドラ実装
+- ユーザー入力の処理
+
+**主要な関数:**
+- `selectModel()`: モデル選択UI
+- `selectPreset()`: プリセット選択UI
+- `showSpinner()`: スピナー表示
+- `stopSpinner()`: スピナー停止
+
+#### src/utils/ollama.ts
+
+ollamaとの通信を担当。
+
+**責務:**
+- ollama APIとの通信
+- モデル一覧取得
+- モデルのダウンロード・削除
+- チャット実行（ストリーミング）
+
+**主要な関数:**
+- `ensureOllamaRunning()`: ollama自動起動
+- `listModels()`: モデル一覧取得
+- `pullModel()`: モデルダウンロード
+- `deleteModel()`: モデル削除
+- `chatWithModel()`: チャット実行
+
+**実装例:**
 ```typescript
-// src/llm/ollama.ts
-export class OllamaClient {
-  constructor(private baseUrl: string) {}
+export async function chatWithModel(
+  model: string,
+  messages: ChatMessage[],
+  onChunk: (chunk: string) => void,
+  parameters?: ChatParameters
+): Promise<void> {
+  const response = await fetch('http://localhost:11434/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: true,
+      options: parameters
+    })
+  });
 
-  async generate(params: GenerateParams): Promise<GenerateResponse> {
-    const response = await fetch(`${this.baseUrl}/api/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
-    });
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
 
-    if (!response.ok) {
-      throw new Error(`Ollama error: ${response.status}`);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n').filter(line => line.trim());
+
+    for (const line of lines) {
+      const data = JSON.parse(line);
+      if (data.message?.content) {
+        onChunk(data.message.content);
+      }
     }
-
-    return response.json();
-  }
-
-  async listModels(): Promise<Model[]> {
-    const response = await fetch(`${this.baseUrl}/api/tags`);
-    const data = await response.json();
-    return data.models;
   }
 }
+```
 
-interface GenerateParams {
+#### src/utils/database.ts
+
+SQLiteデータベースとの通信を担当。
+
+**責務:**
+- データベース初期化
+- セッション管理
+- メッセージの保存・取得
+- 論理削除処理
+
+**主要な関数:**
+- `initDatabase()`: DB初期化
+- `createSession()`: セッション作成
+- `saveMessage()`: メッセージ保存
+- `appendMessagesToSession()`: メッセージ追加
+- `getSession()`: セッション取得
+- `getSessionMessagesWithTurns()`: 往復単位でメッセージ取得
+- `logicalDeleteMessagesAfterTurn()`: 論理削除
+- `getAllParameterPresets()`: プリセット取得
+
+#### src/utils/config.ts
+
+設定ファイルの読み書きを担当。
+
+**責務:**
+- 最後に使用したモデルの保存・取得
+- デフォルトプリセットの管理
+
+**主要な関数:**
+- `getLastUsedModel()`: 最後のモデル取得
+- `saveLastUsedModel()`: モデル保存
+
+#### src/utils/system.ts
+
+システム情報の取得を担当。
+
+**責務:**
+- CPUとメモリ情報の取得
+- 推奨モデルの表示
+- システムスペック表示
+
+**主要な関数:**
+- `getSystemSpec()`: システム情報取得
+- `getRecommendedModels()`: 推奨モデル取得
+- `displaySystemSpec()`: システム情報表示
+- `displayRecommendedModels()`: 推奨モデル表示
+
+### 状態管理
+
+**チャット中の状態:**
+```typescript
+// 会話履歴
+let messages: ChatMessage[] = [];
+
+// セッションID
+let sessionId: number | null = null;
+
+// 選択中のモデル
+let selectedModel: string;
+
+// パラメータ
+let selectedParameters: ChatParameters | undefined;
+
+// /retry の保留中回答
+let pendingRetry: {
+  response: string;
   model: string;
-  prompt: string;
-  stream?: boolean;
-  options?: {
-    temperature?: number;
-    top_p?: number;
-    top_k?: number;
-    max_tokens?: number;
-  };
-}
+  previousResponse: ChatMessage;
+} | null = null;
+
+// /rewind の保留中巻き戻し
+let pendingRewind: {
+  sessionId: number | null;
+  turnNumber: number;
+} | null = null;
+
+// /retry のモデル×プリセット選択待ち
+let pendingRetryComboSelection: boolean = false;
+let retryModelPresetCombos: Array<{
+  model: string;
+  preset: ParameterPreset;
+  displayName: string;
+}> = [];
 ```
 
-### データベース操作
+### エラーハンドリング
 
 ```typescript
-// src/storage/database.ts
-import Database from "better-sqlite3";
-
-export class LlamuneDB {
-  private db: Database.Database;
-
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath);
-    this.migrate();
+// カスタムエラークラス
+export class OllamaError extends Error {
+  constructor(message: string, public code?: string) {
+    super(message);
+    this.name = 'OllamaError';
   }
+}
 
-  private migrate() {
-    // スキーマ作成
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS sessions (...);
-      CREATE TABLE IF NOT EXISTS messages (...);
-      ...
-    `);
-  }
-
-  // セッション操作
-  createSession(session: Session): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO sessions (id, mode, created_at, updated_at)
-      VALUES (?, ?, ?, ?)
-    `);
-    stmt.run(session.id, session.mode, session.createdAt, session.updatedAt);
-  }
-
-  getSession(id: string): Session | undefined {
-    const stmt = this.db.prepare("SELECT * FROM sessions WHERE id = ?");
-    return stmt.get(id) as Session | undefined;
-  }
-
-  // メッセージ操作
-  addMessage(message: Message): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO messages 
-      (id, session_id, role, content, model_name, parameters, execution_time, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(
-      message.id,
-      message.sessionId,
-      message.role,
-      message.content,
-      message.modelName,
-      JSON.stringify(message.parameters),
-      message.executionTime,
-      message.createdAt
-    );
-  }
-
-  getMessages(sessionId: string): Message[] {
-    const stmt = this.db.prepare(
-      "SELECT * FROM messages WHERE session_id = ? ORDER BY created_at"
-    );
-    return stmt.all(sessionId) as Message[];
+// エラー処理例
+try {
+  await chatWithModel(model, messages, onChunk);
+} catch (error) {
+  if (error instanceof OllamaError) {
+    console.error('❌ エラー:', error.message);
+  } else {
+    console.error('❌ 予期しないエラーが発生しました');
   }
 }
 ```
 
 ---
 
-## 開発タスク
+## 開発完了タスク
 
-### Week 1-2: 基盤構築
-
-```
-□ プロジェクトセットアップ
-  □ npm init
-  □ TypeScript設定
-  □ ESLint/Prettier設定
-  □ package.json整備
-
-□ CLI基本構造
-  □ Commander.jsセットアップ
-  □ bin/llamune.js作成
-  □ 基本コマンド登録
-
-□ inkセットアップ
-  □ 基本コンポーネント作成
-  □ Header
-  □ Menu
-  □ レイアウト確認
-
-□ ollama連携
-  □ OllamaClient実装
-  □ generate API
-  □ list models API
-  □ エラーハンドリング
-
-□ データベース
-  □ better-sqlite3セットアップ
-  □ スキーマ作成
-  □ マイグレーション
-  □ 基本CRUD操作
-```
-
-### Week 3-4: コア機能
+### ✅ Week 1-2: 基盤構築（完了）
 
 ```
-□ chatコマンド
-  □ インタラクティブチャット実装
-  □ メッセージ送受信
-  □ 会話履歴保存
-  □ モデル切り替え
+✅ プロジェクトセットアップ
+  - package.json作成
+  - TypeScript設定
+  - ESLint/Prettier設定
 
-□ compareコマンド
-  □ 複数LLM実行
-  □ 並列処理
-  □ 結果収集
-  □ 比較表示
+✅ Commander.js統合
+  - コマンド構造定義
+  - バージョン表示
+  - ヘルプ表示
 
-□ UI実装
-  □ Chat画面
-  □ Compare画面
-  □ プログレスバー
-  □ エラー表示
-
-□ パラメータ調整
-  □ 設定読み込み
-  □ パラメータ変更UI
-  □ デフォルト値管理
-```
-
-### Week 5-6: 完成度向上
-
-```
-□ historyコマンド
-  □ セッション一覧
-  □ メッセージ表示
-  □ 検索機能
-  □ エクスポート
-
-□ configコマンド
-  □ 設定表示
-  □ 設定変更
-  □ バリデーション
-  □ リセット機能
-
-□ modelsコマンド
-  □ モデル一覧
-  □ モデル詳細
-  □ ステータス表示
-
-□ エラーハンドリング
-  □ ネットワークエラー
-  □ DBエラー
-  □ バリデーションエラー
-  □ ユーザーフレンドリーなメッセージ
-
-□ ドキュメント
-  □ README更新
-  □ コマンドヘルプ
-  □ 使用例
-```
-
-### Week 7: リリース準備
-
-```
-□ テスト
-  □ ユニットテスト
-  □ 統合テスト
-  □ 手動テスト
-
-□ パフォーマンス
-  □ 起動速度確認
-  □ メモリ使用量確認
-  □ DB最適化
-
-□ npm公開準備
-  □ package.json最終調整
-  □ .npmignore設定
-  □ README整備
-  □ ビルド確認
-
-□ 社内テスト
-  □ テストユーザー募集
-  □ フィードバック収集
-  □ バグ修正
-```
-
----
-
-## テスト計画
-
-### ユニットテスト
-
-```typescript
-// test/llm/ollama.test.ts
-import { describe, it, expect } from "vitest";
-import { OllamaClient } from "../src/llm/ollama";
-
-describe("OllamaClient", () => {
-  it("should connect to ollama", async () => {
-    const client = new OllamaClient("http://localhost:11434");
-    const models = await client.listModels();
-    expect(models.length).toBeGreaterThan(0);
-  });
-
-  it("should generate response", async () => {
-    const client = new OllamaClient("http://localhost:11434");
-    const response = await client.generate({
-      model: "gemma2:9b",
-      prompt: "Hello",
-    });
-    expect(response.response).toBeDefined();
-  });
-});
-```
-
-### 統合テスト
-
-```typescript
-// test/integration/chat.test.ts
-import { describe, it, expect } from "vitest";
-import { execSync } from "child_process";
-
-describe("chat command", () => {
-  it("should start chat session", () => {
-    const output = execSync("llamune chat --model gemma2:9b", {
-      encoding: "utf-8",
-      timeout: 5000,
-    });
-    expect(output).toContain("Chat Mode");
-  });
-});
-```
-
-### 手動テストチェックリスト
-
-```
-□ 基本動作
-  □ llamune 起動
-  □ メニュー表示
-  □ 各コマンド実行
-
-□ チャット機能
-  □ メッセージ送信
-  □ 返答受信
-  □ 履歴保存
-  □ セッション継続
-
-□ 比較機能
-  □ 複数モデル実行
-  □ 結果表示
-  □ 詳細表示
-
-□ エラーハンドリング
-  □ ollama未起動
-  □ モデル未インストール
-  □ ネットワークエラー
-
-□ パフォーマンス
-  □ 起動速度 < 1秒
-  □ レスポンス速度
-  □ メモリ使用量
-```
-
----
-
-## まとめ
-
-### MVP 完成時の状態
-
-```
-ユーザーができること:
-✅ 複数のLLMと会話
-✅ LLMの回答を比較
-✅ 会話履歴を確認
-✅ 設定を変更
-✅ モデル情報を確認
-
-技術的な達成:
-✅ Node.js + TypeScript
-✅ ink によるTUI
 ✅ ollama連携
-✅ SQLite データ管理
-✅ npm配布
+  - HTTP通信実装
+  - ストリーミング対応
+  - 自動起動機能
+
+✅ SQLiteデータベース
+  - スキーマ設計
+  - 初期化処理
+  - CRUD操作
 ```
 
-### Phase 2 への準備
+### ✅ Week 3-4: コア機能（完了）
 
 ```
-CLI版で検証すること:
-□ ユーザーは価値を感じるか？
-□ どの機能が最も使われるか？
-□ Web UIの必要性は？
-□ パフォーマンスは十分か？
+✅ チャット機能
+  - readline統合
+  - ストリーミング表示
+  - スピナー表示
+  - エラーハンドリング
+
+✅ 会話履歴管理
+  - セッション作成
+  - メッセージ保存
+  - 会話再開機能
+  - 履歴一覧表示
+
+✅ モデル管理
+  - モデル一覧表示
+  - モデルダウンロード
+  - モデル削除
+  - モデル選択UI
+```
+
+### ✅ Week 5-6: 完成度向上（完了）
+
+```
+✅ /retry機能
+  - モデル×プリセット組み合わせ生成
+  - 再実行処理
+  - yes/no選択
+  - 回答の保留・採用・破棄
+
+✅ /rewind機能
+  - 往復番号指定
+  - 論理削除実装
+  - yes/no確認
+  - メッセージ削除
+
+✅ その他のコマンド
+  - /switch: モデル切り替え
+  - /history: 履歴表示
+  - /models: モデル一覧
+  - /current: 現在のモデル
+  - /help: ヘルプ表示
+
+✅ パラメータプリセット
+  - balanced, creative, fast
+  - プリセット選択UI
+  - データベーススキーマ
+  - デフォルト値設定
+
+✅ 推奨モデル機能
+  - システムスペック取得
+  - メモリ容量に応じた推奨
+  - インストール状況表示
+```
+
+### ✅ Week 7: リリース準備（完了）
+
+```
+✅ ドキュメント整備
+  - README.md更新
+  - API仕様書作成
+  - CLI仕様書作成
+
+✅ テスト実施
+  - 基本機能テスト
+  - エラーハンドリング
+  - エッジケース確認
+
+✅ コード整理
+  - リファクタリング
+  - コメント追加
+  - 型定義整理
+
+✅ 社内テスト開始
+  - 実環境での動作確認
+  - フィードバック収集
 ```
 
 ---
 
-**初版作成**: 2025-11-11  
-**作成者**: mop  
-**バージョン**: 1.0.0
-**次回レビュー**: 開発開始時
+## 次のステップ（Phase 2）
+
+### 検討中の機能
+
+```
+🔜 複数LLM並列実行
+  - バックグラウンドで他のモデルも実行
+  - 完了時に通知
+  - 結果の比較表示
+
+🔜 Web UI開発
+  - Express APIサーバー
+  - React フロントエンド
+  - リアルタイムストリーミング
+
+🔜 リッチなマークダウン
+  - シンタックスハイライト
+  - テーブル表示
+  - コードブロック
+
+🔜 アーティファクト管理
+  - 生成されたコードの保存
+  - ファイル出力
+  - バージョン管理
+```
+
+---
+
+**最終更新**: 2025-11-21  
+**作成者**: mop & Claude Sonnet 4.5  
+**バージョン**: 1.0.0 (Phase 1 完了版)  
+**次回レビュー**: Phase 2 開始時

@@ -1,27 +1,29 @@
 # Llamune サービス仕様書
 
-> **📝 このドキュメントの位置づけ**
->
-> このドキュメントは、Llamune のサービス仕様について、思いつく都度、その具体的な定義を忘れてしまわないよう、**覚書**として残しています。
->
+> **📝 このドキュメントの位置づけ**  
+> 
+> このドキュメントは、Llamuneのサービス仕様について、思いつく都度、その具体的な定義を忘れてしまわないよう、**覚書**として残しています。
+> 
 > 各項目には以下の分類タグを付けています：
->
-> - **[MVP 必須]**: Phase 1（CLI 版 MVP）で必ず実装する機能
-> - **[MVP 検討]**: Phase 1 で実装を検討中の機能（技術的課題や優先度により見送る可能性あり）
-> - **[将来機能]**: Phase 2 以降で検討する機能
->
+> - **[Phase 1完了]**: Phase 1（CLI版MVP）で実装完了した機能
+> - **[Phase 1見送り]**: Phase 1で検討したが見送った機能
+> - **[将来機能]**: Phase 2以降で検討する機能
+> 
+> **現在の状況:**
+> - ✅ Phase 1（CLI版MVP）: 実装完了（2025-12 ~ 2026-01）
+> - 🔄 Phase 1.5（Web UI）: 開発中（2026-01 ~ 2026-02）
+> 
 > **正式な実装仕様:**
->
-> - Phase 1（CLI 版）: [llamune-cli-specification.md](./llamune-cli-specification.md)
+> - Phase 1（CLI版）: [llamune-cli-specification.md](./llamune-cli-specification.md)
 > - プロジェクト概要: [README.md](../README.md)
 
-## 目次
 
+## 目次
 1. [プロジェクト概要](#プロジェクト概要)
 2. [解決する課題](#解決する課題)
 3. [コアコンセプト](#コアコンセプト)
 4. [機能要件](#機能要件)
-5. [UI/UX 設計](#uiux設計)
+5. [UI/UX設計](#uiux設計)
 6. [技術アーキテクチャ](#技術アーキテクチャ)
 7. [開発ロードマップ](#開発ロードマップ)
 8. [運営戦略](#運営戦略)
@@ -42,17 +44,15 @@ GitHub: https://github.com/unrcom/llamune
 ### ターゲットユーザー
 
 **組織単位:**
-
 - 業種、業界を問わない企業・団体
 - 部門、チーム単位での導入
 - 機密情報を扱う組織
 - データガバナンスを重視する組織
 
 **具体例:**
-
-- IT 企業の開発チーム
+- IT企業の開発チーム
 - 会計監査法人
-- 物販・EC 事業者
+- 物販・EC事業者
 - 法律事務所
 - 医療機関
 - 製造業の設計部門
@@ -62,11 +62,11 @@ GitHub: https://github.com/unrcom/llamune
 **短期（MVP）:**
 日本のビジネスにおいて「頼りになる推論モデル」を見つけ、活用できるプラットフォームを提供
 
-**中期（1-2 年）:**
-各業界・ドメインに特化した LLM 活用環境を、ユーザーとの共創（PoC）により構築
+**中期（1-2年）:**
+各業界・ドメインに特化したLLM活用環境を、ユーザーとの共創（PoC）により構築
 
-**長期（3-5 年）:**
-企業の知的資産をセキュアに活用し、業務効率を劇的に向上させる AI プラットフォームのスタンダードになる
+**長期（3-5年）:**
+企業の知的資産をセキュアに活用し、業務効率を劇的に向上させるAIプラットフォームのスタンダードになる
 
 ---
 
@@ -75,7 +75,6 @@ GitHub: https://github.com/unrcom/llamune
 ### 1. 機密情報の漏洩リスク
 
 **課題:**
-
 ```
 一般的なクラウドLLMサービス:
 - 入力データが外部サーバーに送信される
@@ -84,8 +83,7 @@ GitHub: https://github.com/unrcom/llamune
 - コンプライアンス違反の懸念
 ```
 
-**Llamune の解決策:**
-
+**Llamuneの解決策:**
 ```
 完全なクローズドネットワーク環境:
 ✅ データは一切外部に送信されない
@@ -94,10 +92,9 @@ GitHub: https://github.com/unrcom/llamune
 ✅ 企業のセキュリティポリシーに準拠
 ```
 
-### 2. 単一 LLM の誤りや偏り
+### 2. 単一LLMの誤りや偏り
 
 **課題:**
-
 ```
 単一のLLMに依存:
 - 回答の誤りに気づきにくい
@@ -106,8 +103,7 @@ GitHub: https://github.com/unrcom/llamune
 - 「それっぽい」誤答を信じてしまう
 ```
 
-**Llamune の解決策:**
-
+**Llamuneの解決策:**
 ```
 複数LLMによるクロスチェック:
 ✅ 同じ質問を複数モデルで推論
@@ -116,10 +112,9 @@ GitHub: https://github.com/unrcom/llamune
 ✅ 用途に応じた最適モデルの選択
 ```
 
-### 3. 汎用 LLM の限界
+### 3. 汎用LLMの限界
 
 **課題:**
-
 ```
 業務特化の知識不足:
 - 社内用語が理解できない
@@ -128,8 +123,7 @@ GitHub: https://github.com/unrcom/llamune
 - ドメイン知識が不足
 ```
 
-**Llamune の解決策:**
-
+**Llamuneの解決策:**
 ```
 3段階の知識注入:
 ✅ レベル1: 追加プロンプト（手軽）
@@ -166,12 +160,11 @@ GitHub: https://github.com/unrcom/llamune
 ```
 
 **重要な演出:**
-
 - ダッシュボードに「通信量: 0 MB ✅」を常時表示
 - 外部通信が発生していないことを視覚的に証明
 - ユーザーの安心感を醸成
 
-### 2. 2 モード構造
+### 2. 2モード構造
 
 ```
 ┌──────────────────────────────────────┐
@@ -192,15 +185,13 @@ GitHub: https://github.com/unrcom/llamune
 フリーワードでの会話を通じて、問題解決や意思決定を支援
 
 **特徴:**
-
 - 自然な会話形式
-- 複数 LLM による多角的な推論
+- 複数LLMによる多角的な推論
 - パラメータの柔軟な調整
 - アーティファクトの時系列管理
 - バックグラウンド推論
 
 **使用例:**
-
 ```
 【ユーザー】
 「新規事業のアイデアを考えたい。
@@ -222,15 +213,14 @@ GitHub: https://github.com/unrcom/llamune
 
 **カスタマイズ例:**
 
-| 組織     | モード名           | 特化機能                   |
-| -------- | ------------------ | -------------------------- |
-| IT 企業  | コーディングモード | Modelfile 構築、コード生成 |
-| 監査法人 | 監査モード         | 規程チェック、証跡管理     |
-| 物販     | EC 支援モード      | 商品説明生成、FAQ 作成     |
-| 法律     | リーガルモード     | 判例検索、契約書レビュー   |
+| 組織 | モード名 | 特化機能 |
+|------|---------|---------|
+| IT企業 | コーディングモード | Modelfile構築、コード生成 |
+| 監査法人 | 監査モード | 規程チェック、証跡管理 |
+| 物販 | EC支援モード | 商品説明生成、FAQ作成 |
+| 法律 | リーガルモード | 判例検索、契約書レビュー |
 
 **構築方法:**
-
 1. PoC（概念実証）からスタート
 2. ユーザーと共創で機能定義
 3. 段階的に実装・最適化
@@ -248,15 +238,13 @@ GitHub: https://github.com/unrcom/llamune
 ```
 
 **更新内容:**
-
-- 新しい LLM モデルの追加
+- 新しいLLMモデルの追加
 - 推奨モデルの変更
 - 実行順序の最適化
 - パラメータプリセットの更新
 - 日本語品質の向上
 
 **データドリブンな改善:**
-
 ```
 3ヶ月間のデータ収集:
 ├─ 使用頻度
@@ -274,23 +262,23 @@ GitHub: https://github.com/unrcom/llamune
 
 ## 機能要件
 
-### MVP 機能（Reasoning Mode） **[Phase 1 の機能群]**
+### MVP機能（Reasoning Mode） **[Phase 1の機能群]**
 
-#### 1. 基本的な会話機能 **[MVP 必須]**
+#### 1. 基本的な会話機能 **[Phase 1完了]**
 
-**機能:**
-
-- テキストベースの対話
-- 複数ターンの会話
-- 会話履歴の保存・参照
-- マークダウン形式の表示
+**実装内容:**
+- ✅ テキストベースの対話（readline使用）
+- ✅ 複数ターンの会話
+- ✅ 会話履歴の保存・参照（SQLite）
+- ✅ ストリーミング表示
+- ✅ セッション管理（作成・再開・削除）
+- ✅ セッションタイトルの自動生成
 
 **技術要件:**
-
 ```typescript
 interface Conversation {
   id: string;
-  mode: "reasoning" | "domain";
+  mode: 'reasoning' | 'domain';
   messages: Message[];
   artifacts: Artifact[];
   settings: LLMSettings;
@@ -300,21 +288,28 @@ interface Conversation {
 
 interface Message {
   id: string;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   modelName?: string;
   timestamp: Date;
 }
 ```
 
-#### 2. LLM 選択・実行機能 **[MVP 必須]**
+#### 2. LLM選択・実行機能 **[Phase 1完了]**
+
+**実装内容:**
+- ✅ インタラクティブなモデル選択
+- ✅ 前回使用モデルの記憶
+- ✅ `/switch` コマンドでモデル切り替え
+- ✅ システムスペックに応じた推奨モデル表示
+- ✅ パラメータプリセット（balanced, creative, fast）
 
 **2.1 運営推奨設定**
 
 ```typescript
 interface RecommendedSettings {
-  version: string; // "2025-Q4"
-  quarter: string; // "2025 Q4"
+  version: string;        // "2025-Q4"
+  quarter: string;        // "2025 Q4"
   models: ModelConfig[];
   executionOrder: string[];
   concurrentLimit: number;
@@ -323,9 +318,9 @@ interface RecommendedSettings {
 }
 
 interface ModelConfig {
-  name: string; // "LLM A"
-  priority: number; // 1, 2, 3...
-  purpose: string; // "メイン推論"
+  name: string;           // "LLM A"
+  priority: number;       // 1, 2, 3...
+  purpose: string;        // "メイン推論"
   parameters: {
     temperature: number;
     top_p: number;
@@ -342,29 +337,28 @@ const recommendedQ4 = {
       name: "LLM A",
       priority: 1,
       purpose: "メイン推論（高品質・高速）",
-      parameters: { temperature: 0.8, top_p: 0.9 },
+      parameters: { temperature: 0.8, top_p: 0.9 }
     },
     {
       name: "LLM C (Reasoning)",
       priority: 2,
       purpose: "Reasoning特化",
-      parameters: { temperature: 0.8, top_p: 0.9 },
+      parameters: { temperature: 0.8, top_p: 0.9 }
     },
     {
       name: "LLM B",
       priority: 3,
       purpose: "汎用・バランス型",
-      parameters: { temperature: 0.8, top_p: 0.9 },
-    },
+      parameters: { temperature: 0.8, top_p: 0.9 }
+    }
   ],
   executionOrder: ["LLM A", "LLM C (Reasoning)", "LLM B"],
   concurrentLimit: 2,
-  updatedAt: "2025-10-01",
+  updatedAt: "2025-10-01"
 };
 ```
 
 **動作:**
-
 ```
 1. ユーザーがプロンプト送信
    ↓
@@ -385,8 +379,8 @@ const recommendedQ4 = {
 ```typescript
 interface UserSettings {
   userId: string;
-  useRecommended: boolean; // true: 推奨設定, false: カスタム
-  customModels?: string[]; // カスタム時のモデルリスト
+  useRecommended: boolean;  // true: 推奨設定, false: カスタム
+  customModels?: string[];  // カスタム時のモデルリスト
   concurrentLimit?: number;
   parameters?: LLMParameters;
 }
@@ -395,17 +389,20 @@ interface UserSettings {
 const userCustom = {
   userId: "user123",
   useRecommended: false,
-  customModels: ["LLM D", "LLM A-Large", "qwq:32b"],
+  customModels: [
+    "LLM D",
+    "LLM A-Large",
+    "qwq:32b"
+  ],
   concurrentLimit: 3,
   parameters: {
     temperature: 0.5,
-    top_p: 0.95,
-  },
+    top_p: 0.95
+  }
 };
 ```
 
 **優先順位:**
-
 ```
 ユーザーカスタム設定 > 運営推奨設定
 
@@ -444,17 +441,23 @@ interface QuarterlyUpdate {
 └─────────────────────────────────┘
 ```
 
-#### 3. パラメータ調整機能 **[MVP 必須]**
+#### 3. パラメータ調整機能 **[Phase 1完了]**
 
-**スライダー UI（Amazon Bedrock 風）:**
+**実装内容:**
+- ✅ 3つのプリセット（balanced, creative, fast）
+- ✅ データベースにプリセット保存
+- ✅ `/retry` 実行時にプリセット選択可能
+- ✅ temperature, top_p, top_k, repeat_penalty, num_ctx 対応
+
+**スライダーUI（Amazon Bedrock風）:**
 
 ```typescript
 interface LLMParameters {
-  temperature: number; // 0.0 - 2.0
-  top_p: number; // 0.0 - 1.0
-  top_k: number; // 1 - 100
-  max_tokens: number; // 50 - 4096
-  repeat_penalty: number; // 1.0 - 2.0
+  temperature: number;      // 0.0 - 2.0
+  top_p: number;           // 0.0 - 1.0
+  top_k: number;           // 1 - 100
+  max_tokens: number;      // 50 - 4096
+  repeat_penalty: number;  // 1.0 - 2.0
 }
 
 // プリセット
@@ -463,25 +466,24 @@ const presets = {
     temperature: 0.2,
     top_p: 0.9,
     max_tokens: 1000,
-    description: "コード生成：正確で一貫したコード",
+    description: "コード生成：正確で一貫したコード"
   },
   general: {
     temperature: 0.7,
     top_p: 0.9,
     max_tokens: 500,
-    description: "一般：バランスの取れた回答",
+    description: "一般：バランスの取れた回答"
   },
   creative: {
     temperature: 1.2,
     top_p: 0.95,
     max_tokens: 2000,
-    description: "創作：創造的で多様な表現",
-  },
+    description: "創作：創造的で多様な表現"
+  }
 };
 ```
 
 **UI コンポーネント:**
-
 ```tsx
 <ParameterPanel>
   <Slider
@@ -492,36 +494,47 @@ const presets = {
     value={temperature}
     hint="決定的 ←──→ 創造的"
   />
-
-  <Slider label="Top P" min={0} max={1} step={0.05} value={topP} />
-
+  
+  <Slider
+    label="Top P"
+    min={0}
+    max={1}
+    step={0.05}
+    value={topP}
+  />
+  
   <PresetButtons>
-    <Button onClick={() => applyPreset("code")}>コード生成</Button>
-    <Button onClick={() => applyPreset("general")}>一般</Button>
-    <Button onClick={() => applyPreset("creative")}>創作</Button>
+    <Button onClick={() => applyPreset('code')}>
+      コード生成
+    </Button>
+    <Button onClick={() => applyPreset('general')}>
+      一般
+    </Button>
+    <Button onClick={() => applyPreset('creative')}>
+      創作
+    </Button>
   </PresetButtons>
 </ParameterPanel>
 ```
 
 #### 4. アーティファクト機能 **[将来機能]**
 
-> **Phase 1 では未実装**: CLI 版では技術的に困難なため、Phase 2（Web 版）で実装予定。
+> **Phase 1では未実装**: CLI版では技術的に困難なため、Phase 2（Web版）で実装予定。
 
 **概念:**
 会話の中で生成された成果物（コード、ドキュメント、データ等）を時系列で管理
 
 **データ構造:**
-
 ```typescript
 interface Artifact {
   id: string;
   conversationId: string;
-  type: "code" | "markdown" | "json" | "csv" | "other";
+  type: 'code' | 'markdown' | 'json' | 'csv' | 'other';
   title: string;
   content: string;
-  language?: string; // code type の場合
+  language?: string;        // code type の場合
   createdAt: Date;
-  messageId: string; // 元になったメッセージ
+  messageId: string;        // 元になったメッセージ
 }
 
 // 例
@@ -533,12 +546,11 @@ const artifact: Artifact = {
   content: "def quick_sort(arr):\n  ...",
   language: "python",
   createdAt: new Date(),
-  messageId: "msg_456",
+  messageId: "msg_456"
 };
 ```
 
-**UI 表示:**
-
+**UI表示:**
 ```
 会話フロー:
 ┌────────────────────────┐
@@ -570,73 +582,111 @@ const artifact: Artifact = {
 └────────────────────────┘
 ```
 
-#### 5. バックグラウンド推論 **[MVP 検討]**
+#### 5. バックグラウンド推論 **[Phase 1見送り]**
 
-> **Phase 1 での実装は要検討**: CLI 版で実装可能か技術検証が必要。UX への影響も考慮し、Phase 2 で実装の可能性あり。
+> **Phase 1では実装せず**: CLI環境での実装が複雑で、UXへの価値が不明確だったため見送り。
+> **代替実装**: `/retry` 機能により、ユーザーが明示的に異なるモデルで再実行可能。
 
-**機能:**
-メインの会話を妨げずに、他の LLM で同時に推論を実行
+**Phase 1の代替機能（/retry）:**
+- ユーザーが `/retry` を入力
+- モデル×プリセットの組み合わせから選択
+- 選択したモデル・プリセットで再実行
+- 新旧の回答を比較して採用・破棄を選択
+
+**Phase 2での再検討:**
+Web UI版では、バックグラウンドでの並列実行がより自然に実装可能。
+
+#### 6. /retry 機能（回答の再生成） **[Phase 1完了]**
+
+**実装内容:**
+最後の質問を別のモデル・パラメータプリセットで再実行し、回答を比較できる機能。
 
 **動作フロー:**
-
 ```
-[ユーザー入力]
-     ↓
-[メインLLM: 即座に回答]
-     ↓ (表示)
-[ユーザーが回答を見ている間]
-     ↓
-[バックグラウンド]
-├─ LLM B で同じプロンプト実行
-└─ LLM C で同じプロンプト実行
-     ↓
-[完了通知]
-└─ 「他の2つのLLMからも回答があります」
-```
+You: Pythonでクイックソートを実装して
+AI (gemma2:9b): はい、実装します...
 
-**UI 表示:**
+You: /retry
+↓
+モデル × プリセットの組み合わせを表示:
+ 1. gemma2:9b (balanced) ⭐
+ 2. gemma2:9b (creative)
+ 3. gemma2:9b (fast)
+ 4. deepseek-r1:7b (balanced)
+ 5. deepseek-r1:7b (creative)
+ ...
 
-```
-┌─────────────────────────────────┐
-│ 💬 会話中                       │
-│                                 │
-│ [LLM A の回答が表示]        │
-│                                 │
-├─────────────────────────────────┤
-│ 🔄 バックグラウンド実行中:      │
-│                                 │
-│ ⏳ LLM C (Reasoning)               │
-│    推論中... 15秒経過           │
-│                                 │
-│ ⏳ LLM B                  │
-│    推論中... 18秒経過           │
-│                                 │
-│ [すべて中断]                    │
-└─────────────────────────────────┘
+You: 4 (選択)
+↓
+🔄 deepseek-r1:7b (balanced) で再実行...
+AI (deepseek-r1:7b): Pythonでクイックソート...
+↓
+💡 この回答を採用しますか？
+  yes, y - 採用（新しい回答を保存）
+  no, n  - 破棄（元の回答を維持）
+
+You: yes
+✅ deepseek-r1:7b の回答を採用しました
 ```
 
-**完了後:**
+**技術的特徴:**
+- 最後のアシスタント回答を一時的に保留
+- 論理削除により元の回答もデータベースに保持
+- プリセットのパラメータを適用して再実行
+- yes/no で採用・破棄を選択
 
+**利点:**
+- バックグラウンド推論より明示的で制御しやすい
+- ユーザーが必要な時だけ実行できる
+- CLI環境でもシンプルに実装可能
+
+#### 7. /rewind 機能（会話の巻き戻し） **[Phase 1完了]**
+
+**実装内容:**
+指定した往復（ターン）まで会話を巻き戻し、そこから別の展開を試せる機能。
+
+**動作フロー:**
 ```
-┌─────────────────────────────────┐
-│ ✅ 他のLLMからも回答が届きました │
-├─────────────────────────────────┤
-│ ・LLM C (Reasoning)                │
-│ ・LLM B                   │
-│                                 │
-│ [すべて表示] [個別に見る] [無視]│
-└─────────────────────────────────┘
+You: /history
+↓
+[1] You: こんにちは
+    AI: こんにちは！...
+[2] You: Pythonでクイックソート
+    AI: はい、実装します...
+[3] You: これを高速化できる？
+    AI: Timsortを使えば...
+
+合計: 3 往復
+
+You: /rewind 2
+↓
+⚠️ 会話 #2 まで巻き戻しますか？
+  yes, y - 実行（往復 #3 以降を削除）
+  no, n  - キャンセル
+
+You: yes
+↓
+✅ 会話 #2 まで巻き戻しました
+削除されたメッセージ: 2件
+
+You: 別のアプローチを教えて
+AI: マージソートを使うこともできます...
 ```
 
-**ユーザー操作:**
+**技術的特徴:**
+- 往復番号を指定（1始まり）
+- 論理削除（`deleted_at` カラム）で実装
+- 物理削除せずデータを保持
+- yes/no で確認してから実行
 
-- **中断:** バックグラウンド実行を停止
-- **表示:** 完了した回答を見る
-- **無視:** 回答を見ずに会話を続ける
+**利点:**
+- 会話の分岐点に戻って別の方向を試せる
+- 削除したメッセージも保持（復元可能性）
+- 会話履歴の柔軟な管理
 
-#### 6. モデル切り替え
+#### 8. モデル切り替え
 
-**「別の LLM で試す」機能:**
+**「別のLLMで試す」機能:**
 
 ```
 現在: LLM A で回答中
@@ -646,12 +696,11 @@ const artifact: Artifact = {
   ├─ LLM B (汎用)
   ├─ LLM D (軽量)
   └─ LLM A-Large (高性能)
-
+  
 選択 → 同じプロンプトで再実行
 ```
 
 **実装:**
-
 ```typescript
 async function retryWithDifferentModel(
   prompt: string,
@@ -660,33 +709,32 @@ async function retryWithDifferentModel(
 ) {
   // 現在の会話コンテキストを保持
   const context = getCurrentContext();
-
+  
   // 新しいモデルで実行
   const response = await ollama.generate({
     model: newModel,
     prompt: prompt,
-    context: context,
+    context: context
   });
-
+  
   // 結果を比較表示
   return {
     original: { model: currentModel, response: originalResponse },
-    alternative: { model: newModel, response: response },
+    alternative: { model: newModel, response: response }
   };
 }
 ```
 
-### 将来機能（Post-MVP） **[Phase 2 以降]**
+### 将来機能（Post-MVP） **[Phase 2以降]**
 
-#### 1. LLM 評価機能 **[将来機能]**
+#### 1. LLM評価機能 **[将来機能]**
 
-> **Phase 3 で実装予定**: 高度な機能として検討。
+> **Phase 3で実装予定**: 高度な機能として検討。
 
 **目的:**
-LLM の回答を別の LLM に評価させ、品質を向上
+LLMの回答を別のLLMに評価させ、品質を向上
 
 **フロー:**
-
 ```
 [ユーザー質問]
      ↓
@@ -704,7 +752,6 @@ LLM の回答を別の LLM に評価させ、品質を向上
 ```
 
 **評価プロンプト例:**
-
 ```
 以下の回答を評価してください：
 
@@ -724,8 +771,7 @@ LLM の回答を別の LLM に評価させ、品質を向上
 各項目について、問題点と改善案を提示してください。
 ```
 
-**UI 表示:**
-
+**UI表示:**
 ```
 ┌─────────────────────────────────┐
 │ [LLM A の回答]              │
@@ -747,20 +793,19 @@ LLM の回答を別の LLM に評価させ、品質を向上
 └─────────────────────────────────┘
 ```
 
-#### 2. Web 検索統合 **[MVP 検討]**
+#### 2. Web検索統合 **[MVP検討]**
 
-> **Phase 1 で実装を検討中**: 技術的実現可能性と UX への影響を評価し、優先度により実装判断。CLI 環境での実装方法も含めて検討。
+> **Phase 1で実装を検討中**: 技術的実現可能性とUXへの影響を評価し、優先度により実装判断。CLI環境での実装方法も含めて検討。
 
 **目的:**
-claude.ai のように、LLM が必要に応じて最新情報を検索
+claude.aiのように、LLMが必要に応じて最新情報を検索
 
 **動作:**
-
 ```typescript
 interface WebSearchConfig {
   enabled: boolean;
-  allowedDomains: string[]; // 閉域内の許可ドメイン
-  searchEngine: "internal" | "limited_external";
+  allowedDomains: string[];  // 閉域内の許可ドメイン
+  searchEngine: 'internal' | 'limited_external';
 }
 
 // 例: 社内イントラネット検索
@@ -769,14 +814,13 @@ const searchConfig = {
   allowedDomains: [
     "intranet.company.com",
     "docs.company.com",
-    "wiki.company.com",
+    "wiki.company.com"
   ],
-  searchEngine: "internal",
+  searchEngine: 'internal'
 };
 ```
 
 **フロー:**
-
 ```
 [ユーザー質問]
 「2025年Q3の売上実績は？」
@@ -790,8 +834,7 @@ const searchConfig = {
 [検索結果を元に回答生成]
 ```
 
-**UI 表示:**
-
+**UI表示:**
 ```
 ┌─────────────────────────────────┐
 │ AI: 検索して確認します...       │
@@ -811,31 +854,31 @@ const searchConfig = {
 
 #### 3. 業務知識注入（RAG/ファインチューニング） **[将来機能]**
 
-> **Phase 3 で実装予定**: ドメイン特化機能の中核として検討。
+> **Phase 3で実装予定**: ドメイン特化機能の中核として検討。
 
-**レベル 1: 追加プロンプト**
+**レベル1: 追加プロンプト**
 
 ```typescript
 interface AdditionalContext {
-  type: "manual";
+  type: 'manual';
   content: string;
-  scope: "session" | "permanent";
+  scope: 'session' | 'permanent';
 }
 
 // 使用例
 const context: AdditionalContext = {
-  type: "manual",
+  type: 'manual',
   content: `
     社内用語:
     - OKR: 目標と主要な結果
     - 1on1: 上司と部下の定期面談
     - Retro: ふりかえり会議
   `,
-  scope: "session",
+  scope: 'session'
 };
 ```
 
-**レベル 2: RAG（Retrieval-Augmented Generation）**
+**レベル2: RAG（Retrieval-Augmented Generation）**
 
 ```typescript
 interface RAGConfig {
@@ -861,34 +904,34 @@ interface Document {
 async function ragQuery(userQuery: string) {
   // 1. ユーザーの質問をベクトル化
   const queryVector = await embed(userQuery);
-
+  
   // 2. 関連ドキュメントを検索
   const relevantDocs = await vectorDB.search(queryVector, limit: 5);
-
+  
   // 3. ドキュメントをコンテキストに追加
   const context = relevantDocs.map(doc => doc.content).join('\n\n');
-
+  
   // 4. LLMに渡す
   const prompt = `
     以下のドキュメントを参考に回答してください：
-
+    
     ${context}
-
+    
     質問：${userQuery}
   `;
-
+  
   return await llm.generate(prompt);
 }
 ```
 
-**レベル 3: ファインチューニング**
+**レベル3: ファインチューニング**
 
 ```typescript
 interface FineTuningConfig {
-  type: "fine-tuning";
+  type: 'fine-tuning';
   baseModel: string;
   trainingData: TrainingData[];
-  platform: "google-colab" | "local";
+  platform: 'google-colab' | 'local';
   epochs: number;
   learningRate: number;
 }
@@ -904,14 +947,13 @@ const auditTrainingData = [
   {
     instruction: "監査手続きを説明して",
     input: "棚卸資産の実査について",
-    output: "棚卸資産の実査は...",
+    output: "棚卸資産の実査は..."
   },
   // ... 数千件のデータ
 ];
 ```
 
 **UI:**
-
 ```
 ┌─────────────────────────────────┐
 │ 業務知識の注入                  │
@@ -932,17 +974,16 @@ const auditTrainingData = [
 └─────────────────────────────────┘
 ```
 
-#### 4. コード生成モード（Modelfile 構築型） **[将来機能]**
+#### 4. コード生成モード（Modelfile構築型） **[将来機能]**
 
-> **Phase 3 以降で検討**: より高度な機能として検討。
+> **Phase 3以降で検討**: より高度な機能として検討。
 
-> 💡 **関連**: [安全な Vibe Coding](./vibe-coding-with-llamune.md) - 複数 LLM でコードを生成・比較する詳細ガイド
+> 💡 **関連**: [安全なVibe Coding](./vibe-coding-with-llamune.md) - 複数LLMでコードを生成・比較する詳細ガイド
 
 **コンセプト:**
-会話しながら仕様を収集 → Modelfile に蓄積 → 一発でコード生成
+会話しながら仕様を収集 → Modelfileに蓄積 → 一発でコード生成
 
 **フロー:**
-
 ```
 【ステップ1: 要件ヒアリング】
 AI: 「どんなアプリを作りますか？」
@@ -967,7 +1008,7 @@ SYSTEM """
 スキーマ:
   users (id, email, name)
   tasks (id, user_id, title, status, due_date)
-
+  
 機能要件:
 1. ユーザー登録・ログイン
 2. タスクCRUD
@@ -991,7 +1032,6 @@ ollama run task-app-generator "すべてのコードを生成"
 ```
 
 **UI:**
-
 ```
 ┌─────────────────────────────────┐
 │ コード生成モード                │
@@ -1011,9 +1051,9 @@ ollama run task-app-generator "すべてのコードを生成"
 
 ---
 
-## UI/UX 設計 **[Phase 2: Web 版 UI]**
+## UI/UX設計 **[Phase 2: Web版UI]**
 
-> **Phase 1（CLI 版）の UI 設計は**: [llamune-cli-specification.md](./llamune-cli-specification.md) を参照
+> **Phase 1（CLI版）のUI設計は**: [llamune-cli-specification.md](./llamune-cli-specification.md) を参照
 
 ### 基本レイアウト（縦長）
 
@@ -1110,7 +1150,6 @@ ollama run task-app-generator "すべてのコードを生成"
 ```
 
 **通信量ゼロの演出:**
-
 ```typescript
 // リアルタイム更新（常にゼロ）
 <NetworkUsage>
@@ -1124,7 +1163,7 @@ ollama run task-app-generator "すべてのコードを生成"
 </NetworkUsage>
 ```
 
-### LLM 設定画面
+### LLM設定画面
 
 ```
 ┌───────────────────────────────────────────┐
@@ -1271,9 +1310,9 @@ ollama run task-app-generator "すべてのコードを生成"
 
 ## 技術アーキテクチャ
 
-### システム構成 **[Phase 2: Web 版の構成]**
+### システム構成 **[Phase 2: Web版の構成]**
 
-> **Phase 1（CLI 版）の構成は**: [llamune-cli-specification.md](./llamune-cli-specification.md) を参照
+> **Phase 1（CLI版）の構成は**: [llamune-cli-specification.md](./llamune-cli-specification.md) を参照
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -1333,7 +1372,7 @@ ollama run task-app-generator "すべてのコードを生成"
 
 ### データベーススキーマ **[Phase 2: PostgreSQL]**
 
-> **Phase 1（CLI 版）のスキーマは**: [llamune-cli-specification.md](./llamune-cli-specification.md) を参照（SQLite 使用）
+> **Phase 1（CLI版）のスキーマは**: [llamune-cli-specification.md](./llamune-cli-specification.md) を参照（SQLite使用）
 
 ```sql
 -- ユーザー（Supabase Authが管理）
@@ -1410,7 +1449,7 @@ CREATE TABLE documents (
 CREATE INDEX ON documents USING ivfflat (embedding vector_cosine_ops);
 ```
 
-### API 設計
+### API設計
 
 #### エンドポイント一覧
 
@@ -1447,9 +1486,9 @@ POST   /api/documents/search  // ベクトル検索
 ```typescript
 // リクエスト
 interface ChatRequest {
-  conversationId?: string; // 新規ならnull
+  conversationId?: string;  // 新規ならnull
   message: string;
-  modelName?: string; // 指定なければ推奨設定
+  modelName?: string;       // 指定なければ推奨設定
   parameters?: LLMParameters;
   backgroundModels?: string[]; // バックグラウンド実行
 }
@@ -1466,7 +1505,7 @@ interface ChatResponse {
 interface BackgroundJob {
   id: string;
   modelName: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: 'pending' | 'running' | 'completed' | 'failed';
   estimatedTime?: number;
 }
 ```
@@ -1500,7 +1539,7 @@ interface LLMExecuteResponse {
 ```typescript
 // リクエスト
 interface BatchExecuteRequest {
-  models: string[]; // ["LLM A", "LLM B"]
+  models: string[];  // ["LLM A", "LLM B"]
   prompt: string;
   parameters: LLMParameters;
   concurrent: number; // 同時実行数
@@ -1511,7 +1550,7 @@ interface BatchExecuteResponse {
   jobId: string;
   results: {
     [modelName: string]: {
-      status: "pending" | "running" | "completed" | "failed";
+      status: 'pending' | 'running' | 'completed' | 'failed';
       response?: string;
       executionTime?: number;
       error?: string;
@@ -1520,27 +1559,27 @@ interface BatchExecuteResponse {
 }
 ```
 
-### WebSocket 通信（リアルタイム）
+### WebSocket通信（リアルタイム）
 
 ```typescript
 // 接続
-const ws = new WebSocket("wss://llamune.com/ws/chat");
+const ws = new WebSocket('wss://llamune.com/ws/chat');
 
 // イベント
 interface WSMessage {
-  type: "chat" | "background-complete" | "error" | "status";
+  type: 'chat' | 'background-complete' | 'error' | 'status';
   data: any;
 }
 
 // 例: バックグラウンド完了通知
 ws.send({
-  type: "background-complete",
+  type: 'background-complete',
   data: {
-    jobId: "job_123",
-    modelName: "LLM C (Reasoning)",
-    response: "...",
-    executionTime: 25000,
-  },
+    jobId: 'job_123',
+    modelName: 'LLM C (Reasoning)',
+    response: '...',
+    executionTime: 25000
+  }
 });
 ```
 
@@ -1569,80 +1608,116 @@ USING (auth.uid() = user_id);
 
 ## 開発ロードマップ
 
-### フェーズ 0: 準備（完了）
+### フェーズ0: 準備（完了）
 
 **期間:** 2025-11-01 ~ 2025-11-08
 
 **成果物:**
-
 - ✅ ドメイン取得 (llamune.com)
 - ✅ GitHub リポジトリ作成
-- ✅ LLM テスト完了（4 モデル）
+- ✅ LLMテスト完了（4モデル）
 - ✅ ドキュメント作成
   - ollama-operations.md
-  - reasoning-test-\*.md
+  - reasoning-test-*.md
   - llm-files-and-finetuning.md
   - llm-parameters-testing-guide.md
   - llamune-service-specification.md
 
 **環境:**
-
 - M1 Mac 16GB（テスト環境）
 - MacBook Air M4 32GB 発注済み（本番開発環境）
 
-### フェーズ 1: MVP 開発（CLI 版）
+### フェーズ1: MVP開発（CLI版） ✅ **完了**
 
-**期間:** 2025-12 ~ 2026-01（7 週間）
+**期間:** 2025-12 ~ 2026-01（7週間）  
+**ステータス:** ✅ 実装完了
 
 **Week 1-2: 基盤構築**
-
 ```
-□ Node.js + TypeScript プロジェクトセットアップ
-□ Commander.js によるCLI構造
-□ ink によるTUI実装
-□ SQLite データベーススキーマ
-□ ollama連携API実装
+✅ Node.js + TypeScript プロジェクトセットアップ
+✅ Commander.js によるCLI構造
+✅ readline による入出力実装（inkは不使用）
+✅ SQLite データベーススキーマ
+✅ ollama連携API実装
+✅ ollama自動起動機能
 ```
 
 **Week 3-4: コア機能**
-
 ```
-□ チャットUI実装（ink）
-□ LLM実行機能
-□ メッセージ送受信
-□ 複数LLM並列実行
-□ 会話履歴管理
-□ レスポンシブ対応
+✅ チャットUI実装（readline）
+✅ LLM実行機能（ストリーミング対応）
+✅ メッセージ送受信
+✅ 会話履歴管理（SQLite）
+✅ セッション作成・再開機能
+✅ スピナー表示
 ```
 
 **Week 5-6: 完成度向上**
-
 ```
-□ パラメータ調整機能（CLI）
-□ 設定管理（config file）
-□ 会話履歴表示・検索
-□ モデル一覧・詳細表示
-□ エラーハンドリング
+✅ /retry 機能（モデル×プリセット再実行）
+✅ /rewind 機能（会話巻き戻し）
+✅ /switch 機能（モデル切り替え）
+✅ パラメータプリセット（balanced, creative, fast）
+✅ 設定管理（config file）
+✅ 会話履歴表示・削除
+✅ モデル一覧・詳細表示
+✅ 推奨モデル表示（システムスペック連動）
+✅ エラーハンドリング
 ```
 
 **Week 7: テスト・リリース準備**
-
 ```
-□ 動作テスト
-□ パフォーマンスチューニング
-□ CLI UX改善
-□ ドキュメント整備
-□ npm公開準備
-□ MVP リリース
+✅ 動作テスト
+✅ CLI UX改善
+✅ ドキュメント整備
+  - README.md
+  - llamune-cli-specification.md
+  - API_SPECIFICATION.md
+✅ マイグレーションスクリプト作成
+✅ 社内テスト開始
 ```
 
 **成果物:**
+- ✅ llamune CLI版 v0.1.0
+- ✅ 基本的なチャット機能（CLI）
+- ✅ /retry 機能（モデル比較）
+- ✅ /rewind 機能（会話分岐）
+- ✅ 会話履歴管理（SQLite、論理削除対応）
+- ✅ パラメータプリセット
+- ✅ 推奨モデル機能
 
-- llamune CLI 版 v0.1.0
-- 基本的な LLM 比較機能（CLI）
-- 会話履歴管理（SQLite）
+**Phase 1で見送った機能:**
+- ❌ バックグラウンド推論（代わりに /retry を実装）
+- ❌ リッチなマークダウン描画
+- ❌ アーティファクト管理
 
-### フェーズ 2: 社内展開（2026 Q1）
+### フェーズ1.5: Web UI 開発 🔄 **進行中**
+
+**期間:** 2026-01 ~ 2026-02  
+**ステータス:** 🔄 開発中
+
+**実装中:**
+```
+🔄 Express API サーバー
+  - RESTful API
+  - Server-Sent Events (SSE)
+  - 認証機能（基本実装）
+
+🔄 React フロントエンド
+  - Vite + TypeScript
+  - Tailwind CSS
+  - Zustand 状態管理
+  - チャット UI
+  - モデル管理 UI
+  - セッション管理 UI
+```
+
+**目標:**
+- Web ブラウザからの利用を可能に
+- CLIと同等の機能をGUIで提供
+- リアルタイムストリーミング表示
+
+### フェーズ2: 社内展開（2026 Q1）
 
 **期間:** 2026-01-01 ~ 2026-03-31
 
@@ -1650,7 +1725,6 @@ USING (auth.uid() = user_id);
 自社での実運用開始、フィードバック収集
 
 **タスク:**
-
 ```
 □ 社内環境にデプロイ
 □ チームメンバーへのトレーニング
@@ -1661,17 +1735,15 @@ USING (auth.uid() = user_id);
 ```
 
 **KPI:**
-
-- アクティブユーザー: 10 名
-- 会話数: 500 回
+- アクティブユーザー: 10名
+- 会話数: 500回
 - ユーザー満足度: 4.0/5.0
 
-### フェーズ 3: ドメイン特化・PoC（2026 Q1~）
+### フェーズ3: ドメイン特化・PoC（2026 Q1~）
 
 **期間:** 2026-01-01 ~
 
-**PoC 開始:**
-
+**PoC開始:**
 ```
 □ 外部企業とのPoC（1-2社）
 □ ドメイン特化モードの構築
@@ -1686,17 +1758,15 @@ USING (auth.uid() = user_id);
 ```
 
 **目標:**
-
 - 他社での導入事例創出
 - ドメイン特化の有効性実証
 - ビジネスモデルの確立
 
-### フェーズ 4: スケール（2027~）
+### フェーズ4: スケール（2027~）
 
 **展開:**
-
 - 複数業界での導入
-- SaaS 化検討
+- SaaS化検討
 - エンタープライズ機能追加
 - パートナープログラム
 
@@ -1739,14 +1809,14 @@ interface UsageMetrics {
       userRating: number;
     };
   };
-
+  
   taskPerformance: {
     coding: ModelPerformance[];
     reasoning: ModelPerformance[];
     documentation: ModelPerformance[];
     // ...
   };
-
+  
   userFeedback: {
     thumbsUp: number;
     thumbsDown: number;
@@ -1758,19 +1828,16 @@ interface UsageMetrics {
 ### 品質評価基準
 
 **自動評価:**
-
 - 推論速度
 - メモリ使用量
 - エラー率
 
 **人間評価:**
-
-- 回答の正確性（5 段階）
-- 日本語の自然さ（5 段階）
-- 有用性（5 段階）
+- 回答の正確性（5段階）
+- 日本語の自然さ（5段階）
+- 有用性（5段階）
 
 **ベンチマーク:**
-
 - JGLUE（日本語理解）
 - JSQuAD（質問応答）
 - 独自の業務タスク
@@ -1778,13 +1845,11 @@ interface UsageMetrics {
 ### コミュニティ構築
 
 **フィードバックループ:**
-
 ```
 ユーザー → フィードバック → 分析 → 改善 → リリース → ユーザー
 ```
 
 **情報発信:**
-
 - 四半期レポート
 - モデル比較記事
 - ベストプラクティス共有
@@ -1794,46 +1859,41 @@ interface UsageMetrics {
 
 ## まとめ
 
-### Llamune の価値
+### Llamuneの価値
 
 1. **セキュリティ:** 完全クローズド環境での運用
-2. **品質:** 複数 LLM による多角的な検証
+2. **品質:** 複数LLMによる多角的な検証
 3. **カスタマイズ:** 業務に特化した環境構築
 4. **進化:** 四半期ごとの継続的な最適化
 
 ### 次のステップ
 
 **即座に:**
-
-- MacBook Air M4 32GB 受取（3 日後）
+- MacBook Air M4 32GB 受取（3日後）
 - LLM A-Large パラメータテスト実行
 
-**1-2 週間:**
-
-- CLI 版 MVP 開発開始
+**1-2週間:**
+- CLI版MVP開発開始
 - Node.js + TypeScript セットアップ
 - ink による TUI 実装
 - SQLite データベース構築
 
-**1-2 ヶ月:**
-
-- Reasoning Mode MVP 完成
+**1-2ヶ月:**
+- Reasoning Mode MVP完成
 - 社内での試験運用開始
 
-**3 ヶ月:**
-
+**3ヶ月:**
 - 本格運用
 - フィードバック収集
 
-**6 ヶ月:**
-
+**6ヶ月:**
 - 拡張機能追加
-- 外部 PoC 開始
+- 外部PoC開始
 
 ---
 
 **初版作成:** 2025-11-08  
-**最終更新:** 2025-11-15  
+**最終更新:** 2025-11-21  
 **作成者:** mop & Claude Sonnet 4.5  
-**バージョン:** 1.0.3  
-**次回レビュー:** MVP 完成時
+**バージョン:** 1.1.0 (Phase 1 完了版)  
+**次回レビュー:** Phase 1.5（Web UI）完成時
