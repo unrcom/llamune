@@ -33,11 +33,11 @@ export interface PasswordValidationResult {
 }
 
 export function validatePassword(password: string): PasswordValidationResult {
-  // 最小8文字
-  if (password.length < 8) {
+  // 最小4文字
+  if (password.length < 4) {
     return {
       valid: false,
-      error: 'Password must be at least 8 characters',
+      error: 'Password must be at least 4 characters',
     };
   }
 
@@ -46,17 +46,6 @@ export function validatePassword(password: string): PasswordValidationResult {
     return {
       valid: false,
       error: 'Password must be at most 128 characters',
-    };
-  }
-
-  // 英字と数字の両方を含む（推奨）
-  const hasLetter = /[a-zA-Z]/.test(password);
-  const hasNumber = /[0-9]/.test(password);
-
-  if (!hasLetter || !hasNumber) {
-    return {
-      valid: false,
-      error: 'Password must contain both letters and numbers',
     };
   }
 
