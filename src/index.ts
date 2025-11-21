@@ -63,7 +63,7 @@ program
 // メインコマンド（引数なしで実行）
 program
   .action(() => {
-    console.log('🔵 ✨ Llamune - Closed Network LLM Platform');
+    console.log('🔵 Llamune ✨ - Closed Network LLM Platform');
     console.log('');
     console.log('使い方:');
     console.log('  llamune [コマンド] [オプション]');
