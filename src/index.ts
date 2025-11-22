@@ -1130,7 +1130,66 @@ program
   .option('-n, --limit <number>', '表示する履歴数', '10')
   .action(async (action, sessionId, title, options) => {
     try {
-      const { getSessionsList, deleteSessionApi, updateSessionTitleApi } = await import('./utils/chat-client.js');
+      const { getSessionsList, getSessionDetail, deleteSessionApi, updateSessionTitleApi } = await import('./utils/chat-client.js');
+
+      // show サブコマンドの処理
+      if (action === 'show') {
+        if (!sessionId) {
+          console.error('❌ 使い方: llmn history show <session_id>');
+          console.error('例: llmn history show 5');
+          process.exit(1);
+        }
+
+        const id = parseInt(sessionId, 10);
+        if (isNaN(id)) {
+          console.error('❌ セッションIDは数値で指定してください');
+          process.exit(1);
+        }
+
+        try {
+          const sessionData = await getSessionDetail(id);
+          const session = sessionData.session;
+          const messages = sessionData.messages;
+
+          console.log('');
+          console.log('📜 会話詳細:');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log(`  ID: ${session.id}`);
+          console.log(`  タイトル: ${session.title || '(タイトルなし)'}`);
+          console.log(`  モデル: ${session.model}`);
+          console.log(`  作成日時: ${new Date(session.created_at).toLocaleString('ja-JP')}`);
+          console.log(`  メッセージ数: ${session.message_count}`);
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('');
+
+          // メッセージを表示
+          if (messages.length === 0) {
+            console.log('  メッセージがありません');
+            console.log('');
+          } else {
+            messages.forEach((msg) => {
+              if (msg.role === 'user') {
+                console.log(`👤 You:`);
+                console.log(`${msg.content}`);
+                console.log('');
+              } else if (msg.role === 'assistant') {
+                const modelName = msg.model || session.model;
+                console.log(`🤖 AI (${modelName}):`);
+                console.log(`${msg.content}`);
+                console.log('');
+              }
+            });
+          }
+
+          console.log('💡 この会話を再開するには:');
+          console.log(`  llmn chat --continue ${id}`);
+          console.log('');
+        } catch (error) {
+          console.error(`❌ セッション ${id} の取得に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          process.exit(1);
+        }
+        return;
+      }
 
       // edit サブコマンドの処理
       if (action === 'edit') {
@@ -1222,11 +1281,13 @@ program
 
       console.log(`合計: ${displaySessions.length} 件の会話`);
       console.log('');
-      console.log('💡 会話を再開するには:');
-      console.log('  llamune chat --continue <ID>');
-      console.log('  llmn chat --continue <ID>');
+      console.log('💡 使い方:');
+      console.log('  会話の詳細を表示: llmn history show <ID>');
+      console.log('  会話を再開: llmn chat --continue <ID>');
+      console.log('  タイトル編集: llmn history edit <ID> <新しいタイトル>');
+      console.log('  会話を削除: llmn history delete <ID>');
       console.log('');
-      console.log('例: llmn chat --continue 1');
+      console.log('例: llmn history show 1');
     } catch (error) {
       console.error('❌ 履歴の取得に失敗しました');
       console.error(error);
