@@ -61,6 +61,7 @@ export async function* sendMessageStream(
   let fullContent = '';
   let resultSessionId = sessionId || 0;
   let resultModel = modelName || '';
+  let currentEvent = '';
 
   while (true) {
     const { done, value } = await reader.read();
@@ -70,32 +71,40 @@ export async function* sendMessageStream(
     const lines = chunk.split('\n');
 
     for (const line of lines) {
-      if (line.startsWith('data: ')) {
+      if (line.startsWith('event: ')) {
+        // イベントタイプを記録
+        currentEvent = line.substring(7);
+      } else if (line.startsWith('data: ')) {
         const data = line.substring(6);
         try {
           const parsed = JSON.parse(data);
+
+          // エラーイベントの場合
+          if (currentEvent === 'error') {
+            throw new Error(parsed.error || 'Stream error');
+          }
+
+          // 完了イベントの場合
+          if (currentEvent === 'done' && parsed.sessionId !== undefined) {
+            resultSessionId = parsed.sessionId;
+            fullContent = parsed.fullContent || fullContent;
+            resultModel = parsed.model || resultModel;
+            currentEvent = '';
+            continue;
+          }
+
+          // チャンクデータ
           if (parsed.content !== undefined) {
             fullContent = parsed.content;
             yield fullContent;
           }
-        } catch {
-          // JSON パースエラーは無視
-        }
-      } else if (line.startsWith('event: done')) {
-        // 次の行に done データがある
-        continue;
-      } else if (line.startsWith('data: ') && line.includes('sessionId')) {
-        const data = line.substring(6);
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.sessionId !== undefined) {
-            resultSessionId = parsed.sessionId;
-            fullContent = parsed.fullContent || fullContent;
-            resultModel = parsed.model || resultModel;
+        } catch (error) {
+          if (error instanceof Error) {
+            throw error;
           }
-        } catch {
           // JSON パースエラーは無視
         }
+        currentEvent = '';
       }
     }
   }
@@ -242,6 +251,7 @@ export async function* retryMessageStream(
   let fullContent = '';
   let resultSessionId = sessionId || 0;
   let resultModel = modelName || '';
+  let currentEvent = '';
 
   while (true) {
     const { done, value } = await reader.read();
@@ -251,22 +261,40 @@ export async function* retryMessageStream(
     const lines = chunk.split('\n');
 
     for (const line of lines) {
-      if (line.startsWith('data: ')) {
+      if (line.startsWith('event: ')) {
+        // イベントタイプを記録
+        currentEvent = line.substring(7);
+      } else if (line.startsWith('data: ')) {
         const data = line.substring(6);
         try {
           const parsed = JSON.parse(data);
+
+          // エラーイベントの場合
+          if (currentEvent === 'error') {
+            throw new Error(parsed.error || 'Retry error');
+          }
+
+          // 完了イベントの場合
+          if (currentEvent === 'done' && parsed.sessionId !== undefined) {
+            resultSessionId = parsed.sessionId;
+            fullContent = parsed.fullContent || fullContent;
+            resultModel = parsed.model || resultModel;
+            currentEvent = '';
+            continue;
+          }
+
+          // チャンクデータ
           if (parsed.content !== undefined) {
             fullContent = parsed.content;
             yield fullContent;
           }
-          if (parsed.sessionId !== undefined) {
-            resultSessionId = parsed.sessionId;
-            fullContent = parsed.fullContent || fullContent;
-            resultModel = parsed.model || resultModel;
+        } catch (error) {
+          if (error instanceof Error) {
+            throw error;
           }
-        } catch {
           // JSON パースエラーは無視
         }
+        currentEvent = '';
       }
     }
   }
