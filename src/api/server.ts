@@ -12,6 +12,7 @@ import presetsRouter from './routes/presets.js';
 import systemRouter from './routes/system.js';
 import chatRouter from './routes/chat.js';
 import authRouter from './routes/auth.js';
+import domainsRouter from './routes/domains.js';
 
 // package.json を読み込む
 const __filename = fileURLToPath(import.meta.url);
@@ -77,6 +78,12 @@ app.get('/api', (req, res) => {
       presets: {
         list: 'GET /api/presets',
       },
+      domains: {
+        list: 'GET /api/domains',
+        get: 'GET /api/domains/:id',
+        prompts: 'GET /api/domains/:id/prompts',
+        getPrompt: 'GET /api/domains/prompts/:id',
+      },
     },
     documentation: {
       main: 'https://github.com/unrcom/llamune/blob/main/docs/API_SPECIFICATION.md',
@@ -107,6 +114,7 @@ app.use('/api/models', modelsRouter);
 app.use('/api/presets', presetsRouter);
 app.use('/api/system', systemRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/domains', domainsRouter);
 
 // ヘルスチェック（認証不要）
 app.get('/health', (req, res) => {

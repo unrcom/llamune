@@ -79,6 +79,35 @@ export interface RefreshToken {
 }
 
 /**
+ * ドメインモードの型定義
+ */
+export interface DomainMode {
+  id: number;
+  name: string;
+  display_name: string;
+  description: string | null;
+  icon: string | null;
+  enabled: number;
+  created_at: string;
+}
+
+/**
+ * ドメインプロンプトの型定義
+ */
+export interface DomainPrompt {
+  id: number;
+  domain_mode_id: number;
+  name: string;
+  display_name: string;
+  description: string | null;
+  system_prompt: string | null;
+  recommended_model: string | null;
+  preset_id: number | null;
+  is_default: number;
+  created_at: string;
+}
+
+/**
  * データベースを初期化
  */
 export function initDatabase(): Database.Database {
@@ -932,6 +961,124 @@ export function cleanupExpiredRefreshTokens(): number {
 
     db.close();
     return result.changes;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+// ========================================
+// ドメインモード管理
+// ========================================
+
+/**
+ * すべてのドメインモードを取得
+ */
+export function getAllDomainModes(): DomainMode[] {
+  const db = initDatabase();
+
+  try {
+    const domainModes = db
+      .prepare('SELECT * FROM domain_modes WHERE enabled = 1 ORDER BY id ASC')
+      .all() as DomainMode[];
+
+    db.close();
+    return domainModes;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * IDでドメインモードを取得
+ */
+export function getDomainModeById(id: number): DomainMode | null {
+  const db = initDatabase();
+
+  try {
+    const domainMode = db
+      .prepare('SELECT * FROM domain_modes WHERE id = ? AND enabled = 1')
+      .get(id) as DomainMode | undefined;
+
+    db.close();
+    return domainMode || null;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * 名前でドメインモードを取得
+ */
+export function getDomainModeByName(name: string): DomainMode | null {
+  const db = initDatabase();
+
+  try {
+    const domainMode = db
+      .prepare('SELECT * FROM domain_modes WHERE name = ? AND enabled = 1')
+      .get(name) as DomainMode | undefined;
+
+    db.close();
+    return domainMode || null;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ドメインIDに紐づくプロンプト一覧を取得
+ */
+export function getDomainPromptsByDomainId(domainId: number): DomainPrompt[] {
+  const db = initDatabase();
+
+  try {
+    const prompts = db
+      .prepare('SELECT * FROM domain_prompts WHERE domain_mode_id = ? ORDER BY id ASC')
+      .all(domainId) as DomainPrompt[];
+
+    db.close();
+    return prompts;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * IDでドメインプロンプトを取得
+ */
+export function getDomainPromptById(id: number): DomainPrompt | null {
+  const db = initDatabase();
+
+  try {
+    const prompt = db
+      .prepare('SELECT * FROM domain_prompts WHERE id = ?')
+      .get(id) as DomainPrompt | undefined;
+
+    db.close();
+    return prompt || null;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ドメインのデフォルトプロンプトを取得
+ */
+export function getDefaultDomainPrompt(domainId: number): DomainPrompt | null {
+  const db = initDatabase();
+
+  try {
+    const prompt = db
+      .prepare('SELECT * FROM domain_prompts WHERE domain_mode_id = ? AND is_default = 1')
+      .get(domainId) as DomainPrompt | undefined;
+
+    db.close();
+    return prompt || null;
   } catch (error) {
     db.close();
     throw error;

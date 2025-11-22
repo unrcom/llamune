@@ -1,6 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { ChatSession } from '../../core/chat-session.js';
-import { getAllSessions, getSession, deleteSession, updateSessionTitle } from '../../utils/database.js';
+import {
+  getAllSessions,
+  getSession,
+  deleteSession,
+  updateSessionTitle,
+  getDomainPromptById,
+} from '../../utils/database.js';
 import type {
   ApiError,
   ChatMessagesRequest,
@@ -20,7 +26,7 @@ const router = Router();
  */
 router.post('/messages', async (req: Request, res: Response) => {
   try {
-    const { sessionId, content, modelName, presetId, history } = req.body as ChatMessagesRequest;
+    const { sessionId, content, modelName, presetId, history, domainPromptId } = req.body as ChatMessagesRequest;
 
     if (!content || content.trim() === '') {
       const error: ApiError = {
@@ -30,6 +36,24 @@ router.post('/messages', async (req: Request, res: Response) => {
       };
       res.status(400).json(error);
       return;
+    }
+
+    // ドメインプロンプトIDが指定されている場合、検証
+    if (domainPromptId) {
+      const domainPrompt = getDomainPromptById(domainPromptId);
+      if (!domainPrompt) {
+        const error: ApiError = {
+          error: 'Invalid domain prompt ID',
+          code: 'INVALID_DOMAIN_PROMPT',
+          statusCode: 400,
+        };
+        res.status(400).json(error);
+        return;
+      }
+      // TODO: 将来的にsystem_promptを適用
+      // if (domainPrompt.system_prompt) {
+      //   // system_promptをセッションに適用
+      // }
     }
 
     // セッションを作成または復元

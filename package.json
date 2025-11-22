@@ -26,7 +26,8 @@
     "migrate:remove-precise": "tsx scripts/migrate-remove-precise-preset.ts",
     "migrate:default-preset": "tsx scripts/migrate-update-default-preset.ts",
     "migrate:session-title": "tsx scripts/migrate-add-session-title.ts",
-    "migrate:auth": "tsx scripts/migrate-add-auth.ts"
+    "migrate:auth": "tsx scripts/migrate-add-auth.ts",
+    "migrate:domain-modes": "tsx scripts/migrate-add-domain-modes.ts"
   },
   "keywords": [
     "llm",

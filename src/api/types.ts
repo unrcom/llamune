@@ -40,6 +40,7 @@ export interface ChatMessagesRequest {
   modelName?: string;
   presetId?: number;
   history?: ChatMessage[];
+  domainPromptId?: number; // ドメイン特化モード用
 }
 
 /**
