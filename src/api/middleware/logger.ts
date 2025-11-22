@@ -62,7 +62,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       if (responseBody.refreshToken) {
         responseBody.refreshToken = `${responseBody.refreshToken.substring(0, 10)}...(masked)`;
       }
-      console.log(`📦 Response Body:`, JSON.stringify(responseBody, null, 2));
+      console.log(`📦 Response Body: ${JSON.stringify(responseBody)}`);
     }
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
