@@ -5,20 +5,12 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import {
-  listModels,
-  ensureOllamaRunning,
   formatSize,
   formatParams,
-  pullModel,
-  deleteModel,
-  chatWithModel,
-  OllamaError,
   type ChatMessage,
   type ChatParameters,
 } from './utils/ollama.js';
 import {
-  getSystemSpec,
-  getRecommendedModels,
   displaySystemSpec,
   displayRecommendedModels,
 } from './utils/system.js';
@@ -33,15 +25,6 @@ import {
   whoamiCommand,
 } from './commands/auth.js';
 import {
-  saveConversation,
-  listSessions,
-  getSession,
-  appendMessagesToSession,
-  getSessionMessagesWithTurns,
-  logicalDeleteMessagesAfterTurn,
-  getAllParameterPresets,
-  updateSessionTitle,
-  deleteSession,
   type ParameterPreset,
 } from './utils/database.js';
 import * as readline from 'readline';
@@ -183,7 +166,7 @@ function stopSpinner(spinner: NodeJS.Timeout): void {
   process.stdout.write('\r\x1b[K'); // 行をクリア
 }
 
-// chat コマンド
+// chat コマンド（API クライアント版）
 program
   .command('chat')
   .description('チャットを開始')
@@ -191,21 +174,19 @@ program
   .option('-c, --continue <session-id>', '過去の会話を再開')
   .action(async (options: { model?: string; continue?: string }) => {
     try {
-      // TODO: API クライアント化後は不要
-      const userId = undefined;
+      // API クライアント機能をインポート
+      const {
+        sendMessageStream,
+        retryMessageStream,
+        getSessionDetail,
+        rewindSessionApi,
+        switchModelApi,
+        getParameterPresetsApi,
+      } = await import('./utils/chat-client.js');
+      const { listModelsApi } = await import('./utils/models-client.js');
 
-      // Ollama の起動確認・自動起動
-      const isRunning = await ensureOllamaRunning();
-      if (!isRunning) {
-        console.log('❌ Ollama の起動に失敗しました');
-        console.log('');
-        console.log('手動で起動してください:');
-        console.log('  ollama serve');
-        process.exit(1);
-      }
-
-      // モデル一覧を取得
-      const models = await listModels();
+      // モデル一覧を取得（API経由）
+      const models = await listModelsApi();
       if (models.length === 0) {
         console.log('❌ インストール済みのモデルがありません');
         console.log('');
@@ -234,9 +215,10 @@ program
       // --continue オプションで過去の会話を再開
       if (options.continue) {
         const sid = parseInt(options.continue, 10);
-        const sessionData = getSession(sid, userId);
-
-        if (!sessionData) {
+        let sessionData;
+        try {
+          sessionData = await getSessionDetail(sid);
+        } catch (error) {
           console.log(`❌ セッションID ${sid} が見つかりません（または、あなたのセッションではありません）`);
           console.log('');
           console.log('履歴を確認してください:');
@@ -320,9 +302,6 @@ program
       console.log('---');
       console.log('');
 
-      // 初期のメッセージ数を記録（会話再開の場合）
-      const initialMessageCount = messages.length;
-
       // Readline インターフェース
       const rl = readline.createInterface({
         input: process.stdin,
@@ -385,24 +364,23 @@ program
           // 一時的にアシスタントの応答を削除して再実行
           messages.pop();
 
-          // プリセットからパラメータを設定
-          const retryParameters: ChatParameters = {};
-          if (combo.preset.temperature !== null) retryParameters.temperature = combo.preset.temperature;
-          if (combo.preset.top_p !== null) retryParameters.top_p = combo.preset.top_p;
-          if (combo.preset.top_k !== null) retryParameters.top_k = combo.preset.top_k;
-          if (combo.preset.repeat_penalty !== null) retryParameters.repeat_penalty = combo.preset.repeat_penalty;
-          if (combo.preset.num_ctx !== null) retryParameters.num_ctx = combo.preset.num_ctx;
-
           try {
-            await chatWithModel(combo.model, messages, (chunk) => {
+            // API経由でリトライ（ストリーミング）
+            const retryGenerator = retryMessageStream(sessionId || undefined, combo.model, combo.preset.id, messages);
+
+            let previousLength = 0;
+            for await (const chunk of retryGenerator) {
               if (retryFirstChunk) {
                 stopSpinner(retrySpinner);
                 process.stdout.write(`AI (${combo.displayName}): `);
                 retryFirstChunk = false;
               }
-              retryResponse += chunk;
-              process.stdout.write(chunk);
-            }, retryParameters);
+              retryResponse = chunk;
+              // chunk は累積コンテンツなので、差分だけを出力
+              const newContent = chunk.substring(previousLength);
+              process.stdout.write(newContent);
+              previousLength = chunk.length;
+            }
 
             process.stdout.write('\n\n');
 
@@ -421,11 +399,7 @@ program
           } catch (error) {
             stopSpinner(retrySpinner);
             console.error('\n');
-            if (error instanceof OllamaError) {
-              console.error('❌ エラー:', error.message);
-            } else {
-              console.error('❌ 予期しないエラーが発生しました');
-            }
+            console.error('❌ エラー:', error instanceof Error ? error.message : '予期しないエラーが発生しました');
             console.log('');
             // エラーの場合は元の応答を復元
             messages.push(previousResponse);
@@ -466,21 +440,30 @@ program
           if (pendingRewind) {
             let deletedCount = 0;
 
-            // セッションがある場合は DB も更新
+            // セッションがある場合は API 経由で巻き戻し
             if (pendingRewind.sessionId !== null) {
-              deletedCount = logicalDeleteMessagesAfterTurn(
-                pendingRewind.sessionId,
-                pendingRewind.turnNumber
-              );
+              try {
+                await rewindSessionApi(pendingRewind.sessionId, pendingRewind.turnNumber);
+                // 巻き戻し後、セッション詳細を再取得してメッセージを更新
+                const updatedSession = await getSessionDetail(pendingRewind.sessionId);
+                const keepCount = pendingRewind.turnNumber * 2;
+                deletedCount = messages.length - keepCount;
+                messages = updatedSession.messages;
+              } catch (error) {
+                console.log('');
+                console.error('❌ 巻き戻しに失敗しました:', error instanceof Error ? error.message : 'Unknown error');
+                console.log('');
+                pendingRewind = null;
+                rl.prompt();
+                return;
+              }
             } else {
               // 新規会話の場合は削除されるメッセージ数を計算
               const keepCount = pendingRewind.turnNumber * 2;
               deletedCount = messages.length - keepCount;
+              // メモリ上の messages 配列を更新
+              messages = messages.slice(0, keepCount);
             }
-
-            // メモリ上の messages 配列も更新
-            const keepCount = pendingRewind.turnNumber * 2;
-            messages = messages.slice(0, keepCount);
 
             console.log('');
             console.log(`✅ 会話 #${pendingRewind.turnNumber} まで巻き戻しました`);
@@ -596,6 +579,19 @@ program
                 return;
               }
 
+              // セッションがある場合は API 経由でモデル切り替え
+              if (sessionId !== null) {
+                try {
+                  await switchModelApi(sessionId, newModel);
+                } catch (error) {
+                  console.log('');
+                  console.error('❌ モデル切り替えに失敗しました:', error instanceof Error ? error.message : 'Unknown error');
+                  console.log('');
+                  rl.prompt();
+                  return;
+                }
+              }
+
               selectedModel = newModel;
               saveLastUsedModel(selectedModel);
               console.log('');
@@ -623,7 +619,7 @@ program
               }
 
               // モデル × プリセットの組み合わせを生成
-              const presets = getAllParameterPresets();
+              const presets = await getParameterPresetsApi();
               retryModelPresetCombos = [];
 
               models.forEach((model) => {
@@ -678,21 +674,30 @@ program
               if (pendingRewind) {
                 let yesDeletedCount = 0;
 
-                // セッションがある場合は DB も更新
+                // セッションがある場合は API 経由で巻き戻し
                 if (pendingRewind.sessionId !== null) {
-                  yesDeletedCount = logicalDeleteMessagesAfterTurn(
-                    pendingRewind.sessionId,
-                    pendingRewind.turnNumber
-                  );
+                  try {
+                    await rewindSessionApi(pendingRewind.sessionId, pendingRewind.turnNumber);
+                    // 巻き戻し後、セッション詳細を再取得してメッセージを更新
+                    const updatedSession = await getSessionDetail(pendingRewind.sessionId);
+                    const yesKeepCount = pendingRewind.turnNumber * 2;
+                    yesDeletedCount = messages.length - yesKeepCount;
+                    messages = updatedSession.messages;
+                  } catch (error) {
+                    console.log('');
+                    console.error('❌ 巻き戻しに失敗しました:', error instanceof Error ? error.message : 'Unknown error');
+                    console.log('');
+                    pendingRewind = null;
+                    rl.prompt();
+                    return;
+                  }
                 } else {
                   // 新規会話の場合は削除されるメッセージ数を計算
                   const yesKeepCount = pendingRewind.turnNumber * 2;
                   yesDeletedCount = messages.length - yesKeepCount;
+                  // メモリ上の messages 配列を更新
+                  messages = messages.slice(0, yesKeepCount);
                 }
-
-                // メモリ上の messages 配列も更新
-                const keepCount = pendingRewind.turnNumber * 2;
-                messages = messages.slice(0, keepCount);
 
                 console.log('');
                 console.log(`✅ 会話 #${pendingRewind.turnNumber} まで巻き戻しました`);
@@ -753,23 +758,15 @@ program
               console.log('📜 現在の会話履歴:');
               console.log('');
 
-              // 往復単位でメッセージを取得して表示
-              let historyTurns;
-
-              if (sessionId) {
-                // セッションがある場合はDBから取得
-                historyTurns = getSessionMessagesWithTurns(sessionId);
-              } else {
-                // 新規会話の場合はメモリから往復を作成
-                historyTurns = [];
-                for (let i = 0; i < messages.length; i += 2) {
-                  if (i + 1 < messages.length && messages[i].role === 'user' && messages[i + 1].role === 'assistant') {
-                    historyTurns.push({
-                      turnNumber: Math.floor(i / 2) + 1,
-                      user: messages[i],
-                      assistant: messages[i + 1],
-                    });
-                  }
+              // 往復単位でメッセージを表示（メモリから往復を作成）
+              const historyTurns = [];
+              for (let i = 0; i < messages.length; i += 2) {
+                if (i + 1 < messages.length && messages[i].role === 'user' && messages[i + 1].role === 'assistant') {
+                  historyTurns.push({
+                    turnNumber: Math.floor(i / 2) + 1,
+                    user: messages[i],
+                    assistant: messages[i + 1],
+                  });
                 }
               }
 
@@ -811,22 +808,15 @@ program
                 return;
               }
 
-              // 現在の往復数を取得
-              let rewindCurrentTurns;
-              if (sessionId) {
-                // セッションがある場合は DB から取得
-                rewindCurrentTurns = getSessionMessagesWithTurns(sessionId);
-              } else {
-                // 新規会話の場合はメモリから往復を作成
-                rewindCurrentTurns = [];
-                for (let i = 0; i < messages.length; i += 2) {
-                  if (i + 1 < messages.length && messages[i].role === 'user' && messages[i + 1].role === 'assistant') {
-                    rewindCurrentTurns.push({
-                      turnNumber: Math.floor(i / 2) + 1,
-                      user: messages[i],
-                      assistant: messages[i + 1],
-                    });
-                  }
+              // 現在の往復数を取得（メモリから往復を作成）
+              const rewindCurrentTurns = [];
+              for (let i = 0; i < messages.length; i += 2) {
+                if (i + 1 < messages.length && messages[i].role === 'user' && messages[i + 1].role === 'assistant') {
+                  rewindCurrentTurns.push({
+                    turnNumber: Math.floor(i / 2) + 1,
+                    user: messages[i],
+                    assistant: messages[i + 1],
+                  });
                 }
               }
 
@@ -892,13 +882,7 @@ program
           pendingRewind = null;
         }
 
-        // ユーザーメッセージを追加
-        messages.push({
-          role: 'user',
-          content: userInput,
-        });
-
-        // AI の応答を取得
+        // AI の応答を取得（API経由）
         console.log('');
         const spinner = showSpinner();
 
@@ -906,18 +890,49 @@ program
         let isFirstChunk = true;
 
         try {
-          await chatWithModel(selectedModel!, messages, (chunk) => {
-            // 最初のチャンクでスピナーを停止
+          // API経由でメッセージ送信（ストリーミング）
+          const messageGenerator = sendMessageStream(
+            userInput,
+            sessionId || undefined,
+            selectedModel,
+            undefined, // presetId
+            messages
+          );
+
+          let previousLength = 0;
+          let result;
+
+          // 手動でイテレーションして return 値を取得
+          while (true) {
+            result = await messageGenerator.next();
+            if (result.done) {
+              // ジェネレーター完了時に return 値を取得
+              if (result.value) {
+                sessionId = result.value.sessionId;
+                fullResponse = result.value.fullContent;
+              }
+              break;
+            }
+
+            // yield された値を処理
+            const chunk = result.value;
             if (isFirstChunk) {
               stopSpinner(spinner);
               process.stdout.write(`AI (${selectedModel}): `);
               isFirstChunk = false;
             }
-            fullResponse += chunk;
-            process.stdout.write(chunk);
-          }, selectedParameters);
+            fullResponse = chunk;
+            // chunk は累積コンテンツなので、差分だけを出力
+            const newContent = chunk.substring(previousLength);
+            process.stdout.write(newContent);
+            previousLength = chunk.length;
+          }
 
-          // アシスタントの応答を履歴に追加（モデル名も記録）
+          // ユーザーメッセージとアシスタントの応答を履歴に追加
+          messages.push({
+            role: 'user',
+            content: userInput,
+          });
           messages.push({
             role: 'assistant',
             content: fullResponse,
@@ -928,11 +943,7 @@ program
         } catch (error) {
           stopSpinner(spinner);
           console.error('\n');
-          if (error instanceof OllamaError) {
-            console.error('❌ エラー:', error.message);
-          } else {
-            console.error('❌ 予期しないエラーが発生しました');
-          }
+          console.error('❌ エラー:', error instanceof Error ? error.message : '予期しないエラーが発生しました');
           console.log('');
         }
 
@@ -942,33 +953,17 @@ program
       rl.on('close', () => {
         console.log('');
 
-        // 新しいメッセージがある場合のみ保存
-        const newMessages = messages.slice(initialMessageCount);
-        if (newMessages.length > 0) {
-          try {
-            if (sessionId !== null) {
-              // 既存セッションに追加
-              appendMessagesToSession(sessionId, newMessages);
-              console.log(`💾 会話を保存しました (ID: ${sessionId})`);
-            } else {
-              // 新規セッション作成
-              const newSessionId = saveConversation(selectedModel, messages, userId);
-              console.log(`💾 会話を保存しました (ID: ${newSessionId})`);
-            }
-          } catch (error) {
-            console.log('⚠️  会話の保存に失敗しました');
-          }
+        // API クライアント版では、メッセージは API 経由で送信時に自動保存されるため、
+        // ここでの明示的な保存は不要
+        if (sessionId !== null) {
+          console.log(`💾 会話は自動保存されています (ID: ${sessionId})`);
         }
 
         console.log('👋 チャットを終了します');
         process.exit(0);
       });
     } catch (error) {
-      if (error instanceof OllamaError) {
-        console.error('❌ エラー:', error.message);
-      } else {
-        console.error('❌ 予期しないエラーが発生しました');
-      }
+      console.error('❌ エラー:', error instanceof Error ? error.message : '予期しないエラーが発生しました');
       process.exit(1);
     }
   });
@@ -999,24 +994,16 @@ program
     console.log('⚠️  このコマンドは開発中です');
   });
 
-// モデル一覧表示の共通処理
+// モデル一覧表示の共通処理（API クライアント版）
 async function showModelList() {
   try {
     console.log('📦 利用可能なモデル:');
     console.log('');
 
-    // Ollama の起動確認・自動起動
-    const isRunning = await ensureOllamaRunning();
-    if (!isRunning) {
-      console.log('❌ Ollama の起動に失敗しました');
-      console.log('');
-      console.log('手動で起動してください:');
-      console.log('  ollama serve');
-      process.exit(1);
-    }
+    const { listModelsApi, getSystemSpecApi, getRecommendedModelsApi } = await import('./utils/models-client.js');
 
-    // モデル一覧を取得
-    const models = await listModels();
+    // モデル一覧を取得（API経由）
+    const models = await listModelsApi();
 
     if (models.length === 0) {
       console.log('⚠️  インストール済みのモデルがありません');
@@ -1024,13 +1011,13 @@ async function showModelList() {
       console.log('🎉 Llamune へようこそ！');
       console.log('');
 
-      // システムスペックを取得して表示
-      const spec = await getSystemSpec();
-      displaySystemSpec(spec);
+      // システムスペックを取得して表示（API経由）
+      const specData = await getSystemSpecApi();
+      displaySystemSpec(specData.spec);
 
-      // 推奨モデルを表示
-      const recommended = getRecommendedModels(spec);
-      displayRecommendedModels(recommended);
+      // 推奨モデルを表示（API経由）
+      const recommendedData = await getRecommendedModelsApi();
+      displayRecommendedModels(recommendedData.recommended);
 
       return;
     }
@@ -1045,11 +1032,7 @@ async function showModelList() {
     console.log('');
     console.log(`合計: ${models.length} モデル`);
   } catch (error) {
-    if (error instanceof OllamaError) {
-      console.error('❌ エラー:', error.message);
-    } else {
-      console.error('❌ 予期しないエラーが発生しました');
-    }
+    console.error('❌ エラー:', error instanceof Error ? error.message : 'Unknown error');
     process.exit(1);
   }
 }
@@ -1060,47 +1043,48 @@ program.command('ls').description('利用可能なモデル一覧を表示').act
 // models コマンド（後方互換性のためのエイリアス）
 program.command('models', { hidden: true }).action(showModelList);
 
-// pull コマンド
+// pull コマンド（API クライアント版）
 program
   .command('pull')
   .description('モデルをダウンロード')
   .argument('[model]', 'モデル名（例: gemma2:9b）')
   .action(async (modelName?: string) => {
     try {
-      // Ollama の起動確認・自動起動
-      const isRunning = await ensureOllamaRunning();
-      if (!isRunning) {
-        console.log('❌ Ollama の起動に失敗しました');
-        console.log('');
-        console.log('手動で起動してください:');
-        console.log('  ollama serve');
-        process.exit(1);
-      }
+      const { pullModelApi, getSystemSpecApi, getRecommendedModelsApi } = await import('./utils/models-client.js');
 
       // モデル名が指定されていない場合は推奨モデルを表示
       if (!modelName) {
         console.log('📥 モデルをダウンロードします');
         console.log('');
 
-        const spec = await getSystemSpec();
-        displaySystemSpec(spec);
+        const specData = await getSystemSpecApi();
+        displaySystemSpec(specData.spec);
 
-        const recommended = getRecommendedModels(spec);
+        const recommendedData = await getRecommendedModelsApi();
         console.log('🎯 推奨モデル:');
         console.log('');
-        recommended.forEach((model, index) => {
+        recommendedData.recommended.forEach((model: any, index: number) => {
           const badge = index === 0 ? '⭐' : '  ';
           console.log(`${badge} ${model.name} - ${model.description}`);
         });
         console.log('');
         console.log('使い方:');
-        console.log(`  llamune pull ${recommended[0].name}`);
-        console.log(`  llmn pull ${recommended[0].name}`);
+        console.log(`  llamune pull ${recommendedData.recommended[0].name}`);
+        console.log(`  llmn pull ${recommendedData.recommended[0].name}`);
         return;
       }
 
-      // モデルをプル
-      await pullModel(modelName);
+      // モデルをプル（API経由）
+      await pullModelApi(modelName, (progress) => {
+        if (progress.status) {
+          process.stdout.write(`\r${progress.status}`);
+          if (progress.completed && progress.total) {
+            const percent = Math.round((progress.completed / progress.total) * 100);
+            process.stdout.write(` ${percent}%`);
+          }
+        }
+      });
+
       console.log('');
       console.log('✅ インストール完了！');
       console.log('');
@@ -1108,37 +1092,25 @@ program
       console.log('  llamune ls');
       console.log('  llmn ls');
     } catch (error) {
-      if (error instanceof OllamaError) {
-        console.error('❌ エラー:', error.message);
-      } else {
-        console.error('❌ 予期しないエラーが発生しました');
-      }
+      console.error('❌ エラー:', error instanceof Error ? error.message : 'Unknown error');
       process.exit(1);
     }
   });
 
-// rm コマンド
+// rm コマンド（API クライアント版）
 program
   .command('rm')
   .description('モデルを削除')
   .argument('<model>', 'モデル名（例: gemma2:9b）')
   .action(async (modelName: string) => {
     try {
-      // Ollama の起動確認・自動起動
-      const isRunning = await ensureOllamaRunning();
-      if (!isRunning) {
-        console.log('❌ Ollama の起動に失敗しました');
-        console.log('');
-        console.log('手動で起動してください:');
-        console.log('  ollama serve');
-        process.exit(1);
-      }
+      const { deleteModelApi } = await import('./utils/models-client.js');
 
       console.log(`🗑️  ${modelName} を削除しています...`);
       console.log('');
 
-      // モデルを削除
-      await deleteModel(modelName);
+      // モデルを削除（API経由）
+      await deleteModelApi(modelName);
 
       console.log(`✅ ${modelName} を削除しました`);
       console.log('');
@@ -1146,11 +1118,7 @@ program
       console.log('  llamune ls');
       console.log('  llmn ls');
     } catch (error) {
-      if (error instanceof OllamaError) {
-        console.error('❌ エラー:', error.message);
-      } else {
-        console.error('❌ 予期しないエラーが発生しました');
-      }
+      console.error('❌ エラー:', error instanceof Error ? error.message : 'Unknown error');
       process.exit(1);
     }
   });
@@ -1266,25 +1234,26 @@ program
     }
   });
 
-// recommend コマンド
+// recommend コマンド（API クライアント版）
 program
   .command('recommend')
   .description('推奨モデルを表示')
   .action(async () => {
     try {
+      const { getSystemSpecApi, getRecommendedModelsApi } = await import('./utils/models-client.js');
+
       console.log('🎯 推奨モデル');
       console.log('');
 
-      // システムスペックを取得
-      const spec = await getSystemSpec();
-      displaySystemSpec(spec);
+      // システムスペックを取得（API経由）
+      const specData = await getSystemSpecApi();
+      displaySystemSpec(specData.spec);
 
-      // 推奨モデルを表示
-      const recommended = getRecommendedModels(spec);
-      displayRecommendedModels(recommended);
+      // 推奨モデルを表示（API経由）
+      const recommendedData = await getRecommendedModelsApi();
+      displayRecommendedModels(recommendedData.recommended);
     } catch (error) {
-      console.error('❌ 推奨モデルの取得に失敗しました');
-      console.error(error);
+      console.error('❌ 推奨モデルの取得に失敗しました:', error instanceof Error ? error.message : 'Unknown error');
       process.exit(1);
     }
   });
