@@ -38,7 +38,8 @@ router.post('/messages', async (req: Request, res: Response) => {
       return;
     }
 
-    // ドメインプロンプトIDが指定されている場合、検証
+    // ドメインプロンプトIDが指定されている場合、検証してsystem_promptを取得
+    let systemPrompt: string | undefined;
     if (domainPromptId) {
       const domainPrompt = getDomainPromptById(domainPromptId);
       if (!domainPrompt) {
@@ -50,10 +51,8 @@ router.post('/messages', async (req: Request, res: Response) => {
         res.status(400).json(error);
         return;
       }
-      // TODO: 将来的にsystem_promptを適用
-      // if (domainPrompt.system_prompt) {
-      //   // system_promptをセッションに適用
-      // }
+      // system_promptを取得（nullの場合はundefined）
+      systemPrompt = domainPrompt.system_prompt || undefined;
     }
 
     // セッションを作成または復元
@@ -73,9 +72,9 @@ router.post('/messages', async (req: Request, res: Response) => {
       }
       session = existing;
     } else {
-      // 新規セッション（user_idを設定）
+      // 新規セッション（user_idとsystemPromptを設定）
       const model = modelName || 'gemma2:9b';
-      session = new ChatSession(model, null, history, undefined, userId);
+      session = new ChatSession(model, null, history, undefined, userId, systemPrompt);
     }
 
     // SSEヘッダーを設定

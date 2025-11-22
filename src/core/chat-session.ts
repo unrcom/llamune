@@ -26,19 +26,30 @@ export class ChatSession {
   private model: string;
   private parameters?: ChatParameters;
   private userId?: number;
+  private systemPrompt?: string;
 
   constructor(
     model: string,
     sessionId?: number | null,
     messages?: ChatMessage[],
     parameters?: ChatParameters,
-    userId?: number
+    userId?: number,
+    systemPrompt?: string
   ) {
     this.model = model;
     this.sessionId = sessionId || null;
     this.messages = messages || [];
     this.parameters = parameters;
     this.userId = userId;
+    this.systemPrompt = systemPrompt;
+
+    // system promptが指定されていて、messagesが空またはsystem roleがない場合、先頭に追加
+    if (systemPrompt && (this.messages.length === 0 || this.messages[0].role !== 'system')) {
+      this.messages.unshift({
+        role: 'system',
+        content: systemPrompt,
+      });
+    }
   }
 
   /**
