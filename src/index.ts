@@ -1155,15 +1155,14 @@ program
     }
   });
 
-// history コマンド
+// history コマンド（API クライアント版）
 program
   .command('history [action] [sessionId] [title]')
   .description('会話履歴を表示・編集・削除')
   .option('-n, --limit <number>', '表示する履歴数', '10')
-  .action((action, sessionId, title, options) => {
+  .action(async (action, sessionId, title, options) => {
     try {
-      // TODO: API クライアント化後は不要
-      const userId = undefined;
+      const { getSessionsList, deleteSessionApi, updateSessionTitleApi } = await import('./utils/chat-client.js');
 
       // edit サブコマンドの処理
       if (action === 'edit') {
@@ -1179,12 +1178,12 @@ program
           process.exit(1);
         }
 
-        const success = updateSessionTitle(id, title, userId);
-        if (success) {
+        try {
+          await updateSessionTitleApi(id, title);
           console.log(`✅ セッション ${id} のタイトルを更新しました`);
           console.log(`   新しいタイトル: ${title}`);
-        } else {
-          console.error(`❌ セッション ${id} が見つかりません（または、あなたのセッションではありません）`);
+        } catch (error) {
+          console.error(`❌ セッション ${id} の更新に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`);
           process.exit(1);
         }
         return;
@@ -1204,18 +1203,18 @@ program
           process.exit(1);
         }
 
-        const success = deleteSession(id, userId);
-        if (success) {
+        try {
+          await deleteSessionApi(id);
           console.log(`✅ セッション ${id} を削除しました`);
-        } else {
-          console.error(`❌ セッション ${id} が見つかりません（または、あなたのセッションではありません）`);
+        } catch (error) {
+          console.error(`❌ セッション ${id} の削除に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`);
           process.exit(1);
         }
         return;
       }
 
-      const limit = parseInt(options.limit, 10);
-      const sessions = listSessions(limit, userId);
+      // セッション一覧表示
+      const sessions = await getSessionsList();
 
       if (sessions.length === 0) {
         console.log('📜 会話履歴がありません');
@@ -1229,7 +1228,10 @@ program
       console.log('📜 会話履歴:');
       console.log('');
 
-      sessions.forEach((session) => {
+      const limit = parseInt(options.limit, 10);
+      const displaySessions = sessions.slice(0, limit);
+
+      displaySessions.forEach((session: any) => {
         const date = new Date(session.created_at);
         const formattedDate = date.toLocaleString('ja-JP', {
           year: 'numeric',
@@ -1250,7 +1252,7 @@ program
         console.log('');
       });
 
-      console.log(`合計: ${sessions.length} 件の会話`);
+      console.log(`合計: ${displaySessions.length} 件の会話`);
       console.log('');
       console.log('💡 会話を再開するには:');
       console.log('  llamune chat --continue <ID>');
