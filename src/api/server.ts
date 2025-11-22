@@ -5,6 +5,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { authenticateJWT } from './middleware/jwt-auth.js';
+import { requestLogger } from './middleware/logger.js';
 import { validateJwtConfig } from '../utils/jwt.js';
 import modelsRouter from './routes/models.js';
 import presetsRouter from './routes/presets.js';
@@ -35,6 +36,7 @@ const PORT = process.env.PORT || 3000;
 // ミドルウェア
 app.use(cors());
 app.use(express.json());
+app.use(requestLogger); // リクエスト・レスポンスのロギング
 
 // API メタ情報（認証不要）
 app.get('/api', (req, res) => {
