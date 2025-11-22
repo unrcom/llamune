@@ -31,7 +31,6 @@ import {
   loginCommand,
   logoutCommand,
   whoamiCommand,
-  getCurrentUserId,
 } from './commands/auth.js';
 import {
   saveConversation,
@@ -192,8 +191,8 @@ program
   .option('-c, --continue <session-id>', '過去の会話を再開')
   .action(async (options: { model?: string; continue?: string }) => {
     try {
-      // 現在のユーザーIDを取得
-      const userId = getCurrentUserId();
+      // TODO: API クライアント化後は不要
+      const userId = undefined;
 
       // Ollama の起動確認・自動起動
       const isRunning = await ensureOllamaRunning();
@@ -1163,7 +1162,8 @@ program
   .option('-n, --limit <number>', '表示する履歴数', '10')
   .action((action, sessionId, title, options) => {
     try {
-      const userId = getCurrentUserId();
+      // TODO: API クライアント化後は不要
+      const userId = undefined;
 
       // edit サブコマンドの処理
       if (action === 'edit') {
