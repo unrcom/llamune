@@ -1268,14 +1268,18 @@ program
           minute: '2-digit',
         });
 
-        // タイトルを表示（なければ「(タイトルなし)」）
-        const title = session.title || '(タイトルなし)';
+        // タイトルを表示（なければ「(タイトルなし)」と会話の冒頭を表示）
+        let displayTitle = session.title;
+        if (!displayTitle) {
+          const preview = session.preview ? session.preview.substring(0, 30) : '';
+          displayTitle = `(タイトルなし) ${preview}${preview.length === 30 ? '...' : ''}`;
+        }
 
         console.log(`  ID: ${session.id}`);
         console.log(`  日時: ${formattedDate}`);
         console.log(`  モデル: ${session.model}`);
         console.log(`  メッセージ数: ${session.message_count}`);
-        console.log(`  タイトル: ${title}`);
+        console.log(`  タイトル: ${displayTitle}`);
         console.log('');
       });
 
