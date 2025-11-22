@@ -109,3 +109,31 @@ export interface ApiError {
   code: string;
   statusCode: number;
 }
+
+// 認証関連型
+export interface User {
+  id: number;
+  username: string;
+  role: 'admin' | 'user';
+  created_at: string;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface RefreshTokenResponse {
+  accessToken: string;
+}

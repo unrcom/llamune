@@ -2,16 +2,48 @@ import { useEffect, useState } from 'react';
 import { SessionList } from './components/Session/SessionList';
 import { ChatWindow } from './components/Chat/ChatWindow';
 import { ModelManager } from './components/Models/ModelManager';
+import { Login } from './components/Auth/Login';
 import { useChatStore } from './store/chatStore';
-import { fetchModels, fetchPresets } from './utils/api';
+import { useAuthStore } from './store/authStore';
+import { fetchModels, fetchPresets, getCurrentUser } from './utils/api';
 
 function App() {
   const setModels = useChatStore((state) => state.setModels);
   const setPresets = useChatStore((state) => state.setPresets);
   const mobileView = useChatStore((state) => state.mobileView);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
   const [isMobile, setIsMobile] = useState(false);
+  const [isValidating, setIsValidating] = useState(true);
+
+  // 起動時にトークンの有効性を検証
+  useEffect(() => {
+    const validateAuth = async () => {
+      if (!isAuthenticated) {
+        setIsValidating(false);
+        return;
+      }
+
+      try {
+        // トークンの有効性を確認
+        await getCurrentUser();
+        setIsValidating(false);
+      } catch (error) {
+        // トークンが無効な場合はログアウト
+        console.warn('Invalid token detected, logging out...');
+        clearAuth();
+        setIsValidating(false);
+      }
+    };
+
+    validateAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
+    // 認証済みかつ検証完了後のみデータを読み込む
+    if (!isAuthenticated || isValidating) return;
+
     // モデル一覧を取得
     const loadModels = async () => {
       try {
@@ -34,7 +66,7 @@ function App() {
 
     loadModels();
     loadPresets();
-  }, [setModels, setPresets]);
+  }, [isAuthenticated, isValidating, setModels, setPresets]);
 
   useEffect(() => {
     // モバイル判定
@@ -47,6 +79,24 @@ function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // 検証中はローディング画面を表示
+  if (isValidating) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 未認証の場合はログイン画面を表示
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  // 認証済みの場合はメインアプリを表示
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       {/* Left Sidebar - デスクトップではSessionList/ModelManagerを切り替え、モバイルではビューに応じて表示 */}

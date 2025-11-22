@@ -124,3 +124,87 @@ export interface PullModelRequest {
 export interface DeleteModelRequest {
   modelName: string;
 }
+
+// ========================================
+// 認証関連の型定義
+// ========================================
+
+/**
+ * ユーザー登録リクエスト
+ */
+export interface RegisterRequest {
+  username: string;
+  password: string;
+  role?: 'admin' | 'user';
+}
+
+/**
+ * ログインリクエスト
+ */
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+/**
+ * ログインレスポンス
+ */
+export interface LoginResponse {
+  user: {
+    id: number;
+    username: string;
+    role: 'admin' | 'user';
+  };
+  accessToken: string;
+  refreshToken: string;
+}
+
+/**
+ * トークンリフレッシュリクエスト
+ */
+export interface RefreshTokenRequest {
+  refreshToken: string;
+}
+
+/**
+ * トークンリフレッシュレスポンス
+ */
+export interface RefreshTokenResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
+/**
+ * ログアウトリクエスト
+ */
+export interface LogoutRequest {
+  refreshToken: string;
+}
+
+/**
+ * ユーザー情報レスポンス
+ */
+export interface UserResponse {
+  id: number;
+  username: string;
+  role: 'admin' | 'user';
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * パスワード変更リクエスト
+ */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/**
+ * JWTペイロード（Express Request に追加）
+ */
+export interface AuthenticatedUser {
+  userId: number;
+  username: string;
+  role: 'admin' | 'user';
+}

@@ -56,6 +56,29 @@ export interface ParameterPreset {
 }
 
 /**
+ * ユーザーの型定義
+ */
+export interface User {
+  id: number;
+  username: string;
+  password_hash: string;
+  role: 'admin' | 'user';
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * リフレッシュトークンの型定義
+ */
+export interface RefreshToken {
+  id: number;
+  user_id: number;
+  token: string;
+  expires_at: string;
+  created_at: string;
+}
+
+/**
  * データベースを初期化
  */
 export function initDatabase(): Database.Database {
@@ -170,15 +193,16 @@ export function saveMessage(
  */
 export function saveConversation(
   model: string,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  userId?: number
 ): number {
   const db = initDatabase();
   const now = new Date().toISOString();
 
   // セッションを作成
   const sessionResult = db
-    .prepare('INSERT INTO sessions (model, created_at, updated_at) VALUES (?, ?, ?)')
-    .run(model, now, now);
+    .prepare('INSERT INTO sessions (model, user_id, created_at, updated_at) VALUES (?, ?, ?, ?)')
+    .run(model, userId || null, now, now);
 
   const sessionId = sessionResult.lastInsertRowid as number;
 
@@ -223,36 +247,45 @@ export function appendMessagesToSession(
 /**
  * セッション一覧を取得
  */
-export function listSessions(limit = 200): ChatSession[] {
+export function listSessions(limit = 200, userId?: number): ChatSession[] {
   const db = initDatabase();
 
-  const sessions = db
-    .prepare(
-      `
-      SELECT * FROM (
-        SELECT
-          s.id,
-          s.model,
-          s.created_at,
-          s.updated_at,
-          s.title,
-          COUNT(m.id) as message_count,
-          (
-            SELECT content
-            FROM messages
-            WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
-            ORDER BY id ASC
-            LIMIT 1
-          ) as preview
-        FROM sessions s
-        LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
-        GROUP BY s.id
-        ORDER BY s.created_at DESC
-        LIMIT ?
-      ) ORDER BY created_at ASC
-    `
-    )
-    .all(limit) as ChatSession[];
+  let query = `
+    SELECT * FROM (
+      SELECT
+        s.id,
+        s.model,
+        s.created_at,
+        s.updated_at,
+        s.title,
+        COUNT(m.id) as message_count,
+        (
+          SELECT content
+          FROM messages
+          WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
+          ORDER BY id ASC
+          LIMIT 1
+        ) as preview
+      FROM sessions s
+      LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
+  `;
+
+  if (userId !== undefined) {
+    query += `
+      WHERE s.user_id = ?
+    `;
+  }
+
+  query += `
+      GROUP BY s.id
+      ORDER BY s.created_at DESC
+      LIMIT ?
+    ) ORDER BY created_at ASC
+  `;
+
+  const sessions = userId !== undefined
+    ? db.prepare(query).all(userId, limit) as ChatSession[]
+    : db.prepare(query).all(limit) as ChatSession[];
 
   db.close();
   return sessions;
@@ -261,12 +294,18 @@ export function listSessions(limit = 200): ChatSession[] {
 /**
  * セッションのタイトルを更新
  */
-export function updateSessionTitle(sessionId: number, title: string): boolean {
+export function updateSessionTitle(sessionId: number, title: string, userId?: number): boolean {
   const db = initDatabase();
 
-  const result = db
-    .prepare('UPDATE sessions SET title = ? WHERE id = ?')
-    .run(title, sessionId);
+  let query = 'UPDATE sessions SET title = ? WHERE id = ?';
+  let params: any[] = [title, sessionId];
+
+  if (userId !== undefined) {
+    query = 'UPDATE sessions SET title = ? WHERE id = ? AND user_id = ?';
+    params = [title, sessionId, userId];
+  }
+
+  const result = db.prepare(query).run(...params);
 
   db.close();
   return result.changes > 0;
@@ -274,9 +313,11 @@ export function updateSessionTitle(sessionId: number, title: string): boolean {
 
 /**
  * セッションの詳細を取得
+ * @param sessionId - セッションID
+ * @param userId - ユーザーID（指定された場合、所有者チェックを行う）
  */
-export function getSession(sessionId: number): {
-  session: ChatSession;
+export function getSession(sessionId: number, userId?: number): {
+  session: ChatSession & { user_id?: number };
   messages: ChatMessage[];
 } | null {
   const db = initDatabase();
@@ -288,6 +329,7 @@ export function getSession(sessionId: number): {
       SELECT
         s.id,
         s.model,
+        s.user_id,
         s.created_at,
         s.updated_at,
         COUNT(m.id) as message_count,
@@ -304,9 +346,15 @@ export function getSession(sessionId: number): {
       GROUP BY s.id
     `
     )
-    .get(sessionId) as ChatSession | undefined;
+    .get(sessionId) as (ChatSession & { user_id?: number }) | undefined;
 
   if (!session) {
+    db.close();
+    return null;
+  }
+
+  // 所有者チェック（userIdが指定されている場合）
+  if (userId !== undefined && session.user_id !== userId) {
     db.close();
     return null;
   }
@@ -573,27 +621,35 @@ export function getParameterPresetById(id: number): ParameterPreset | null {
 
 /**
  * すべてのセッションを取得（プレビュー付き）
+ * @param userId - ユーザーID（指定された場合、そのユーザーのセッションのみ取得）
  */
-export function getAllSessions(): ChatSession[] {
+export function getAllSessions(userId?: number): ChatSession[] {
   const db = initDatabase();
 
-  const sessions = db
-    .prepare(
-      `
-      SELECT
-        s.id,
-        s.model,
-        s.created_at,
-        s.title,
-        COUNT(m.id) as message_count,
-        (SELECT content FROM messages WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL ORDER BY id ASC LIMIT 1) as preview
-      FROM sessions s
-      LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
-      GROUP BY s.id
-      ORDER BY s.created_at DESC
-    `
-    )
-    .all() as ChatSession[];
+  let query = `
+    SELECT
+      s.id,
+      s.model,
+      s.created_at,
+      s.title,
+      COUNT(m.id) as message_count,
+      (SELECT content FROM messages WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL ORDER BY id ASC LIMIT 1) as preview
+    FROM sessions s
+    LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
+  `;
+
+  if (userId !== undefined) {
+    query += ` WHERE s.user_id = ?`;
+  }
+
+  query += `
+    GROUP BY s.id
+    ORDER BY s.created_at DESC
+  `;
+
+  const sessions = userId !== undefined
+    ? db.prepare(query).all(userId) as ChatSession[]
+    : db.prepare(query).all() as ChatSession[];
 
   db.close();
   return sessions;
@@ -622,10 +678,22 @@ export function updateSessionModel(sessionId: number, modelName: string): boolea
 /**
  * セッションを削除
  */
-export function deleteSession(sessionId: number): boolean {
+export function deleteSession(sessionId: number, userId?: number): boolean {
   const db = initDatabase();
 
   try {
+    // ユーザー所有権チェック
+    if (userId !== undefined) {
+      const session = db
+        .prepare('SELECT user_id FROM sessions WHERE id = ?')
+        .get(sessionId) as { user_id?: number } | undefined;
+
+      if (!session || session.user_id !== userId) {
+        db.close();
+        return false; // セッションが存在しないか、所有者ではない
+      }
+    }
+
     // メッセージを削除
     db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
 
@@ -634,6 +702,236 @@ export function deleteSession(sessionId: number): boolean {
 
     db.close();
     return result.changes > 0;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+// ========================================
+// ユーザー管理
+// ========================================
+
+/**
+ * ユーザーを作成
+ */
+export function createUser(
+  username: string,
+  passwordHash: string,
+  role: 'admin' | 'user' = 'user'
+): number {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare(
+        'INSERT INTO users (username, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(username, passwordHash, role, now, now);
+
+    db.close();
+    return result.lastInsertRowid as number;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ユーザー名でユーザーを取得
+ */
+export function getUserByUsername(username: string): User | null {
+  const db = initDatabase();
+
+  try {
+    const user = db
+      .prepare('SELECT * FROM users WHERE username = ?')
+      .get(username) as User | undefined;
+
+    db.close();
+    return user || null;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * IDでユーザーを取得
+ */
+export function getUserById(userId: number): User | null {
+  const db = initDatabase();
+
+  try {
+    const user = db
+      .prepare('SELECT * FROM users WHERE id = ?')
+      .get(userId) as User | undefined;
+
+    db.close();
+    return user || null;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * すべてのユーザーを取得（管理者用）
+ */
+export function getAllUsers(): User[] {
+  const db = initDatabase();
+
+  try {
+    const users = db
+      .prepare('SELECT id, username, role, created_at, updated_at FROM users ORDER BY created_at DESC')
+      .all() as User[];
+
+    db.close();
+    return users;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ユーザーのパスワードを更新
+ */
+export function updateUserPassword(userId: number, newPasswordHash: string): boolean {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
+      .run(newPasswordHash, now, userId);
+
+    db.close();
+    return result.changes > 0;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ユーザーを削除
+ */
+export function deleteUser(userId: number): boolean {
+  const db = initDatabase();
+
+  try {
+    // カスケード削除により、関連するsessions, refresh_tokensも削除される
+    const result = db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+
+    db.close();
+    return result.changes > 0;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+// ========================================
+// リフレッシュトークン管理
+// ========================================
+
+/**
+ * リフレッシュトークンを保存
+ */
+export function saveRefreshToken(
+  userId: number,
+  token: string,
+  expiresAt: string
+): number {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare(
+        'INSERT INTO refresh_tokens (user_id, token, expires_at, created_at) VALUES (?, ?, ?, ?)'
+      )
+      .run(userId, token, expiresAt, now);
+
+    db.close();
+    return result.lastInsertRowid as number;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * リフレッシュトークンを取得
+ */
+export function getRefreshToken(token: string): RefreshToken | null {
+  const db = initDatabase();
+
+  try {
+    const refreshToken = db
+      .prepare('SELECT * FROM refresh_tokens WHERE token = ?')
+      .get(token) as RefreshToken | undefined;
+
+    db.close();
+    return refreshToken || null;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ユーザーのリフレッシュトークンを削除
+ */
+export function deleteRefreshToken(token: string): boolean {
+  const db = initDatabase();
+
+  try {
+    const result = db.prepare('DELETE FROM refresh_tokens WHERE token = ?').run(token);
+
+    db.close();
+    return result.changes > 0;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * ユーザーのすべてのリフレッシュトークンを削除
+ */
+export function deleteAllRefreshTokensForUser(userId: number): number {
+  const db = initDatabase();
+
+  try {
+    const result = db
+      .prepare('DELETE FROM refresh_tokens WHERE user_id = ?')
+      .run(userId);
+
+    db.close();
+    return result.changes;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+/**
+ * 期限切れのリフレッシュトークンを削除
+ */
+export function cleanupExpiredRefreshTokens(): number {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare('DELETE FROM refresh_tokens WHERE expires_at < ?')
+      .run(now);
+
+    db.close();
+    return result.changes;
   } catch (error) {
     db.close();
     throw error;

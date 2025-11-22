@@ -6,17 +6,144 @@ import type {
   ParameterPreset,
   RecommendedModel,
   SystemSpec,
+  LoginRequest,
+  LoginResponse,
+  RefreshTokenResponse,
+  User,
 } from '../types';
+import { useAuthStore } from '../store/authStore';
 
 const API_BASE_URL = '/api';
 
+// 認証ヘッダーを取得
+function getAuthHeaders(): HeadersInit {
+  const tokens = useAuthStore.getState().tokens;
+  if (tokens?.accessToken) {
+    return {
+      'Authorization': `Bearer ${tokens.accessToken}`,
+    };
+  }
+  // フォールバック: 環境変数のAPIキー（後方互換性のため）
+  if (import.meta.env.VITE_API_KEY) {
+    return {
+      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+    };
+  }
+  return {};
+}
+
+// トークンリフレッシュ処理
+async function refreshAccessToken(): Promise<boolean> {
+  const tokens = useAuthStore.getState().tokens;
+  if (!tokens?.refreshToken) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+    });
+
+    if (!response.ok) {
+      // リフレッシュトークンが無効な場合はログアウト
+      useAuthStore.getState().clearAuth();
+      return false;
+    }
+
+    const data: RefreshTokenResponse = await response.json();
+    useAuthStore.getState().updateAccessToken(data.accessToken);
+    return true;
+  } catch (error) {
+    console.error('Failed to refresh token:', error);
+    return false;
+  }
+}
+
+// 認証付きfetch（トークン期限切れ時は自動リフレッシュ）
+async function authenticatedFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const headers = {
+    ...options.headers,
+    ...getAuthHeaders(),
+  };
+
+  let response = await fetch(url, { ...options, headers });
+
+  // 401エラーの場合、トークンをリフレッシュして再試行
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      // リフレッシュ成功、新しいトークンで再試行
+      const newHeaders = {
+        ...options.headers,
+        ...getAuthHeaders(),
+      };
+      response = await fetch(url, { ...options, headers: newHeaders });
+    }
+  }
+
+  return response;
+}
+
+// 認証API
+export async function login(username: string, password: string): Promise<LoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, password } as LoginRequest),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Login failed');
+  }
+
+  return response.json();
+}
+
+export async function logout(): Promise<void> {
+  const tokens = useAuthStore.getState().tokens;
+  if (tokens?.refreshToken) {
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+      });
+    } catch (error) {
+      console.error('Logout API call failed:', error);
+    }
+  }
+  useAuthStore.getState().clearAuth();
+  // Zustand persist は state を空にしても localStorage キーを削除しないため、明示的に削除
+  localStorage.removeItem('llamune-auth');
+}
+
+export async function getCurrentUser(): Promise<User> {
+  const response = await authenticatedFetch(`${API_BASE_URL}/auth/me`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch current user');
+  }
+
+  const data = await response.json();
+  return data.user;
+}
+
 // セッション一覧を取得
 export async function fetchSessions(): Promise<SessionsResponse> {
-  const response = await fetch(`${API_BASE_URL}/chat/sessions`, {
-    headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
-    },
-  });
+  const response = await authenticatedFetch(`${API_BASE_URL}/chat/sessions`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch sessions');
@@ -27,11 +154,7 @@ export async function fetchSessions(): Promise<SessionsResponse> {
 
 // セッション詳細を取得
 export async function fetchSession(sessionId: number): Promise<SessionDetailResponse> {
-  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
-    headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
-    },
-  });
+  const response = await authenticatedFetch(`${API_BASE_URL}/chat/sessions/${sessionId}`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch session');
@@ -42,11 +165,7 @@ export async function fetchSession(sessionId: number): Promise<SessionDetailResp
 
 // モデル一覧を取得
 export async function fetchModels(): Promise<{ models: Model[] }> {
-  const response = await fetch(`${API_BASE_URL}/models`, {
-    headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
-    },
-  });
+  const response = await authenticatedFetch(`${API_BASE_URL}/models`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch models');
@@ -57,11 +176,7 @@ export async function fetchModels(): Promise<{ models: Model[] }> {
 
 // パラメータプリセット一覧を取得
 export async function fetchPresets(): Promise<{ presets: ParameterPreset[] }> {
-  const response = await fetch(`${API_BASE_URL}/presets`, {
-    headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
-    },
-  });
+  const response = await authenticatedFetch(`${API_BASE_URL}/presets`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch presets');
@@ -77,11 +192,10 @@ export async function retryLastMessage(
   presetId?: number | null,
   history?: Message[]
 ): Promise<Response> {
-  const response = await fetch(`${API_BASE_URL}/chat/retry`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/chat/retry`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
     },
     body: JSON.stringify({
       sessionId,
@@ -103,11 +217,10 @@ export async function rewindSession(
   sessionId: number,
   turnNumber: number
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/rewind`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/chat/sessions/${sessionId}/rewind`, {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
     },
     body: JSON.stringify({ turnNumber }),
   });
@@ -122,11 +235,10 @@ export async function updateSessionTitle(
   sessionId: number,
   title: string
 ): Promise<{ success: boolean; sessionId: number; title: string }> {
-  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/title`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/chat/sessions/${sessionId}/title`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
     },
     body: JSON.stringify({ title }),
   });
@@ -142,11 +254,8 @@ export async function updateSessionTitle(
 export async function deleteSessionApi(
   sessionId: number
 ): Promise<{ success: boolean; sessionId: number }> {
-  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
     method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
-    },
   });
 
   if (!response.ok) {
@@ -161,11 +270,7 @@ export async function fetchRecommendedModels(): Promise<{
   spec: SystemSpec;
   recommended: RecommendedModel[];
 }> {
-  const response = await fetch(`${API_BASE_URL}/models/recommended`, {
-    headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
-    },
-  });
+  const response = await authenticatedFetch(`${API_BASE_URL}/models/recommended`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch recommended models');
@@ -176,11 +281,10 @@ export async function fetchRecommendedModels(): Promise<{
 
 // モデルをダウンロード
 export async function pullModel(modelName: string): Promise<{ success: boolean; modelName: string }> {
-  const response = await fetch(`${API_BASE_URL}/models/pull`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/models/pull`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
     },
     body: JSON.stringify({ modelName }),
   });
@@ -194,11 +298,10 @@ export async function pullModel(modelName: string): Promise<{ success: boolean; 
 
 // モデルを削除
 export async function deleteModel(modelName: string): Promise<{ success: boolean; modelName: string }> {
-  const response = await fetch(`${API_BASE_URL}/models`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/models`, {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
     },
     body: JSON.stringify({ modelName }),
   });

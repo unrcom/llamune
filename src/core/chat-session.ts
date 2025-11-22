@@ -25,17 +25,20 @@ export class ChatSession {
   private sessionId: number | null;
   private model: string;
   private parameters?: ChatParameters;
+  private userId?: number;
 
   constructor(
     model: string,
     sessionId?: number | null,
     messages?: ChatMessage[],
-    parameters?: ChatParameters
+    parameters?: ChatParameters,
+    userId?: number
   ) {
     this.model = model;
     this.sessionId = sessionId || null;
     this.messages = messages || [];
     this.parameters = parameters;
+    this.userId = userId;
   }
 
   /**
@@ -276,7 +279,7 @@ export class ChatSession {
       return this.sessionId;
     } else {
       // 新規セッション作成
-      this.sessionId = saveConversation(this.model, this.messages);
+      this.sessionId = saveConversation(this.model, this.messages, this.userId);
       return this.sessionId;
     }
   }
@@ -305,8 +308,8 @@ export class ChatSession {
   /**
    * セッションIDからセッションを復元
    */
-  static fromSessionId(sessionId: number): ChatSession | null {
-    const sessionData = getSession(sessionId);
+  static fromSessionId(sessionId: number, userId?: number): ChatSession | null {
+    const sessionData = getSession(sessionId, userId);
     if (!sessionData) {
       return null;
     }
@@ -314,7 +317,9 @@ export class ChatSession {
     return new ChatSession(
       sessionData.session.model,
       sessionId,
-      sessionData.messages
+      sessionData.messages,
+      undefined,
+      sessionData.session.user_id
     );
   }
 }
