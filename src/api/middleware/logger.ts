@@ -30,7 +30,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       headers.authorization = `Bearer ${token.substring(0, 10)}...(masked)`;
     }
   }
-  console.log(`📋 Headers:`, JSON.stringify(headers, null, 2));
+  console.log(`📋 Headers: ${JSON.stringify(headers)}`);
 
   // リクエストボディ（パスワードはマスク）
   if (req.body && Object.keys(req.body).length > 0) {
@@ -41,7 +41,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     if (body.refreshToken) {
       body.refreshToken = `${body.refreshToken.substring(0, 10)}...(masked)`;
     }
-    console.log(`📦 Body:`, JSON.stringify(body, null, 2));
+    console.log(`📦 Body: ${JSON.stringify(body)}`);
   }
 
   // レスポンス情報をログ出力するために res.json をフック
