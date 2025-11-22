@@ -71,13 +71,28 @@ function readPassword(prompt: string): Promise<string> {
  */
 export async function loginCommand(): Promise<void> {
   try {
-    // 既にログイン済みかチェック
+    // 既にログイン済みかチェック（トークンの有効性も確認）
     if (isLoggedIn()) {
       const tokens = loadAuthTokens();
-      console.log(`⚠️  Already logged in as ${tokens?.user.username}`);
-      console.log('');
-      console.log('ログアウトするには: llamune logout');
-      return;
+
+      if (tokens) {
+        // トークンが実際に有効か確認
+        try {
+          await getMeApi(tokens.accessToken);
+          console.log(`⚠️  Already logged in as ${tokens.user.username}`);
+          console.log('');
+          console.log('ログアウトするには: llamune logout');
+          return;
+        } catch (error) {
+          // トークンが無効または期限切れ
+          console.log('⚠️  Stored token is invalid or expired');
+          console.log('🔄 Logging out and proceeding with login...');
+          console.log('');
+
+          // 無効なトークンを削除
+          deleteAuthTokens();
+        }
+      }
     }
 
     console.log('🔐 Llamune Login');
@@ -284,10 +299,16 @@ export async function whoamiCommand(): Promise<void> {
       console.log('');
       console.log(`  Token stored at: ~/.llamune/auth.json`);
     } catch (error) {
-      // トークンが期限切れの可能性
-      console.error('❌ Failed to fetch user info (token may be expired)');
+      // トークンが期限切れまたは無効
+      console.error('❌ Failed to fetch user info (token is invalid or expired)');
       console.log('');
-      console.log('再ログインしてください: llamune logout && llamune login');
+      console.log('🔄 Removing invalid token...');
+
+      // 無効なトークンを削除
+      deleteAuthTokens();
+
+      console.log('');
+      console.log('再ログインしてください: llamune login');
       process.exit(1);
     }
   } catch (error) {
