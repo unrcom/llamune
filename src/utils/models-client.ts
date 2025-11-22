@@ -3,7 +3,7 @@
  * CLI から API サーバーの models エンドポイントを呼び出す
  */
 
-import { getAuthHeaders } from './auth-client.js';
+import { fetchWithAuth } from './auth-client.js';
 
 const API_BASE_URL = process.env.LLAMUNE_API_URL || 'http://localhost:3000';
 
@@ -25,13 +25,8 @@ export interface ModelInfo {
  * モデル一覧を取得
  */
 export async function listModelsApi(): Promise<ModelInfo[]> {
-  const headers = {
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/models`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/models`, {
     method: 'GET',
-    headers,
   });
 
   if (!response.ok) {
@@ -50,14 +45,11 @@ export async function pullModelApi(
   name: string,
   onProgress?: (progress: { status: string; completed?: number; total?: number }) => void
 ): Promise<void> {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/models/pull`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/models/pull`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ name }),
   });
 
@@ -97,14 +89,11 @@ export async function pullModelApi(
  * モデルを削除
  */
 export async function deleteModelApi(name: string): Promise<void> {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/models`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/models`, {
     method: 'DELETE',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ name }),
   });
 
@@ -118,13 +107,8 @@ export async function deleteModelApi(name: string): Promise<void> {
  * 推奨モデル一覧を取得
  */
 export async function getRecommendedModelsApi(): Promise<any> {
-  const headers = {
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/models/recommended`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/models/recommended`, {
     method: 'GET',
-    headers,
   });
 
   if (!response.ok) {
@@ -139,13 +123,8 @@ export async function getRecommendedModelsApi(): Promise<any> {
  * システム情報を取得
  */
 export async function getSystemSpecApi(): Promise<any> {
-  const headers = {
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/system/spec`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/system/spec`, {
     method: 'GET',
-    headers,
   });
 
   if (!response.ok) {

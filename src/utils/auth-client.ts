@@ -83,6 +83,73 @@ export function getAuthHeaders(): Record<string, string> {
 }
 
 /**
+ * トークンをリフレッシュして保存
+ */
+export async function refreshAndSaveToken(): Promise<AuthTokens> {
+  const tokens = loadAuthTokens();
+  if (!tokens) {
+    throw new Error('Not logged in. Please run: llamune login');
+  }
+
+  try {
+    // リフレッシュトークンで新しいトークンペアを取得
+    const newTokens = await refreshTokenApi(tokens.refreshToken);
+
+    // 新しいトークンを保存
+    const updatedTokens: AuthTokens = {
+      accessToken: newTokens.accessToken,
+      refreshToken: newTokens.refreshToken,
+      user: tokens.user, // ユーザー情報は保持
+    };
+    saveAuthTokens(updatedTokens);
+
+    return updatedTokens;
+  } catch (error) {
+    // リフレッシュ失敗時はトークンを削除
+    deleteAuthTokens();
+    throw new Error('Token refresh failed. Please login again: llamune login');
+  }
+}
+
+/**
+ * API fetch with automatic token refresh on 401
+ */
+export async function fetchWithAuth(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  // 最初のリクエスト
+  let response = await fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      ...getAuthHeaders(),
+    },
+  });
+
+  // 401 エラーの場合、トークンをリフレッシュしてリトライ
+  if (response.status === 401) {
+    try {
+      await refreshAndSaveToken();
+
+      // リトライ
+      response = await fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          ...getAuthHeaders(),
+        },
+      });
+    } catch (error) {
+      // リフレッシュ失敗時はそのまま 401 レスポンスを返す
+      throw error;
+    }
+  }
+
+  return response;
+}
+
+/**
  * ユーザー登録API呼び出し
  */
 export async function registerApi(

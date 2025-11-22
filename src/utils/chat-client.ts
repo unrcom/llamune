@@ -3,7 +3,7 @@
  * CLI から API サーバーの chat エンドポイントを呼び出す
  */
 
-import { getAuthHeaders } from './auth-client.js';
+import { fetchWithAuth } from './auth-client.js';
 import type { ChatMessage } from './ollama.js';
 
 const API_BASE_URL = process.env.LLAMUNE_API_URL || 'http://localhost:3000';
@@ -18,11 +18,6 @@ export async function* sendMessageStream(
   presetId?: number,
   history?: ChatMessage[]
 ): AsyncGenerator<string, { sessionId: number; fullContent: string; model: string }, unknown> {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-
   const body: any = {
     content,
   };
@@ -40,9 +35,11 @@ export async function* sendMessageStream(
     body.history = history;
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/chat/messages`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/messages`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(body),
   });
 
@@ -120,13 +117,8 @@ export async function* sendMessageStream(
  * セッション一覧を取得
  */
 export async function getSessionsList(): Promise<any[]> {
-  const headers = {
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/chat/sessions`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions`, {
     method: 'GET',
-    headers,
   });
 
   if (!response.ok) {
@@ -145,13 +137,8 @@ export async function getSessionDetail(sessionId: number): Promise<{
   session: any;
   messages: ChatMessage[];
 }> {
-  const headers = {
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/chat/sessions/${sessionId}`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions/${sessionId}`, {
     method: 'GET',
-    headers,
   });
 
   if (!response.ok) {
@@ -166,13 +153,8 @@ export async function getSessionDetail(sessionId: number): Promise<{
  * セッションを削除
  */
 export async function deleteSessionApi(sessionId: number): Promise<void> {
-  const headers = {
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/chat/sessions/${sessionId}`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions/${sessionId}`, {
     method: 'DELETE',
-    headers,
   });
 
   if (!response.ok) {
@@ -185,14 +167,11 @@ export async function deleteSessionApi(sessionId: number): Promise<void> {
  * セッションタイトルを更新
  */
 export async function updateSessionTitleApi(sessionId: number, title: string): Promise<void> {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/chat/sessions/${sessionId}/title`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions/${sessionId}/title`, {
     method: 'PUT',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ title }),
   });
 
@@ -211,11 +190,6 @@ export async function* retryMessageStream(
   presetId?: number,
   history?: ChatMessage[]
 ): AsyncGenerator<string, { sessionId: number; fullContent: string; model: string }, unknown> {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-
   const body: any = {
     modelName,
   };
@@ -230,9 +204,11 @@ export async function* retryMessageStream(
     body.history = history;
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/chat/retry`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/retry`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(body),
   });
 
@@ -310,14 +286,11 @@ export async function* retryMessageStream(
  * セッションを巻き戻し
  */
 export async function rewindSessionApi(sessionId: number, turnNumber: number): Promise<void> {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/chat/sessions/${sessionId}/rewind`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions/${sessionId}/rewind`, {
     method: 'DELETE',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ turnNumber }),
   });
 
@@ -331,14 +304,11 @@ export async function rewindSessionApi(sessionId: number, turnNumber: number): P
  * モデルを切り替え
  */
 export async function switchModelApi(sessionId: number, modelName: string): Promise<void> {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/chat/sessions/${sessionId}/model`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/chat/sessions/${sessionId}/model`, {
     method: 'PUT',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ modelName }),
   });
 
@@ -352,13 +322,8 @@ export async function switchModelApi(sessionId: number, modelName: string): Prom
  * パラメータプリセット一覧を取得
  */
 export async function getParameterPresetsApi(): Promise<any[]> {
-  const headers = {
-    ...getAuthHeaders(),
-  };
-
-  const response = await fetch(`${API_BASE_URL}/api/presets`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/presets`, {
     method: 'GET',
-    headers,
   });
 
   if (!response.ok) {
