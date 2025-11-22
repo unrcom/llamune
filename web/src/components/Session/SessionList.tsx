@@ -78,8 +78,8 @@ export function SessionList() {
   };
 
   const handleDomainSelect = (domainPromptId: number | null) => {
-    setCurrentDomainPromptId(domainPromptId);
     resetChat();
+    setCurrentDomainPromptId(domainPromptId);
     setMobileView('chat'); // モバイルでチャット画面に切り替え
   };
 

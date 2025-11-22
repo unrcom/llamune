@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Model, ParameterPreset } from '../../types';
 
 interface RetryModalProps {

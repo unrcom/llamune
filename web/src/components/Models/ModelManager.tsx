@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useChatStore } from '../../store/chatStore';
 import { fetchModels, fetchRecommendedModels, pullModel, deleteModel } from '../../utils/api';
-import type { Model, RecommendedModel, SystemSpec } from '../../types';
+import type { RecommendedModel, SystemSpec } from '../../types';
 
 export function ModelManager() {
   const { models, setModels, setMobileView } = useChatStore();
