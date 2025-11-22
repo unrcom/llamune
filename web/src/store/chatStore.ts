@@ -6,6 +6,7 @@ interface ChatState {
   currentSessionId: number | null;
   currentModel: string;
   currentPresetId: number | null;
+  currentDomainPromptId: number | null; // ドメイン特化モード用
   messages: Message[];
 
   // セッション一覧
@@ -31,6 +32,7 @@ interface ChatState {
   setCurrentSession: (sessionId: number | null) => void;
   setCurrentModel: (model: string) => void;
   setCurrentPresetId: (presetId: number | null) => void;
+  setCurrentDomainPromptId: (domainPromptId: number | null) => void;
   addMessage: (message: Message) => void;
   setMessages: (messages: Message[]) => void;
   removeLastAssistantMessage: () => Message | null;
@@ -52,6 +54,7 @@ export const useChatStore = create<ChatState>((set) => ({
   currentSessionId: null,
   currentModel: '',
   currentPresetId: null,
+  currentDomainPromptId: null,
   messages: [],
   sessions: [],
   models: [],
@@ -73,6 +76,7 @@ export const useChatStore = create<ChatState>((set) => ({
   setCurrentSession: (sessionId) => set({ currentSessionId: sessionId }),
   setCurrentModel: (model) => set({ currentModel: model }),
   setCurrentPresetId: (presetId) => set({ currentPresetId: presetId }),
+  setCurrentDomainPromptId: (domainPromptId) => set({ currentDomainPromptId: domainPromptId }),
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, message]
   })),
@@ -126,6 +130,7 @@ export const useChatStore = create<ChatState>((set) => ({
   }),
   resetChat: () => set({
     currentSessionId: null,
+    currentDomainPromptId: null,
     messages: [],
     error: null,
     isRetryPending: false,

@@ -71,6 +71,31 @@ export interface SystemSpec {
   }[];
 }
 
+// ドメインモード型
+export interface DomainMode {
+  id: number;
+  name: string;
+  display_name: string;
+  description: string | null;
+  icon: string | null;
+  enabled: number;
+  created_at: string;
+}
+
+// ドメインプロンプト型
+export interface DomainPrompt {
+  id: number;
+  domain_mode_id: number;
+  name: string;
+  display_name: string;
+  description: string | null;
+  system_prompt: string | null;
+  recommended_model: string | null;
+  preset_id: number | null;
+  is_default: number;
+  created_at: string;
+}
+
 // APIリクエスト型
 export interface SendMessageParams {
   sessionId?: number;
@@ -78,6 +103,7 @@ export interface SendMessageParams {
   modelName?: string;
   presetId?: number;
   history?: Message[];
+  domainPromptId?: number; // ドメイン特化モード用
 }
 
 // APIレスポンス型

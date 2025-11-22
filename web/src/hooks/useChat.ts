@@ -27,6 +27,7 @@ export function useChat() {
   const {
     currentSessionId,
     currentModel,
+    currentDomainPromptId,
     messages,
     addMessage,
     removeLastAssistantMessage,
@@ -63,6 +64,7 @@ export function useChat() {
           content,
           modelName: currentModel,
           history: currentSessionId ? undefined : messages,
+          domainPromptId: currentDomainPromptId,
         }),
       });
 

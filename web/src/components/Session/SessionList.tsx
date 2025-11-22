@@ -3,9 +3,10 @@ import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { fetchSessions, fetchSession, updateSessionTitle, deleteSessionApi } from '../../utils/api';
 import type { Session } from '../../types';
+import { DomainSelector } from './DomainSelector';
 
 export function SessionList() {
-  const { currentSessionId, setCurrentSession, setMessages, resetChat, setSessions, setMobileView } = useChatStore();
+  const { currentSessionId, setCurrentSession, setMessages, resetChat, setSessions, setMobileView, setCurrentDomainPromptId } = useChatStore();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [sessions, setLocalSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
@@ -14,6 +15,7 @@ export function SessionList() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showInfoId, setShowInfoId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showDomainSelector, setShowDomainSelector] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const sortedSessions = useMemo(() => {
@@ -72,7 +74,13 @@ export function SessionList() {
   }, []);
 
   const handleNewChat = () => {
+    setShowDomainSelector(true);
+  };
+
+  const handleDomainSelect = (domainPromptId: number | null) => {
+    setCurrentDomainPromptId(domainPromptId);
     resetChat();
+    setMobileView('chat'); // モバイルでチャット画面に切り替え
   };
 
   const handleOpenModels = () => {
@@ -277,6 +285,13 @@ export function SessionList() {
           </div>
         )}
       </div>
+
+      {/* Domain Selector Modal */}
+      <DomainSelector
+        isOpen={showDomainSelector}
+        onClose={() => setShowDomainSelector(false)}
+        onSelect={handleDomainSelect}
+      />
     </div>
   );
 }

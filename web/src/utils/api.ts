@@ -10,6 +10,8 @@ import type {
   LoginResponse,
   RefreshTokenResponse,
   User,
+  DomainMode,
+  DomainPrompt,
 } from '../types';
 import { useAuthStore } from '../store/authStore';
 
@@ -308,6 +310,28 @@ export async function deleteModel(modelName: string): Promise<{ success: boolean
 
   if (!response.ok) {
     throw new Error('Failed to delete model');
+  }
+
+  return response.json();
+}
+
+// ドメインモード一覧を取得
+export async function fetchDomainModes(): Promise<{ domains: DomainMode[] }> {
+  const response = await authenticatedFetch(`${API_BASE_URL}/domains`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch domain modes');
+  }
+
+  return response.json();
+}
+
+// 特定ドメインのプロンプト一覧を取得
+export async function fetchDomainPrompts(domainId: number): Promise<{ prompts: DomainPrompt[] }> {
+  const response = await authenticatedFetch(`${API_BASE_URL}/domains/${domainId}/prompts`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch domain prompts');
   }
 
   return response.json();
