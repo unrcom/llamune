@@ -160,23 +160,39 @@ export function DomainSelector({ isOpen, onClose, onSelect }: DomainSelectorProp
                       利用可能なドメインがありません
                     </div>
                   ) : (
-                    domains.map((domain) => (
-                      <button
-                        key={domain.id}
-                        onClick={() => handleSelectDomain(domain)}
-                        className="w-full text-left p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-                      >
+                    <>
+                      {/* 説明パネル */}
+                      <div className="w-full text-left p-4 bg-gradient-to-r from-blue-900/40 to-purple-900/40 rounded-lg border border-blue-700/50">
                         <div className="flex items-center gap-3">
-                          <span className="text-2xl">{domain.icon || '📦'}</span>
+                          <span className="text-2xl">💼</span>
                           <div>
-                            <div className="font-semibold text-white">{domain.display_name}</div>
-                            {domain.description && (
-                              <div className="text-sm text-gray-400">{domain.description}</div>
-                            )}
+                            <div className="font-semibold text-white">あなたの本職を支援するモード</div>
+                            <div className="text-sm text-gray-300 mt-1">
+                              あなたのドメインを深く理解し個別に開発致します
+                            </div>
                           </div>
                         </div>
-                      </button>
-                    ))
+                      </div>
+
+                      {/* ドメインリスト */}
+                      {domains.map((domain) => (
+                        <button
+                          key={domain.id}
+                          onClick={() => handleSelectDomain(domain)}
+                          className="w-full text-left p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">{domain.icon || '📦'}</span>
+                            <div>
+                              <div className="font-semibold text-white">{domain.display_name}</div>
+                              {domain.description && (
+                                <div className="text-sm text-gray-400">{domain.description}</div>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </>
                   )}
                 </>
               )}
