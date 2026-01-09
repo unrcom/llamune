@@ -32,6 +32,30 @@ function ThinkingBlock({ thinking }: { thinking: string }) {
   );
 }
 
+/**
+ * システムプロンプト折りたたみコンポーネント
+ */
+function SystemPromptBlock({ systemPrompt }: { systemPrompt: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="system-prompt-block">
+      <button
+        className="system-prompt-toggle"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="system-prompt-icon">{isOpen ? '▼' : '▶'}</span>
+        <span>📋 システムプロンプト</span>
+      </button>
+      {isOpen && (
+        <div className="system-prompt-content">
+          {systemPrompt}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Chat() {
   const { user, logout } = useAuth();
   const [modes, setModes] = useState<Mode[]>([]);
@@ -39,6 +63,7 @@ export function Chat() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSession, setCurrentSession] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
@@ -80,6 +105,7 @@ export function Chat() {
         try {
           const data = await api.getSession(currentSession);
           setMessages(data.messages || []);
+          setSystemPrompt(data.systemPrompt || null);
         } catch (err) {
           console.error('Failed to fetch messages:', err);
         }
@@ -87,6 +113,7 @@ export function Chat() {
       fetchMessages();
     } else {
       setMessages([]);
+      setSystemPrompt(null);
     }
   }, [currentSession]);
 
@@ -104,6 +131,7 @@ export function Chat() {
       setSessions(prev => [...prev, { ...data.session, message_count: 0 }]);
       setCurrentSession(data.session.id);
       setMessages([]);
+      setSystemPrompt(data.systemPrompt || null);
       setShowNewChat(false);
     } catch (err) {
       console.error('Failed to create session:', err);
@@ -213,6 +241,9 @@ export function Chat() {
         {currentSession ? (
           <>
             <div className="messages">
+              {systemPrompt && (
+                <SystemPromptBlock systemPrompt={systemPrompt} />
+              )}
               {messages.map((msg, i) => (
                 <div key={i} className={`message ${msg.role}`}>
                   <div className="message-role">

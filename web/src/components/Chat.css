@@ -199,6 +199,51 @@
   overflow-y: auto;
 }
 
+/* システムプロンプトブロック */
+.system-prompt-block {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #333;
+}
+
+.system-prompt-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #1a2a1e;
+  border: 1px solid #2a4a2e;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: #6a9a6e;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.system-prompt-toggle:hover {
+  background: #1e3e22;
+  color: #8aba8e;
+}
+
+.system-prompt-icon {
+  font-size: 0.7rem;
+}
+
+.system-prompt-content {
+  background: #0f1a13;
+  border: 1px solid #2a4a2e;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  padding: 1rem;
+  color: #6a9a6e;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 /* 入力エリア */
 .input-area {
   display: flex;
