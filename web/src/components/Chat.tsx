@@ -35,8 +35,28 @@ function ThinkingBlock({ thinking }: { thinking: string }) {
 /**
  * システムプロンプト折りたたみコンポーネント
  */
-function SystemPromptBlock({ systemPrompt }: { systemPrompt: string }) {
+function SystemPromptBlock({ 
+  systemPrompt,
+  modeIcon,
+  modeDisplayName,
+  model,
+}: { 
+  systemPrompt: string;
+  modeIcon?: string;
+  modeDisplayName?: string;
+  model?: string;
+}) {
   const [isOpen, setIsOpen] = useState(false);
+
+  // ヘッダーテキストを構築
+  const headerParts: string[] = [];
+  if (modeIcon) headerParts.push(modeIcon);
+  if (modeDisplayName) headerParts.push(modeDisplayName);
+  if (model) headerParts.push(`(${model})`);
+  
+  const headerText = headerParts.length > 0 
+    ? `${headerParts.join(' ')} のシステムプロンプト`
+    : '📋 システムプロンプト';
 
   return (
     <div className="system-prompt-block">
@@ -45,13 +65,124 @@ function SystemPromptBlock({ systemPrompt }: { systemPrompt: string }) {
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="system-prompt-icon">{isOpen ? '▼' : '▶'}</span>
-        <span>📋 システムプロンプト</span>
+        <span>{headerText}</span>
       </button>
       {isOpen && (
         <div className="system-prompt-content">
           {systemPrompt}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * リトライモーダル（モデル選択）
+ */
+function RetryModal({
+  isOpen,
+  onClose,
+  models,
+  currentModel,
+  onRetry,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  models: Model[];
+  currentModel: string;
+  onRetry: (model: string) => void;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal retry-modal" onClick={(e) => e.stopPropagation()}>
+        <h3>🔄 別のモデルで再生成</h3>
+        <p className="retry-description">モデルを選択してください</p>
+        
+        <div className="model-list">
+          {models.map((model) => (
+            <button
+              key={model.name}
+              className={`model-item ${model.name === currentModel ? 'current' : ''}`}
+              onClick={() => {
+                onRetry(model.name);
+                onClose();
+              }}
+            >
+              <span className="model-name">{model.name}</span>
+              <span className="model-size">{model.sizeFormatted}</span>
+              {model.name === currentModel && <span className="current-badge">現在</span>}
+            </button>
+          ))}
+        </div>
+
+        <div className="modal-actions">
+          <button onClick={onClose}>キャンセル</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 回答比較コンポーネント
+ */
+function CompareAnswers({
+  originalAnswer,
+  retryAnswer,
+  onAccept,
+  onReject,
+}: {
+  originalAnswer: Message;
+  retryAnswer: Message;
+  onAccept: () => void;
+  onReject: () => void;
+}) {
+  return (
+    <div className="compare-answers">
+      <div className="compare-header">
+        <span>💡 どちらの回答を採用しますか？</span>
+      </div>
+      <div className="compare-grid">
+        {/* 元の回答 */}
+        <div className="compare-card original">
+          <div className="compare-card-header">
+            <span className="compare-label">元の回答</span>
+            {originalAnswer.model && (
+              <span className="compare-model">{originalAnswer.model}</span>
+            )}
+          </div>
+          {originalAnswer.thinking && (
+            <ThinkingBlock thinking={originalAnswer.thinking} />
+          )}
+          <div className="compare-content">
+            {originalAnswer.content}
+          </div>
+          <button className="compare-btn reject" onClick={onReject}>
+            こちらを採用
+          </button>
+        </div>
+
+        {/* リトライ回答 */}
+        <div className="compare-card retry">
+          <div className="compare-card-header">
+            <span className="compare-label">新しい回答</span>
+            {retryAnswer.model && (
+              <span className="compare-model">{retryAnswer.model}</span>
+            )}
+          </div>
+          {retryAnswer.thinking && (
+            <ThinkingBlock thinking={retryAnswer.thinking} />
+          )}
+          <div className="compare-content">
+            {retryAnswer.content}
+          </div>
+          <button className="compare-btn accept" onClick={onAccept}>
+            こちらを採用
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -64,6 +195,9 @@ export function Chat() {
   const [currentSession, setCurrentSession] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
+  const [sessionModel, setSessionModel] = useState<string | null>(null);
+  const [modeDisplayName, setModeDisplayName] = useState<string | null>(null);
+  const [modeIcon, setModeIcon] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
@@ -72,6 +206,13 @@ export function Chat() {
   const [selectedMode, setSelectedMode] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // リトライ関連の状態
+  const [showRetryModal, setShowRetryModal] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryPending, setRetryPending] = useState(false);
+  const [originalAnswer, setOriginalAnswer] = useState<Message | null>(null);
+  const [retryAnswer, setRetryAnswer] = useState<Message | null>(null);
 
   // 初期データ取得
   useEffect(() => {
@@ -106,6 +247,9 @@ export function Chat() {
           const data = await api.getSession(currentSession);
           setMessages(data.messages || []);
           setSystemPrompt(data.systemPrompt || null);
+          setSessionModel(data.session?.model || null);
+          setModeDisplayName(data.modeDisplayName || null);
+          setModeIcon(data.modeIcon || null);
         } catch (err) {
           console.error('Failed to fetch messages:', err);
         }
@@ -114,6 +258,9 @@ export function Chat() {
     } else {
       setMessages([]);
       setSystemPrompt(null);
+      setSessionModel(null);
+      setModeDisplayName(null);
+      setModeIcon(null);
     }
   }, [currentSession]);
 
@@ -132,6 +279,9 @@ export function Chat() {
       setCurrentSession(data.session.id);
       setMessages([]);
       setSystemPrompt(data.systemPrompt || null);
+      setSessionModel(data.session?.model || selectedModel);
+      setModeDisplayName(data.modeDisplayName || null);
+      setModeIcon(data.modeIcon || null);
       setShowNewChat(false);
     } catch (err) {
       console.error('Failed to create session:', err);
@@ -197,6 +347,101 @@ export function Chat() {
     }
   };
 
+  // リトライ実行
+  const handleRetry = async (model: string) => {
+    if (!currentSession || isRetrying) return;
+
+    // 最後のアシスタントメッセージを保存
+    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
+    if (!lastAssistant) return;
+
+    setOriginalAnswer(lastAssistant);
+    setIsRetrying(true);
+    setStreamingContent('');
+    setStreamingThinking('');
+
+    try {
+      let fullContent = '';
+      let fullThinking = '';
+      let retryModel = model;
+
+      for await (const chunk of api.retryMessage(currentSession, model)) {
+        fullContent = chunk.content;
+        fullThinking = chunk.thinking || '';
+        retryModel = chunk.model;
+        setStreamingContent(chunk.content);
+        setStreamingThinking(chunk.thinking || '');
+      }
+
+      // リトライ回答を設定
+      setRetryAnswer({
+        role: 'assistant',
+        content: fullContent,
+        thinking: fullThinking || undefined,
+        model: retryModel,
+      });
+      setStreamingContent('');
+      setStreamingThinking('');
+      setRetryPending(true);
+    } catch (err) {
+      console.error('Failed to retry:', err);
+      setOriginalAnswer(null);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  // リトライ回答を採用
+  const handleAcceptRetry = async () => {
+    if (!currentSession || !retryAnswer) return;
+
+    try {
+      await api.acceptRetry(currentSession);
+      
+      // メッセージを更新（元の回答を削除して新しい回答に置き換え）
+      setMessages(prev => {
+        const newMessages = [...prev];
+        // 最後のアシスタントメッセージを探して置き換え
+        for (let i = newMessages.length - 1; i >= 0; i--) {
+          if (newMessages[i].role === 'assistant') {
+            newMessages[i] = retryAnswer;
+            break;
+          }
+        }
+        return newMessages;
+      });
+
+      // 状態をリセット
+      setRetryPending(false);
+      setOriginalAnswer(null);
+      setRetryAnswer(null);
+    } catch (err) {
+      console.error('Failed to accept retry:', err);
+    }
+  };
+
+  // リトライ回答を破棄（元の回答を採用）
+  const handleRejectRetry = async () => {
+    if (!currentSession) return;
+
+    try {
+      await api.rejectRetry(currentSession);
+      
+      // 状態をリセット（メッセージはそのまま）
+      setRetryPending(false);
+      setOriginalAnswer(null);
+      setRetryAnswer(null);
+    } catch (err) {
+      console.error('Failed to reject retry:', err);
+    }
+  };
+
+  // 最後のアシスタントメッセージのインデックスを取得
+  const lastAssistantIndex = messages.reduceRight(
+    (acc, msg, idx) => (acc === -1 && msg.role === 'assistant' ? idx : acc),
+    -1
+  );
+
   return (
     <div className="chat-container">
       {/* サイドバー */}
@@ -242,26 +487,77 @@ export function Chat() {
           <>
             <div className="messages">
               {systemPrompt && (
-                <SystemPromptBlock systemPrompt={systemPrompt} />
+                <SystemPromptBlock 
+                  systemPrompt={systemPrompt}
+                  modeIcon={modeIcon || undefined}
+                  modeDisplayName={modeDisplayName || undefined}
+                  model={sessionModel || undefined}
+                />
               )}
-              {messages.map((msg, i) => (
-                <div key={i} className={`message ${msg.role}`}>
-                  <div className="message-role">
-                    {msg.role === 'user' ? '👤 You' : '🤖 AI'}
+              {/* リトライ比較中は最後のアシスタントメッセージを非表示 */}
+              {messages.map((msg, i) => {
+                // リトライ比較中は最後のアシスタントメッセージをスキップ
+                if (retryPending && i === lastAssistantIndex && msg.role === 'assistant') {
+                  return null;
+                }
+
+                const isLastAssistant = i === lastAssistantIndex && msg.role === 'assistant';
+
+                return (
+                  <div key={i} className={`message ${msg.role}`}>
+                    <div className="message-header">
+                      <div className="message-role">
+                        {msg.role === 'user' ? '👤 You' : '🤖 AI'}
+                      </div>
+                      {msg.model && msg.role === 'assistant' && (
+                        <span className="message-model">{msg.model}</span>
+                      )}
+                    </div>
+                    {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
+                    <div className="message-content">
+                      {msg.content}
+                    </div>
+                    {/* 最後のアシスタントメッセージにリトライボタン */}
+                    {isLastAssistant && !loading && !isRetrying && !retryPending && (
+                      <button
+                        className="retry-btn"
+                        onClick={() => setShowRetryModal(true)}
+                      >
+                        🔄 Retry
+                      </button>
+                    )}
                   </div>
-                  {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
-                  <div className="message-content">
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-              {(streamingContent || streamingThinking) && (
+                );
+              })}
+
+              {/* リトライ比較ビュー */}
+              {retryPending && originalAnswer && retryAnswer && (
+                <CompareAnswers
+                  originalAnswer={originalAnswer}
+                  retryAnswer={retryAnswer}
+                  onAccept={handleAcceptRetry}
+                  onReject={handleRejectRetry}
+                />
+              )}
+
+              {/* ストリーミング中（通常送信） */}
+              {(streamingContent || streamingThinking) && !isRetrying && (
                 <div className="message assistant">
                   <div className="message-role">🤖 AI</div>
                   {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
                   <div className="message-content">{streamingContent}</div>
                 </div>
               )}
+
+              {/* リトライ中のストリーミング */}
+              {isRetrying && (
+                <div className="message assistant streaming-retry">
+                  <div className="message-role">🤖 AI (リトライ中...)</div>
+                  {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
+                  <div className="message-content">{streamingContent || '生成中...'}</div>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -276,10 +572,10 @@ export function Chat() {
                   }
                 }}
                 placeholder="メッセージを入力..."
-                disabled={loading}
+                disabled={loading || isRetrying || retryPending}
               />
-              <button onClick={handleSend} disabled={loading || !input.trim()}>
-                {loading ? '...' : '送信'}
+              <button onClick={handleSend} disabled={loading || isRetrying || retryPending || !input.trim()}>
+                {loading || isRetrying ? '...' : '送信'}
               </button>
             </div>
           </>
@@ -333,6 +629,15 @@ export function Chat() {
           </div>
         </div>
       )}
+
+      {/* リトライモーダル */}
+      <RetryModal
+        isOpen={showRetryModal}
+        onClose={() => setShowRetryModal(false)}
+        models={models}
+        currentModel={selectedModel}
+        onRetry={handleRetry}
+      />
     </div>
   );
 }

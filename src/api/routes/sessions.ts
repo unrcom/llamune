@@ -52,6 +52,9 @@ router.post('/', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
     res.status(201).json({
       session: sessionData.session,
       systemPrompt: sessionData.systemPrompt,
+      modeName: sessionData.modeName,
+      modeDisplayName: sessionData.modeDisplayName,
+      modeIcon: sessionData.modeIcon,
     });
   } catch (error) {
     console.error('Create session error:', error);
@@ -80,6 +83,9 @@ router.get('/:id', authMiddleware, (req: AuthenticatedRequest, res: Response) =>
       session: sessionData.session,
       messages: sessionData.messages,
       systemPrompt: sessionData.systemPrompt,
+      modeName: sessionData.modeName,
+      modeDisplayName: sessionData.modeDisplayName,
+      modeIcon: sessionData.modeIcon,
     });
   } catch (error) {
     console.error('Get session error:', error);

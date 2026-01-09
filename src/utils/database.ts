@@ -544,6 +544,9 @@ export function getSession(sessionId: number, userId?: number): {
   session: Session;
   messages: Message[];
   systemPrompt?: string;
+  modeName?: string;
+  modeDisplayName?: string;
+  modeIcon?: string;
 } | null {
   const db = initDatabase();
 
@@ -561,15 +564,34 @@ export function getSession(sessionId: number, userId?: number): {
       return null;
     }
 
-    // システムプロンプトを取得
+    // モード情報とシステムプロンプトを取得
     let systemPrompt: string | undefined;
+    let modeName: string | undefined;
+    let modeDisplayName: string | undefined;
+    let modeIcon: string | undefined;
+
     if (session.system_prompt_snapshot) {
       systemPrompt = session.system_prompt_snapshot;
-    } else if (session.mode_id) {
+    }
+    
+    if (session.mode_id) {
       const mode = db
-        .prepare('SELECT system_prompt FROM modes WHERE id = ?')
-        .get(session.mode_id) as { system_prompt?: string } | undefined;
-      systemPrompt = mode?.system_prompt || undefined;
+        .prepare('SELECT name, display_name, icon, system_prompt FROM modes WHERE id = ?')
+        .get(session.mode_id) as { 
+          name?: string;
+          display_name?: string;
+          icon?: string;
+          system_prompt?: string;
+        } | undefined;
+      
+      if (mode) {
+        modeName = mode.name;
+        modeDisplayName = mode.display_name;
+        modeIcon = mode.icon || undefined;
+        if (!systemPrompt) {
+          systemPrompt = mode.system_prompt || undefined;
+        }
+      }
     }
 
     // メッセージを取得
@@ -599,6 +621,9 @@ export function getSession(sessionId: number, userId?: number): {
       session,
       messages,
       systemPrompt,
+      modeName,
+      modeDisplayName,
+      modeIcon,
     };
   } finally {
     db.close();

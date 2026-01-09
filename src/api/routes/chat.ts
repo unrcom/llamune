@@ -111,7 +111,7 @@ router.post('/send', authMiddleware, async (req: AuthenticatedRequest, res: Resp
 });
 
 /**
- * POST /api/chat/retry - リトライ（最後のアシスタントメッセージを削除して再生成）
+ * POST /api/chat/retry - リトライ（最後のアシスタントメッセージを削除せずに再生成）
  */
 router.post('/retry', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -130,26 +130,26 @@ router.post('/retry', authMiddleware, async (req: AuthenticatedRequest, res: Res
       return;
     }
 
-    // 最後のアシスタントメッセージを削除
-    deleteLastAssistantMessage(sessionId);
+    // リトライ用のモデル（指定がなければセッションのモデル）
+    const retryModel = model || sessionData.session.model;
 
-    // モデルが指定されていれば更新
-    const currentModel = model || sessionData.session.model;
-
-    // メッセージ履歴を再構築
-    const updatedSessionData = getSession(sessionId, req.user?.userId);
-    if (!updatedSessionData) {
-      res.status(500).json({ error: 'Failed to get session', code: 'INTERNAL_ERROR' });
-      return;
-    }
-
+    // メッセージ履歴を構築（最後のアシスタントメッセージを除く）
     const messages: ChatMessage[] = [];
     
-    if (updatedSessionData.systemPrompt) {
-      messages.push({ role: 'system', content: updatedSessionData.systemPrompt });
+    if (sessionData.systemPrompt) {
+      messages.push({ role: 'system', content: sessionData.systemPrompt });
     }
 
-    for (const msg of updatedSessionData.messages) {
+    // 最後のアシスタントメッセージを除外してメッセージを構築
+    const messagesWithoutLastAssistant = [...sessionData.messages];
+    for (let i = messagesWithoutLastAssistant.length - 1; i >= 0; i--) {
+      if (messagesWithoutLastAssistant[i].role === 'assistant') {
+        messagesWithoutLastAssistant.splice(i, 1);
+        break;
+      }
+    }
+
+    for (const msg of messagesWithoutLastAssistant) {
       messages.push({ role: msg.role, content: msg.content });
     }
 
@@ -164,8 +164,7 @@ router.post('/retry', authMiddleware, async (req: AuthenticatedRequest, res: Res
     let fullThinking = '';
 
     try {
-      for await (const chunk of chatStream({ model: currentModel, messages })) {
-        // chatStreamは既に累積されたcontentを返すので、そのまま使用
+      for await (const chunk of chatStream({ model: retryModel, messages })) {
         fullContent = chunk.content;
         if (chunk.thinking) {
           fullThinking = chunk.thinking;
@@ -175,6 +174,7 @@ router.post('/retry', authMiddleware, async (req: AuthenticatedRequest, res: Res
           content: fullContent,
           thinking: fullThinking || undefined,
           done: chunk.done,
+          model: retryModel,
         });
         res.write(`data: ${eventData}\n\n`);
 
@@ -183,8 +183,8 @@ router.post('/retry', authMiddleware, async (req: AuthenticatedRequest, res: Res
         }
       }
 
-      // アシスタントメッセージを保存
-      saveMessage(sessionId, 'assistant', fullContent, currentModel, fullThinking || undefined);
+      // リトライの回答を保存（元の回答は残したまま）
+      saveMessage(sessionId, 'assistant', fullContent, retryModel, fullThinking || undefined);
 
       res.write('data: [DONE]\n\n');
     } catch (streamError) {
@@ -199,6 +199,64 @@ router.post('/retry', authMiddleware, async (req: AuthenticatedRequest, res: Res
     if (!res.headersSent) {
       res.status(500).json({ error: 'Failed to retry', code: 'INTERNAL_ERROR' });
     }
+  }
+});
+
+/**
+ * POST /api/chat/retry/accept - リトライ回答を採用（元の回答を削除）
+ */
+router.post('/retry/accept', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      res.status(400).json({ error: 'Session ID is required', code: 'VALIDATION_ERROR' });
+      return;
+    }
+
+    // セッション所有者チェック
+    const sessionData = getSession(sessionId, req.user?.userId);
+    if (!sessionData) {
+      res.status(404).json({ error: 'Session not found', code: 'NOT_FOUND' });
+      return;
+    }
+
+    // 最後から2番目のアシスタントメッセージを削除（元の回答）
+    const success = deleteSecondLastAssistantMessage(sessionId);
+    
+    res.json({ success, sessionId });
+  } catch (error) {
+    console.error('Accept retry error:', error);
+    res.status(500).json({ error: 'Failed to accept retry', code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * POST /api/chat/retry/reject - リトライ回答を破棄（新しい回答を削除）
+ */
+router.post('/retry/reject', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      res.status(400).json({ error: 'Session ID is required', code: 'VALIDATION_ERROR' });
+      return;
+    }
+
+    // セッション所有者チェック
+    const sessionData = getSession(sessionId, req.user?.userId);
+    if (!sessionData) {
+      res.status(404).json({ error: 'Session not found', code: 'NOT_FOUND' });
+      return;
+    }
+
+    // 最後のアシスタントメッセージを削除（リトライ回答）
+    const success = deleteLastAssistantMessage(sessionId);
+    
+    res.json({ success, sessionId });
+  } catch (error) {
+    console.error('Reject retry error:', error);
+    res.status(500).json({ error: 'Failed to reject retry', code: 'INTERNAL_ERROR' });
   }
 });
 

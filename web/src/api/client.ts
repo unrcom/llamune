@@ -242,3 +242,82 @@ export async function* sendMessage(
     reader.releaseLock();
   }
 }
+
+// ========================================
+// リトライ API
+// ========================================
+
+export async function* retryMessage(
+  sessionId: number,
+  model: string
+): AsyncGenerator<{ content: string; thinking?: string; model: string; done: boolean }> {
+  const response = await authFetch(`${API_BASE}/chat/retry`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, model }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to retry message');
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') return;
+          
+          try {
+            const parsed = JSON.parse(data);
+            yield {
+              content: parsed.content || '',
+              thinking: parsed.thinking,
+              model: parsed.model || model,
+              done: parsed.done || false,
+            };
+          } catch {
+            // ignore parse errors
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export async function acceptRetry(sessionId: number): Promise<boolean> {
+  const response = await authFetch(`${API_BASE}/chat/retry/accept`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId }),
+  });
+  if (!response.ok) throw new Error('Failed to accept retry');
+  const data = await response.json();
+  return data.success;
+}
+
+export async function rejectRetry(sessionId: number): Promise<boolean> {
+  const response = await authFetch(`${API_BASE}/chat/retry/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId }),
+  });
+  if (!response.ok) throw new Error('Failed to reject retry');
+  const data = await response.json();
+  return data.success;
+}
