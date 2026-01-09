@@ -565,12 +565,6 @@ export function Chat() {
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
                 placeholder="メッセージを入力..."
                 disabled={loading || isRetrying || retryPending}
               />
