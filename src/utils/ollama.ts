@@ -122,21 +122,13 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<{
             // 今回のチャンクの内容
             const chunkContent = data.message?.content || '';
             
-            // 思考過程の抽出（<think>タグ対応）
-            let thinking: string | undefined;
-            let cleanContent = chunkContent;
-
-            // <think>タグがある場合は分離
-            const thinkMatch = chunkContent.match(/<think>([\s\S]*?)<\/think>/);
-            if (thinkMatch) {
-              thinking = thinkMatch[1];
-              cleanContent = chunkContent.replace(/<think>[\s\S]*?<\/think>/, '').trim();
-            }
+            // 思考過程の抽出（Ollamaのmessage.thinkingフィールド対応）
+            const chunkThinking = data.message?.thinking || '';
 
             // 累積
-            fullContent += cleanContent;
-            if (thinking) {
-              fullThinking += thinking;
+            fullContent += chunkContent;
+            if (chunkThinking) {
+              fullThinking += chunkThinking;
             }
 
             yield {
