@@ -33,6 +33,9 @@ export type Session = {
   preview: string | null;
   created_at: string;
   updated_at: string;
+  mode_display_name?: string;
+  mode_icon?: string;
+  project_path?: string;
 };
 
 export type Message = {

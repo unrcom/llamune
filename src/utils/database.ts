@@ -85,6 +85,9 @@ export interface SessionListItem {
   preview: string | null;
   created_at: string;
   updated_at: string;
+  mode_display_name?: string;
+  mode_icon?: string;
+  project_path?: string;
 }
 
 /**
@@ -480,30 +483,33 @@ export function createSession(
 }
 
 /**
- * セッション一覧を取得
+ * セッション一覧を取得（新しい順）
  */
 export function listSessions(limit = 200, userId?: number): SessionListItem[] {
   const db = initDatabase();
 
   try {
     let query = `
-      SELECT * FROM (
-        SELECT
-          s.id,
-          s.model,
-          s.created_at,
-          s.updated_at,
-          s.title,
-          COUNT(m.id) as message_count,
-          (
-            SELECT content
-            FROM messages
-            WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
-            ORDER BY id ASC
-            LIMIT 1
-          ) as preview
-        FROM sessions s
-        LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
+      SELECT
+        s.id,
+        s.model,
+        s.created_at,
+        s.updated_at,
+        s.title,
+        s.project_path,
+        md.display_name as mode_display_name,
+        md.icon as mode_icon,
+        COUNT(m.id) as message_count,
+        (
+          SELECT content
+          FROM messages
+          WHERE session_id = s.id AND role = 'user' AND deleted_at IS NULL
+          ORDER BY id ASC
+          LIMIT 1
+        ) as preview
+      FROM sessions s
+      LEFT JOIN messages m ON s.id = m.session_id AND m.deleted_at IS NULL
+      LEFT JOIN modes md ON s.mode_id = md.id
     `;
 
     if (userId !== undefined) {
@@ -511,10 +517,9 @@ export function listSessions(limit = 200, userId?: number): SessionListItem[] {
     }
 
     query += `
-        GROUP BY s.id
-        ORDER BY s.created_at DESC
-        LIMIT ?
-      ) ORDER BY created_at ASC
+      GROUP BY s.id
+      ORDER BY s.created_at DESC
+      LIMIT ?
     `;
 
     const sessions = userId !== undefined

@@ -185,6 +185,16 @@ export async function deleteSession(id: number) {
   if (!response.ok) throw new Error('Failed to delete session');
 }
 
+export async function updateSessionTitle(id: number, title: string) {
+  const response = await authFetch(`${API_BASE}/sessions/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) throw new Error('Failed to update session title');
+  return await response.json();
+}
+
 // ========================================
 // チャット API (ストリーミング)
 // ========================================

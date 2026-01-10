@@ -396,10 +396,16 @@ export function Chat() {
   const [selectedMode, setSelectedMode] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   // プロジェクトフォルダ関連の状態
   const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null);
   const [showDirectoryModal, setShowDirectoryModal] = useState(false);
+
+  // セッション編集関連の状態
+  const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [hoverInfoSessionId, setHoverInfoSessionId] = useState<number | null>(null);
 
   // リトライ関連の状態
   const [showRetryModal, setShowRetryModal] = useState(false);
@@ -542,6 +548,56 @@ export function Chat() {
     }
   };
 
+  // セッションタイトル編集開始
+  const startEditingTitle = (session: Session, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSessionId(session.id);
+    setEditingTitle(session.title || '');
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  };
+
+  // セッションタイトル保存
+  const saveSessionTitle = async () => {
+    if (editingSessionId === null) return;
+
+    try {
+      await api.updateSessionTitle(editingSessionId, editingTitle);
+      setSessions(prev => prev.map(s =>
+        s.id === editingSessionId ? { ...s, title: editingTitle } : s
+      ));
+    } catch (err) {
+      console.error('Failed to update title:', err);
+    } finally {
+      setEditingSessionId(null);
+      setEditingTitle('');
+    }
+  };
+
+  // タイトル編集キャンセル
+  const cancelEditingTitle = () => {
+    setEditingSessionId(null);
+    setEditingTitle('');
+  };
+
+  // タイトル編集キー操作
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveSessionTitle();
+    } else if (e.key === 'Escape') {
+      cancelEditingTitle();
+    }
+  };
+
+  // 日付フォーマット（YYYY-MM-DD）
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // リトライ実行
   const handleRetry = async (model: string) => {
     if (!currentSession || isRetrying) return;
@@ -653,17 +709,78 @@ export function Chat() {
             <div
               key={session.id}
               className={`session-item ${currentSession === session.id ? 'active' : ''}`}
-              onClick={() => setCurrentSession(session.id)}
+              onClick={() => editingSessionId !== session.id && setCurrentSession(session.id)}
             >
-              <span className="session-title">
-                {session.title || '(無題)'}
-              </span>
-              <button
-                className="delete-btn"
-                onClick={(e) => handleDeleteSession(session.id, e)}
-              >
-                ×
-              </button>
+              {editingSessionId === session.id ? (
+                <div className="session-edit">
+                  <input
+                    ref={editInputRef}
+                    type="text"
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onKeyDown={handleTitleKeyDown}
+                    onBlur={saveSessionTitle}
+                    className="session-edit-input"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="session-info-wrapper"
+                    onMouseEnter={() => setHoverInfoSessionId(session.id)}
+                    onMouseLeave={() => setHoverInfoSessionId(null)}
+                  >
+                    <button
+                      className="session-action-btn info-btn"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      ℹ️
+                    </button>
+                    {hoverInfoSessionId === session.id && (
+                      <div className="session-info-tooltip">
+                        <div className="tooltip-row">
+                          <span className="tooltip-label">📅 日付:</span>
+                          <span>{session.created_at ? formatDate(session.created_at) : '(不明)'}</span>
+                        </div>
+                        <div className="tooltip-row">
+                          <span className="tooltip-label">🎯 モード:</span>
+                          <span>{session.mode_icon || ''} {session.mode_display_name || '(なし)'}</span>
+                        </div>
+                        <div className="tooltip-row">
+                          <span className="tooltip-label">🤖 LLM:</span>
+                          <span>{session.model || '(不明)'}</span>
+                        </div>
+                        <div className="tooltip-row">
+                          <span className="tooltip-label">📁 プロジェクト:</span>
+                          <span className="tooltip-path">{session.project_path || '(なし)'}</span>
+                        </div>
+                        <div className="tooltip-row">
+                          <span className="tooltip-label">💬 チャット数:</span>
+                          <span>{session.message_count ?? 0}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <span className="session-title">
+                    {currentSession === session.id && '⭐ '}
+                    {session.title || '(無題)'}
+                  </span>
+                  <div className="session-actions">
+                    <button
+                      className="session-action-btn edit-btn"
+                      onClick={(e) => startEditingTitle(session, e)}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className="session-action-btn delete-btn"
+                      onClick={(e) => handleDeleteSession(session.id, e)}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
