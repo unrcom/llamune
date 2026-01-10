@@ -3,6 +3,8 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAuth } from '../hooks/useAuth';
 import type { Mode, Model, Session, Message } from '../types';
 import * as api from '../api/client';
@@ -826,8 +828,8 @@ export function Chat() {
                       )}
                     </div>
                     {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
-                    <div className="message-content">
-                      {msg.content}
+                    <div className="message-content markdown-body">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                     </div>
                     {/* 最後のアシスタントメッセージにリトライボタン */}
                     {isLastAssistant && !loading && !isRetrying && !retryPending && (
@@ -857,7 +859,9 @@ export function Chat() {
                 <div className="message assistant">
                   <div className="message-role">🤖 AI</div>
                   {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
-                  <div className="message-content">{streamingContent}</div>
+                  <div className="message-content markdown-body">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
+                  </div>
                 </div>
               )}
 
@@ -866,7 +870,9 @@ export function Chat() {
                 <div className="message assistant streaming-retry">
                   <div className="message-role">🤖 AI (リトライ中...)</div>
                   {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
-                  <div className="message-content">{streamingContent || '生成中...'}</div>
+                  <div className="message-content markdown-body">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent || '生成中...'}</ReactMarkdown>
+                  </div>
                 </div>
               )}
 
