@@ -195,6 +195,34 @@ export async function updateSessionTitle(id: number, title: string) {
   return await response.json();
 }
 
+export async function exportSession(id: number): Promise<{ blob: Blob; filename: string }> {
+  const response = await authFetch(`${API_BASE}/sessions/${id}/export`);
+  if (!response.ok) throw new Error('Failed to export session');
+  
+  // レスポンスからファイル名を取得
+  const contentDisposition = response.headers.get('Content-Disposition');
+  console.log('Content-Disposition:', contentDisposition);
+  let filename = `llamune_chat_${id}.json`;
+  if (contentDisposition) {
+    // RFC 5987形式（filename*=UTF-8''...）をパース
+    const rfc5987Matches = /filename\*=UTF-8''([^;\s]+)/.exec(contentDisposition);
+    console.log('RFC 5987 matches:', rfc5987Matches);
+    if (rfc5987Matches && rfc5987Matches[1]) {
+      filename = decodeURIComponent(rfc5987Matches[1]);
+      console.log('Decoded filename:', filename);
+    } else {
+      // 通常形式（filename="..."）をパース
+      const matches = /filename="([^"]+)"/.exec(contentDisposition);
+      if (matches && matches[1]) {
+        filename = matches[1];
+      }
+    }
+  }
+  
+  const blob = await response.blob();
+  return { blob, filename };
+}
+
 // ========================================
 // チャット API (ストリーミング)
 // ========================================

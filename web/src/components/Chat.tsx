@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '../hooks/useAuth';
-import type { Mode, Model, Session, Message } from '../types';
+import type { Mode, Model, Session, Message, ImportedSession } from '../types';
 import * as api from '../api/client';
 import './Chat.css';
 
@@ -417,6 +417,10 @@ export function Chat() {
   const [originalAnswer, setOriginalAnswer] = useState<Message | null>(null);
   const [retryAnswer, setRetryAnswer] = useState<Message | null>(null);
 
+  // インポート（閲覧モード）関連の状態
+  const [importedData, setImportedData] = useState<ImportedSession | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // 初期データ取得
   useEffect(() => {
     const fetchData = async () => {
@@ -581,6 +585,64 @@ export function Chat() {
     } catch (err) {
       console.error('Failed to delete session:', err);
     }
+  };
+
+  // セッションエクスポート
+  const handleExportSession = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      const { blob, filename } = await api.exportSession(id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Failed to export session:', err);
+      alert('エクスポートに失敗しました');
+    }
+  };
+
+  // インポートボタンクリック
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // ファイル選択時のインポート処理
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as ImportedSession;
+
+      // 簡易バリデーション
+      if (!data.session || !data.messages) {
+        throw new Error('Invalid file format');
+      }
+
+      // インポートデータを設定（閲覧モードに入る）
+      setImportedData(data);
+      setCurrentSession(null); // 通常セッションの選択を解除
+    } catch (err) {
+      console.error('Failed to import:', err);
+      alert('インポートに失敗しました。ファイル形式を確認してください。');
+    } finally {
+      // ファイル入力をリセット（同じファイルを再選択できるように）
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // 閲覧モードを終了
+  const closeImportView = () => {
+    setImportedData(null);
   };
 
   // セッションタイトル編集開始
@@ -748,6 +810,16 @@ export function Chat() {
           <button className="new-chat-btn" onClick={() => setShowNewChat(true)}>
             + 新しいチャット
           </button>
+          <button className="import-btn" onClick={handleImportClick}>
+            📤 インポート
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={handleFileImport}
+          />
         </div>
 
         <div className="sessions-list">
@@ -813,14 +885,23 @@ export function Chat() {
                   </span>
                   <div className="session-actions">
                     <button
+                      className="session-action-btn export-btn"
+                      onClick={(e) => handleExportSession(session.id, e)}
+                      title="エクスポート"
+                    >
+                      📥
+                    </button>
+                    <button
                       className="session-action-btn edit-btn"
                       onClick={(e) => startEditingTitle(session, e)}
+                      title="タイトル編集"
                     >
                       ✏️
                     </button>
                     <button
                       className="session-action-btn delete-btn"
                       onClick={(e) => handleDeleteSession(session.id, e)}
+                      title="削除"
                     >
                       🗑️
                     </button>
@@ -841,7 +922,48 @@ export function Chat() {
 
       {/* メインエリア */}
       <main className="main-area">
-        {currentSession ? (
+        {/* インポート閲覧モード */}
+        {importedData ? (
+          <>
+            <div className="import-header">
+              <div className="import-info">
+                <span className="import-badge">📖 閲覧モード</span>
+                <span className="import-title">{importedData.session.title || '(無題)'}</span>
+                <span className="import-meta">
+                  {importedData.session.model} | {importedData.session.created_at ? new Date(importedData.session.created_at).toLocaleDateString() : ''} | {importedData.messages.length}件
+                </span>
+              </div>
+              <button className="import-close-btn" onClick={closeImportView}>
+                ✕ 閉じる
+              </button>
+            </div>
+            <div className="messages">
+              {importedData.session.systemPrompt && (
+                <SystemPromptBlock 
+                  systemPrompt={importedData.session.systemPrompt}
+                  model={importedData.session.model}
+                />
+              )}
+              {importedData.messages.map((msg, i) => (
+                <div key={i} className={`message ${msg.role}`}>
+                  <div className="message-header">
+                    <div className="message-role">
+                      {msg.role === 'user' ? '👤 You' : '🤖 AI'}
+                    </div>
+                    {msg.model && msg.role === 'assistant' && (
+                      <span className="message-model">{msg.model}</span>
+                    )}
+                  </div>
+                  {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
+                  <div className="message-content markdown-body">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          </>
+        ) : currentSession ? (
           <>
             <div className="messages">
               {systemPrompt && (

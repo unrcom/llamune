@@ -146,4 +146,66 @@ router.delete('/:id', authMiddleware, (req: AuthenticatedRequest, res: Response)
   }
 });
 
+/**
+ * GET /api/sessions/:id/export - セッションをJSON形式でエクスポート
+ */
+router.get('/:id/export', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Invalid session ID', code: 'INVALID_ID' });
+      return;
+    }
+
+    const sessionData = getSession(id, req.user?.userId);
+    if (!sessionData) {
+      res.status(404).json({ error: 'Session not found', code: 'NOT_FOUND' });
+      return;
+    }
+
+    // エクスポート用のJSON構造を作成
+    const exportData = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      session: {
+        id: sessionData.session.id,
+        title: sessionData.session.title,
+        model: sessionData.session.model,
+        created_at: sessionData.session.created_at,
+        updated_at: sessionData.session.updated_at,
+        project_path: sessionData.session.project_path,
+        systemPrompt: sessionData.systemPrompt,
+      },
+      messages: sessionData.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        model: msg.model,
+        thinking: msg.thinking,
+      })),
+    };
+
+    // ファイル名に使用するためのタイトル（特殊文字を除去）
+    const title = sessionData.session.title || 'chat';
+    console.log('Export - original title:', title);
+    const safeTitle = title
+      .replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\s-]/g, '')
+      .substring(0, 50)
+      .trim() || 'chat';
+    console.log('Export - safeTitle:', safeTitle);
+    
+    // Content-Dispositionヘッダーでファイル名を指定（RFC 5987形式で日本語対応）
+    const filename = `llamune_${safeTitle}_${id}.json`;
+    console.log('Export - filename:', filename);
+    const encodedFilename = encodeURIComponent(filename);
+    console.log('Export - encodedFilename:', encodedFilename);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.json(exportData);
+  } catch (error) {
+    console.error('Export session error:', error);
+    res.status(500).json({ error: 'Failed to export session', code: 'INTERNAL_ERROR' });
+  }
+});
+
 export default router;

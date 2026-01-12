@@ -39,6 +39,25 @@
   background: #3a8eef;
 }
 
+.import-btn {
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  background: transparent;
+  color: #888;
+  border: 1px solid #444;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.import-btn:hover {
+  background: #333;
+  color: #fff;
+  border-color: #666;
+}
+
 .sessions-list {
   flex: 1;
   overflow-y: auto;
@@ -968,4 +987,58 @@
   color: #4a9eff;
   font-family: monospace;
   word-break: break-all;
+}
+
+/* インポート閲覧モード */
+.import-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #2a3a5e;
+  border-bottom: 1px solid #4a9eff;
+}
+
+.import-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.import-badge {
+  background: #4a9eff;
+  color: #fff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.import-title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #fff;
+}
+
+.import-meta {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.import-close-btn {
+  background: transparent;
+  border: 1px solid #666;
+  color: #888;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.import-close-btn:hover {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
 }

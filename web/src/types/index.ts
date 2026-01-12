@@ -44,3 +44,24 @@ export type Message = {
   model?: string;
   thinking?: string;
 };
+
+// インポート用の型
+export type ImportedSession = {
+  version: string;
+  exportedAt: string;
+  session: {
+    id: number;
+    title: string | null;
+    model: string;
+    created_at: string;
+    updated_at?: string;
+    project_path?: string | null;
+    systemPrompt?: string | null;
+  };
+  messages: {
+    role: 'user' | 'assistant';
+    content: string;
+    model?: string;
+    thinking?: string;
+  }[];
+};
