@@ -30,7 +30,7 @@ ollama version is 0.5.4
 ```
 command not found: ollama
 ```
-→ Ollama がインストールされていません。[Ollama公式サイト](https://ollama.com/) からダウンロードしてインストールしてください。
+→ Ollama がインストールされていません。<a href="https://ollama.com/" target="_blank">Ollama公式サイト</a> からダウンロードしてインストールしてください。
 
 ---
 
@@ -49,13 +49,12 @@ curl http://localhost:11434/api/tags
 ```
 curl: (7) Failed to connect to localhost port 11434
 ```
-→ Ollama が起動していません。以下のコマンドで起動してください：
+→ Ollama が起動していません。
 
-```bash
-ollama serve
-```
-
-> 💡 **ヒント**: Ollama アプリをインストールしている場合は、アプリを起動するだけで自動的にサーバーが起動します（メニューバーにラマのアイコンが表示されます）。
+**起動方法：**
+1. Finder で「アプリケーション」フォルダを開く
+2. 「Ollama」をダブルクリック
+3. メニューバーにラマのアイコン 🦙 が表示されるまで待つ
 
 ---
 
@@ -99,7 +98,7 @@ success
 
 > ⏱️ **所要時間**: 約5〜15分（インターネット速度によります）
 
-> 💡 **他のモデルを使いたい場合**: [Ollama Library](https://ollama.com/library) で利用可能なモデルを確認できます。
+> 💡 **他のモデルを使いたい場合**: <a href="https://ollama.com/library" target="_blank">Ollama Library</a> で利用可能なモデルを確認できます。
 
 ---
 
@@ -120,7 +119,7 @@ Docker version 27.4.0, build bde2b89
 ```
 command not found: docker
 ```
-→ Docker Desktop がインストールされていません。[Docker公式サイト](https://www.docker.com/products/docker-desktop/) からダウンロードしてインストールしてください。
+→ Docker Desktop がインストールされていません。<a href="https://www.docker.com/products/docker-desktop/" target="_blank">Docker公式サイト</a> からダウンロードしてインストールしてください。
 
 > 📝 **インストール時の注意**: 「Apple Silicon」版を選択してください。
 
@@ -147,42 +146,52 @@ Cannot connect to the Docker daemon at unix:///Users/.../.docker/run/docker.sock
 
 ---
 
-## 3. llamune のダウンロードと起動
+## 3. llamune の起動
 
-### 3.1 llamune をダウンロード
+### 3.1 docker-compose.yml をダウンロード
+
+以下のURLにアクセスして、`docker-compose.yml` をダウンロードしてください。
+
+https://raw.githubusercontent.com/unrcom/llamune/main/docker-compose.yml
+
+**ダウンロード方法：**
+1. 上記URLをブラウザで開く
+2. 右クリック →「名前を付けて保存」または `Cmd + S`
+3. デスクトップなど、わかりやすい場所に保存
+
+または、ターミナルで以下を実行：
 
 ```bash
 cd ~/Desktop
-git clone https://github.com/unrcom/llamune.git
-cd llamune
+curl -O https://raw.githubusercontent.com/unrcom/llamune/main/docker-compose.yml
 ```
-
-> 💡 この例ではデスクトップにダウンロードしていますが、お好みの場所で構いません。
 
 ---
 
 ### 3.2 Docker コンテナを起動
 
+`docker-compose.yml` を保存したフォルダで、以下のコマンドを実行してください。
+
 ```bash
-docker compose up --build
+cd ~/Desktop
+docker compose up
 ```
 
 **初回起動時の表示例：**
 ```
-[+] Building 45.2s (27/27) FINISHED
-...
-llamune_backend  | 🚀 Starting llamune backend setup...
-llamune_backend  | 📝 Creating .env file from .env.example...
-llamune_backend  | 🔑 Generating secrets...
-llamune_backend  | ⏳ Waiting for Ollama to be ready...
-llamune_backend  | ✅ Ollama is ready!
-llamune_backend  | ✅ Admin user created (username: admin, password: admin)
-llamune_backend  | 🎉 Setup complete! Starting API server...
+[+] Running 2/2
+ ✔ Container llamune_backend   Started
+ ✔ Container llamune_frontend  Started
+Attaching to llamune_backend, llamune_frontend
+llamune_backend  | 🦙 Llamune starting...
+llamune_backend  | 📦 Initializing database...
+llamune_backend  | ✅ Database initialized
+llamune_backend  | 🚀 API server running on http://localhost:3000
 llamune_frontend |   VITE v7.3.1  ready in 124 ms
 llamune_frontend |   ➜  Local:   http://localhost:5173/
 ```
 
-> ⏱️ **初回起動時間**: 約1〜5分（Dockerイメージのビルドが必要なため）
+> ⏱️ **初回起動時間**: 約1〜2分（Dockerイメージのダウンロードが必要なため）
 
 ---
 
@@ -196,39 +205,15 @@ llamune_frontend |   ➜  Local:   http://localhost:5173/
 
 ---
 
-## 4. ログインとユーザー作成
+## 4. ユーザー登録とログイン
 
-### 4.1 管理者でログイン
+### 4.1 新規ユーザー登録
 
-初期設定では管理者ユーザーが自動作成されています。
+1. ログイン画面で「新規登録」をクリック
+2. ユーザー名とパスワードを入力
+3. 「登録」ボタンをクリック
 
-- **ユーザー名**: `admin`
-- **パスワード**: `admin`
-
----
-
-### 4.2 新しいユーザーを作成（オプション）
-
-管理者以外のユーザーを作成したい場合は、**別のターミナルウィンドウ**を開いて以下のコマンドを実行してください。
-
-```bash
-cd ~/Desktop/llamune
-docker exec -it llamune_backend npm run dev:cli -- create-user <ユーザー名> <パスワード> user
-```
-
-**例：ユーザー「taro」をパスワード「mypassword」で作成**
-```bash
-docker exec -it llamune_backend npm run dev:cli -- create-user taro mypassword user
-```
-
-**成功した場合の表示：**
-```
-User created: taro (role: user)
-```
-
-> 📝 **ロールの種類**:
-> - `admin`: 管理者（すべての機能にアクセス可能）
-> - `user`: 一般ユーザー
+登録が完了すると、自動的にログインされます。
 
 ---
 
@@ -250,25 +235,17 @@ Docker コンテナを起動したターミナルで `Ctrl + C` を押してく�
 ### 5.2 llamune を再起動する
 
 ```bash
-cd ~/Desktop/llamune
+cd ~/Desktop
 docker compose up
 ```
-
-> 💡 2回目以降は `--build` オプションは不要です（ソースコードを変更した場合のみ必要）。
 
 ---
 
 ## 6. トラブルシューティング
 
-### 「Ollama is not ready yet」と表示され続ける
+### 「Ollama is not ready yet」や接続エラーが表示される
 
-Ollama が起動していません。別のターミナルで以下を実行してください：
-
-```bash
-ollama serve
-```
-
-または、Ollama アプリを起動してください。
+Ollama が起動していません。アプリケーションフォルダから Ollama を起動してください。
 
 ---
 
@@ -285,16 +262,26 @@ kill -9 <PID>
 
 ### 「Cannot connect to the Docker daemon」と表示される
 
-Docker Desktop が起動していません。アプリケーションから Docker を起動してください。
+Docker Desktop が起動していません。アプリケーションフォルダから Docker を起動して、メニューバーにクジラのアイコン 🐳 が表示されるまで待ってください。
 
 ---
 
-### コンテナを完全にリセットしたい
+### 「container name is already in use」と表示される
+
+以前のコンテナが残っています。以下のコマンドで削除してから再起動してください：
 
 ```bash
-docker compose down
 docker rm -f llamune_backend llamune_frontend
-docker compose up --build
+docker compose up
+```
+
+---
+
+### データをリセットしたい
+
+```bash
+rm -rf ~/.llamune
+docker compose up
 ```
 
 ---
