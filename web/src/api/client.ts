@@ -142,6 +142,63 @@ export async function getModes() {
   return (await response.json()).modes;
 }
 
+export async function getMode(id: number) {
+  const response = await fetch(`${API_BASE}/modes/${id}`);
+  if (!response.ok) throw new Error('Failed to fetch mode');
+  return (await response.json()).mode;
+}
+
+export async function createMode(data: {
+  name: string;
+  displayName: string;
+  description?: string;
+  icon?: string;
+  systemPrompt?: string;
+}) {
+  const response = await authFetch(`${API_BASE}/modes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create mode');
+  }
+  return (await response.json()).mode;
+}
+
+export async function updateMode(
+  id: number,
+  data: {
+    name?: string;
+    displayName?: string;
+    description?: string;
+    icon?: string;
+    systemPrompt?: string;
+  }
+) {
+  const response = await authFetch(`${API_BASE}/modes/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update mode');
+  }
+  return (await response.json()).mode;
+}
+
+export async function deleteMode(id: number) {
+  const response = await authFetch(`${API_BASE}/modes/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete mode');
+  }
+}
+
 // ========================================
 // モデル API
 // ========================================
