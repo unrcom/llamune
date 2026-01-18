@@ -379,7 +379,7 @@ function CompareAnswers({
   );
 }
 
-export function Chat() {
+export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const { user, logout } = useAuth();
   const [modes, setModes] = useState<Mode[]>([]);
   const [models, setModels] = useState<Model[]>([]);
@@ -397,6 +397,7 @@ export function Chat() {
   const [showNewChat, setShowNewChat] = useState(false);
   const [selectedMode, setSelectedMode] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -804,11 +805,23 @@ export function Chat() {
   return (
     <div className="chat-container">
       {/* サイドバー */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
-          <h2>🔵 llamune</h2>
+          <div className="sidebar-header-top">
+            <button 
+              className="sidebar-toggle-btn"
+              onClick={() => setIsSidebarOpen(false)}
+              title="サイドバーを閉じる"
+            >
+              ☰
+            </button>
+            <h2 className="sidebar-logo">llamune</h2>
+          </div>
           <button className="new-chat-btn" onClick={() => setShowNewChat(true)}>
             + 新しいチャット
+          </button>
+          <button className="modes-btn" onClick={onNavigateToModes}>
+            ⚙️ モード管理
           </button>
           <button className="import-btn" onClick={handleImportClick}>
             📤 インポート
@@ -922,6 +935,17 @@ export function Chat() {
 
       {/* メインエリア */}
       <main className="main-area">
+        {/* サイドバーが閉じている時の開くボタン */}
+        {!isSidebarOpen && (
+          <button 
+            className="sidebar-open-btn"
+            onClick={() => setIsSidebarOpen(true)}
+            title="サイドバーを開く"
+          >
+            ☰
+          </button>
+        )}
+        
         {/* インポート閲覧モード */}
         {importedData ? (
           <>
@@ -1106,8 +1130,10 @@ export function Chat() {
               </select>
             </div>
 
-            <div className="form-group">
-              <label>プロジェクトフォルダ（オプション）</label>
+            {/* プロジェクトフォルダ - 「あなたの本職を支援」モードの時のみ表示 */}
+            {modes.find(m => m.id === selectedMode)?.display_name === 'あなたの本職を支援' && (
+              <div className="form-group">
+                <label>プロジェクトフォルダ（オプション）</label>
               <div className="project-path-selector">
                 <input
                   type="text"
@@ -1134,6 +1160,7 @@ export function Chat() {
                 )}
               </div>
             </div>
+            )}
 
             <div className="modal-actions">
               <button onClick={() => { setShowNewChat(false); setSelectedProjectPath(null); }}>キャンセル</button>

@@ -15,6 +15,28 @@
   margin-bottom: 2rem;
 }
 
+.modes-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.btn-back {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+
+.btn-back:hover {
+  background: #545b62;
+}
+
 .modes-header h2 {
   margin: 0;
   font-size: 1.8rem;
@@ -48,6 +70,7 @@
   padding: 1rem;
   border-bottom: 1px solid #dee2e6;
   vertical-align: middle;
+  color: #212529;
 }
 
 .modes-table tbody tr:last-child td {
@@ -67,16 +90,6 @@
 .mode-display-name {
   font-weight: 500;
   min-width: 150px;
-  color: #212529;
-}
-
-.mode-name code {
-  background: #f1f3f5;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  color: #495057;
-  font-family: 'Monaco', 'Courier New', monospace;
 }
 
 .mode-description {

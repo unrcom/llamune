@@ -8,7 +8,7 @@ import type { Mode } from '../types';
 import { ModeForm } from './ModeForm';
 import './ModesManagement.css';
 
-export function ModesManagement() {
+export function ModesManagement({ onNavigateToChat }: { onNavigateToChat: () => void }) {
   const [modes, setModes] = useState<Mode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +79,12 @@ export function ModesManagement() {
   return (
     <div className="modes-management">
       <div className="modes-header">
-        <h2>モード管理</h2>
+        <div className="modes-header-left">
+          <button className="btn-back" onClick={onNavigateToChat}>
+            ← チャットに戻る
+          </button>
+          <h2>モード管理</h2>
+        </div>
         <button className="btn-primary" onClick={handleCreate}>
           新しいモードを作成
         </button>
@@ -97,7 +102,6 @@ export function ModesManagement() {
             <tr>
               <th>アイコン</th>
               <th>表示名</th>
-              <th>内部名</th>
               <th>説明</th>
               <th>デフォルト</th>
               <th>操作</th>
@@ -108,9 +112,6 @@ export function ModesManagement() {
               <tr key={mode.id}>
                 <td className="mode-icon">{mode.icon || '🤖'}</td>
                 <td className="mode-display-name">{mode.display_name}</td>
-                <td className="mode-name">
-                  <code>{mode.name}</code>
-                </td>
                 <td className="mode-description">
                   {mode.description || '-'}
                 </td>

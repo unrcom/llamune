@@ -12,7 +12,7 @@ import './App.css';
 type Page = 'chat' | 'modes';
 
 function AppContent() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('chat');
 
   if (loading) {
@@ -29,35 +29,10 @@ function AppContent() {
   }
 
   return (
-    <div className="app-container">
-      <nav className="app-nav">
-        <div className="nav-brand">Llamune</div>
-        <div className="nav-links">
-          <button
-            className={`nav-link ${currentPage === 'chat' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('chat')}
-          >
-            💬 チャット
-          </button>
-          <button
-            className={`nav-link ${currentPage === 'modes' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('modes')}
-          >
-            ⚙️ モード管理
-          </button>
-        </div>
-        <div className="nav-user">
-          <span className="user-name">{user.username}</span>
-          <button className="btn-logout" onClick={logout}>
-            ログアウト
-          </button>
-        </div>
-      </nav>
-      <main className="app-main">
-        {currentPage === 'chat' && <Chat />}
-        {currentPage === 'modes' && <ModesManagement />}
-      </main>
-    </div>
+    <>
+      {currentPage === 'chat' && <Chat onNavigateToModes={() => setCurrentPage('modes')} />}
+      {currentPage === 'modes' && <ModesManagement onNavigateToChat={() => setCurrentPage('chat')} />}
+    </>
   );
 }
 

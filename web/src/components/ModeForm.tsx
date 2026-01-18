@@ -7,6 +7,30 @@ import { createMode, updateMode } from '../api/client';
 import type { Mode } from '../types';
 import './ModeForm.css';
 
+// アイコン選択肢
+const ICON_OPTIONS = [
+  { value: '💻', label: '💻 コーディング' },
+  { value: '🤖', label: '🤖 AI・ロボット' },
+  { value: '✍️', label: '✍️ ライティング' },
+  { value: '🎨', label: '🎨 クリエイティブ' },
+  { value: '📊', label: '📊 分析・データ' },
+  { value: '🔬', label: '🔬 研究・学術' },
+  { value: '💼', label: '💼 ビジネス' },
+  { value: '🎓', label: '🎓 教育・学習' },
+  { value: '🌍', label: '🌍 翻訳・言語' },
+  { value: '🎮', label: '🎮 ゲーム' },
+  { value: '📚', label: '📚 読書・文学' },
+  { value: '🎵', label: '🎵 音楽' },
+  { value: '🏃', label: '🏃 健康・フィットネス' },
+  { value: '🍳', label: '🍳 料理・レシピ' },
+  { value: '🛠️', label: '🛠️ エンジニアリング' },
+  { value: '💡', label: '💡 アイデア・創造' },
+  { value: '📱', label: '📱 テクノロジー' },
+  { value: '🎯', label: '🎯 目標・計画' },
+  { value: '⚡', label: '⚡ 効率化' },
+  { value: '🌟', label: '🌟 その他' },
+];
+
 interface ModeFormProps {
   mode: Mode | null;
   onClose: () => void;
@@ -15,7 +39,6 @@ interface ModeFormProps {
 
 export function ModeForm({ mode, onClose, onSuccess }: ModeFormProps) {
   const [formData, setFormData] = useState({
-    name: '',
     displayName: '',
     description: '',
     icon: '',
@@ -27,7 +50,6 @@ export function ModeForm({ mode, onClose, onSuccess }: ModeFormProps) {
   useEffect(() => {
     if (mode) {
       setFormData({
-        name: mode.name,
         displayName: mode.display_name,
         description: mode.description || '',
         icon: mode.icon || '',
@@ -37,7 +59,7 @@ export function ModeForm({ mode, onClose, onSuccess }: ModeFormProps) {
   }, [mode]);
 
   function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -52,7 +74,6 @@ export function ModeForm({ mode, onClose, onSuccess }: ModeFormProps) {
       if (mode) {
         // 編集
         await updateMode(mode.id, {
-          name: formData.name,
           displayName: formData.displayName,
           description: formData.description || undefined,
           icon: formData.icon || undefined,
@@ -61,7 +82,6 @@ export function ModeForm({ mode, onClose, onSuccess }: ModeFormProps) {
       } else {
         // 新規作成
         await createMode({
-          name: formData.name,
           displayName: formData.displayName,
           description: formData.description || undefined,
           icon: formData.icon || undefined,
@@ -101,40 +121,34 @@ export function ModeForm({ mode, onClose, onSuccess }: ModeFormProps) {
               onChange={handleChange}
               required
               placeholder="例: 一般的な対話"
+              readOnly={mode?.is_default === 1}
+              disabled={mode?.is_default === 1}
+              className={mode?.is_default === 1 ? 'readonly-field' : ''}
             />
-            <small>ユーザーに表示される名前</small>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="name">
-              内部名 <span className="required">*</span>
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              placeholder="例: general"
-              pattern="[a-z0-9_-]+"
-              title="小文字の英数字、ハイフン、アンダースコアのみ"
-            />
-            <small>システム内部で使用される一意の識別子（小文字英数字、-, _のみ）</small>
+            <small>
+              {mode?.is_default === 1 
+                ? 'デフォルトモードの表示名は変更できません' 
+                : 'ユーザーに表示される名前'}
+            </small>
           </div>
 
           <div className="form-group">
             <label htmlFor="icon">アイコン</label>
-            <input
-              type="text"
+            <select
               id="icon"
               name="icon"
               value={formData.icon}
               onChange={handleChange}
-              placeholder="例: 🤖"
-              maxLength={2}
-            />
-            <small>絵文字1文字を推奨</small>
+              className="icon-select"
+            >
+              <option value="">選択してください</option>
+              {ICON_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <small>モードを識別するアイコン</small>
           </div>
 
           <div className="form-group">
