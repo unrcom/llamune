@@ -330,63 +330,64 @@ function DirectoryTreeModal({
 }
 
 /**
- * 回答比較コンポーネント
+ * 回答選択コンポーネント（複数回答スタック対応）
  */
-function CompareAnswers({
-  originalAnswer,
-  retryAnswer,
-  onAccept,
-  onReject,
+function AnswerSelector({
+  candidates,
+  onSelect,
+  onRetryMore,
+  isRetrying,
+  maxCandidates = 8,
 }: {
-  originalAnswer: Message;
-  retryAnswer: Message;
-  onAccept: () => void;
-  onReject: () => void;
+  candidates: Message[];
+  onSelect: (index: number) => void;
+  onRetryMore: () => void;
+  isRetrying: boolean;
+  maxCandidates?: number;
 }) {
   return (
-    <div className="compare-answers">
-      <div className="compare-header">
-        <span>💡 どちらの回答を採用しますか？</span>
+    <div className="answer-selector">
+      <div className="answer-selector-header">
+        <span>💡 どの回答を採用しますか？（{candidates.length}個の候補）</span>
       </div>
-      <div className="compare-grid">
-        {/* 元の回答 */}
-        <div className="compare-card original">
-          <div className="compare-card-header">
-            <span className="compare-label">元の回答</span>
-            {originalAnswer.model && (
-              <span className="compare-model">{originalAnswer.model}</span>
+      <div className="answer-candidates">
+        {candidates.map((candidate, index) => (
+          <div key={index} className={`answer-card ${index === 0 ? 'original' : 'retry'}`}>
+            <div className="answer-card-header">
+              <span className="answer-label">
+                {index === 0 ? '元の回答' : `回答 ${index + 1}`}
+              </span>
+              {candidate.model && (
+                <span className="answer-model">{candidate.model}</span>
+              )}
+            </div>
+            {candidate.thinking && (
+              <ThinkingBlock thinking={candidate.thinking} />
             )}
+            <div className="answer-content">
+              {candidate.content}
+            </div>
+            <button
+              className={`answer-btn ${index === 0 ? 'original' : 'select'}`}
+              onClick={() => onSelect(index)}
+              disabled={isRetrying}
+            >
+              こちらを採用
+            </button>
           </div>
-          {originalAnswer.thinking && (
-            <ThinkingBlock thinking={originalAnswer.thinking} />
-          )}
-          <div className="compare-content">
-            {originalAnswer.content}
-          </div>
-          <button className="compare-btn reject" onClick={onReject}>
-            こちらを採用
+        ))}
+      </div>
+      {candidates.length < maxCandidates && (
+        <div className="answer-selector-actions">
+          <button
+            className="retry-more-btn"
+            onClick={onRetryMore}
+            disabled={isRetrying}
+          >
+            {isRetrying ? '生成中...' : '🔄 別のモデルでもう1つ生成'}
           </button>
         </div>
-
-        {/* リトライ回答 */}
-        <div className="compare-card retry">
-          <div className="compare-card-header">
-            <span className="compare-label">新しい回答</span>
-            {retryAnswer.model && (
-              <span className="compare-model">{retryAnswer.model}</span>
-            )}
-          </div>
-          {retryAnswer.thinking && (
-            <ThinkingBlock thinking={retryAnswer.thinking} />
-          )}
-          <div className="compare-content">
-            {retryAnswer.content}
-          </div>
-          <button className="compare-btn accept" onClick={onAccept}>
-            こちらを採用
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -427,8 +428,8 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const [showRetryModal, setShowRetryModal] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryPending, setRetryPending] = useState(false);
-  const [originalAnswer, setOriginalAnswer] = useState<Message | null>(null);
-  const [retryAnswer, setRetryAnswer] = useState<Message | null>(null);
+  const [answerCandidates, setAnswerCandidates] = useState<Message[]>([]);
+  const MAX_CANDIDATES = 8;
 
   // インポート（閲覧モード）関連の状態
   const [importedData, setImportedData] = useState<ImportedSession | null>(null);
@@ -708,15 +709,17 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     return `${year}-${month}-${day}`;
   };
 
-  // リトライ実行
+  // リトライ実行（初回または追加）
   const handleRetry = async (model: string) => {
     if (!currentSession || isRetrying) return;
 
-    // 最後のアシスタントメッセージを保存
-    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
-    if (!lastAssistant) return;
+    // 初回リトライの場合、元の回答を候補に追加
+    if (answerCandidates.length === 0) {
+      const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
+      if (!lastAssistant) return;
+      setAnswerCandidates([lastAssistant]);
+    }
 
-    setOriginalAnswer(lastAssistant);
     setIsRetrying(true);
     setStreamingContent('');
     setStreamingThinking('');
@@ -738,13 +741,14 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
         setStreamingThinking(chunk.thinking || '');
       }
 
-      // リトライ回答を設定
-      setRetryAnswer({
+      // 新しい回答を候補に追加
+      const newAnswer: Message = {
         role: 'assistant',
         content: fullContent,
         thinking: fullThinking || undefined,
         model: retryModel,
-      });
+      };
+      setAnswerCandidates(prev => [...prev, newAnswer]);
       setStreamingContent('');
       setStreamingThinking('');
       setRetryPending(true);
@@ -754,7 +758,11 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
       } else {
         console.error('Failed to retry:', err);
       }
-      setOriginalAnswer(null);
+      // キャンセル時、候補が1つしかない場合はリセット
+      if (answerCandidates.length <= 1) {
+        setAnswerCandidates([]);
+        setRetryPending(false);
+      }
     } finally {
       setIsRetrying(false);
       setStreamingContent('');
@@ -763,48 +771,43 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     }
   };
 
-  // リトライ回答を採用
-  const handleAcceptRetry = async () => {
-    if (!currentSession || !retryAnswer) return;
+  // 追加リトライ用（モーダルを表示）
+  const handleRetryMore = () => {
+    setShowRetryModal(true);
+  };
 
+  // 回答を選択（採用）
+  const handleSelectAnswer = async (index: number) => {
+    if (!currentSession || answerCandidates.length === 0) return;
+
+    const selectedAnswer = answerCandidates[index];
+    
     try {
-      await api.acceptRetry(currentSession);
-      
-      // メッセージを更新（元の回答を削除して新しい回答に置き換え）
-      setMessages(prev => {
-        const newMessages = [...prev];
-        // 最後のアシスタントメッセージを探して置き換え
-        for (let i = newMessages.length - 1; i >= 0; i--) {
-          if (newMessages[i].role === 'assistant') {
-            newMessages[i] = retryAnswer;
-            break;
+      // index === 0 の場合は元の回答を採用（rejectRetry）
+      // それ以外は新しい回答を採用（acceptRetry）
+      if (index === 0) {
+        await api.rejectRetry(currentSession);
+        // メッセージはそのまま
+      } else {
+        await api.acceptRetry(currentSession);
+        // メッセージを更新（選択した回答に置き換え）
+        setMessages(prev => {
+          const newMessages = [...prev];
+          for (let i = newMessages.length - 1; i >= 0; i--) {
+            if (newMessages[i].role === 'assistant') {
+              newMessages[i] = selectedAnswer;
+              break;
+            }
           }
-        }
-        return newMessages;
-      });
+          return newMessages;
+        });
+      }
 
       // 状態をリセット
       setRetryPending(false);
-      setOriginalAnswer(null);
-      setRetryAnswer(null);
+      setAnswerCandidates([]);
     } catch (err) {
-      console.error('Failed to accept retry:', err);
-    }
-  };
-
-  // リトライ回答を破棄（元の回答を採用）
-  const handleRejectRetry = async () => {
-    if (!currentSession) return;
-
-    try {
-      await api.rejectRetry(currentSession);
-      
-      // 状態をリセット（メッセージはそのまま）
-      setRetryPending(false);
-      setOriginalAnswer(null);
-      setRetryAnswer(null);
-    } catch (err) {
-      console.error('Failed to reject retry:', err);
+      console.error('Failed to select answer:', err);
     }
   };
 
@@ -1046,13 +1049,14 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                 );
               })}
 
-              {/* リトライ比較ビュー */}
-              {retryPending && originalAnswer && retryAnswer && (
-                <CompareAnswers
-                  originalAnswer={originalAnswer}
-                  retryAnswer={retryAnswer}
-                  onAccept={handleAcceptRetry}
-                  onReject={handleRejectRetry}
+              {/* 回答選択ビュー（複数候補対応） */}
+              {retryPending && answerCandidates.length > 0 && (
+                <AnswerSelector
+                  candidates={answerCandidates}
+                  onSelect={handleSelectAnswer}
+                  onRetryMore={handleRetryMore}
+                  isRetrying={isRetrying}
+                  maxCandidates={MAX_CANDIDATES}
                 />
               )}
 
@@ -1061,12 +1065,12 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                 <div className="message assistant">
                   <div className="message-role">🤖 AI</div>
                   {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
-                  {(streamingContent || streamingThinking) ? (
+                  {streamingContent ? (
                     <div className="message-content markdown-body">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
                     </div>
                   ) : (
-                    <LoadingIndicator />
+                    <LoadingIndicator message={streamingThinking ? '回答を作成中...' : '思考中...'} />
                   )}
                 </div>
               )}
@@ -1076,12 +1080,12 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                 <div className="message assistant streaming-retry">
                   <div className="message-role">🤖 AI (リトライ中)</div>
                   {streamingThinking && <ThinkingBlock thinking={streamingThinking} />}
-                  {(streamingContent || streamingThinking) ? (
+                  {streamingContent ? (
                     <div className="message-content markdown-body">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
                     </div>
                   ) : (
-                    <LoadingIndicator message="別のモデルで生成中..." />
+                    <LoadingIndicator message={streamingThinking ? '回答を作成中...' : '別のモデルで思考中...'} />
                   )}
                 </div>
               )}

@@ -812,8 +812,8 @@
   border-radius: 3px;
 }
 
-/* 回答比較ビュー */
-.compare-answers {
+/* 回答選択ビュー（複数候補対応） */
+.answer-selector {
   margin: 1rem 0;
   padding: 1rem;
   background: #0f0f23;
@@ -821,7 +821,7 @@
   border-radius: 8px;
 }
 
-.compare-header {
+.answer-selector-header {
   text-align: center;
   padding-bottom: 1rem;
   margin-bottom: 1rem;
@@ -830,19 +830,13 @@
   font-weight: 500;
 }
 
-.compare-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.answer-candidates {
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
-@media (max-width: 900px) {
-  .compare-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.compare-card {
+.answer-card {
   background: #16213e;
   border: 1px solid #333;
   border-radius: 8px;
@@ -851,15 +845,15 @@
   flex-direction: column;
 }
 
-.compare-card.original {
+.answer-card.original {
   border-color: #555;
 }
 
-.compare-card.retry {
+.answer-card.retry {
   border-color: #4a9eff;
 }
 
-.compare-card-header {
+.answer-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -868,20 +862,20 @@
   border-bottom: 1px solid #333;
 }
 
-.compare-label {
+.answer-label {
   font-weight: 500;
   font-size: 0.9rem;
 }
 
-.compare-card.original .compare-label {
+.answer-card.original .answer-label {
   color: #aaa;
 }
 
-.compare-card.retry .compare-label {
+.answer-card.retry .answer-label {
   color: #4a9eff;
 }
 
-.compare-model {
+.answer-model {
   font-size: 0.75rem;
   color: #666;
   background: #222;
@@ -889,7 +883,7 @@
   border-radius: 3px;
 }
 
-.compare-content {
+.answer-content {
   flex: 1;
   color: #ccc;
   font-size: 0.9rem;
@@ -901,7 +895,7 @@
   margin-bottom: 1rem;
 }
 
-.compare-btn {
+.answer-btn {
   width: 100%;
   padding: 0.75rem;
   border: none;
@@ -912,22 +906,63 @@
   transition: all 0.2s;
 }
 
-.compare-btn.reject {
+.answer-btn.original {
   background: #333;
   color: #fff;
 }
 
-.compare-btn.reject:hover {
+.answer-btn.original:hover {
   background: #444;
 }
 
-.compare-btn.accept {
+.answer-btn.select {
   background: #4a9eff;
   color: #fff;
 }
 
-.compare-btn.accept:hover {
+.answer-btn.select:hover {
   background: #3a8eef;
+}
+
+.answer-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.answer-selector-actions {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #333;
+  display: flex;
+  justify-content: center;
+}
+
+.retry-more-btn {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: 1px solid #4a9eff;
+  border-radius: 6px;
+  color: #4a9eff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.retry-more-btn:hover {
+  background: #4a9eff;
+  color: #fff;
+}
+
+.retry-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: #555;
+  color: #555;
+}
+
+.retry-more-btn:disabled:hover {
+  background: transparent;
+  color: #555;
 }
 
 /* リトライ中のストリーミング */
