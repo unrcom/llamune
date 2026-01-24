@@ -97,6 +97,7 @@ export interface Message {
   content: string;
   model?: string;
   thinking?: string;
+  is_adopted?: boolean;  // true=採用(LLMコンテキストに含む), false=履歴のみ
 }
 
 /**
@@ -107,6 +108,7 @@ interface MessageWithId {
   role: string;
   content: string;
   model?: string;
+  is_adopted?: number;
 }
 
 export interface MessageTurn {
@@ -237,11 +239,19 @@ export function initDatabase(): Database.Database {
       content TEXT NOT NULL,
       model TEXT,
       thinking TEXT,
+      is_adopted INTEGER DEFAULT 1,
       deleted_at TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
     )
   `);
+
+  // マイグレーション: is_adopted カラムが存在しない場合は追加
+  const columns = db.prepare("PRAGMA table_info(messages)").all() as Array<{ name: string }>;
+  const hasIsAdopted = columns.some(col => col.name === 'is_adopted');
+  if (!hasIsAdopted) {
+    db.exec('ALTER TABLE messages ADD COLUMN is_adopted INTEGER DEFAULT 1');
+  }
 
   // デフォルトモードの初期化
   initializeDefaultModes(db);
@@ -600,7 +610,7 @@ export function getSession(sessionId: number, userId?: number): {
     // メッセージを取得
     const messagesRaw = db
       .prepare(`
-        SELECT role, content, model, thinking
+        SELECT role, content, model, thinking, is_adopted
         FROM messages
         WHERE session_id = ? AND deleted_at IS NULL
         ORDER BY id ASC
@@ -610,6 +620,7 @@ export function getSession(sessionId: number, userId?: number): {
         content: string;
         model?: string;
         thinking?: string;
+        is_adopted?: number;
       }>;
 
     // メッセージを復号
@@ -618,6 +629,7 @@ export function getSession(sessionId: number, userId?: number): {
       content: decrypt(msg.content),
       model: msg.model,
       thinking: msg.thinking ? decrypt(msg.thinking) : undefined,
+      is_adopted: msg.is_adopted !== 0,  // 0以外はtrue（デフォルトも含む）
     }));
 
     return {
@@ -853,6 +865,88 @@ export function deleteLastAssistantMessage(sessionId: number): boolean {
     db.prepare('DELETE FROM messages WHERE id = ?').run(lastMessage.id);
 
     return true;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * セッションの最新のアシスタントメッセージ群を取得（リトライ候補用）
+ * 最後のユーザーメッセージ以降のアシスタントメッセージをすべて取得
+ */
+export function getRetryAssistantMessages(sessionId: number): Array<{ id: number; model?: string }> {
+  const db = initDatabase();
+
+  try {
+    // 最後のユーザーメッセージのIDを取得
+    const lastUserMessage = db
+      .prepare('SELECT id FROM messages WHERE session_id = ? AND role = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1')
+      .get(sessionId, 'user') as { id: number } | undefined;
+
+    if (!lastUserMessage) {
+      return [];
+    }
+
+    // そのユーザーメッセージ以降のアシスタントメッセージを取得
+    const messages = db
+      .prepare(`
+        SELECT id, model 
+        FROM messages 
+        WHERE session_id = ? AND role = ? AND id > ? AND deleted_at IS NULL
+        ORDER BY id ASC
+      `)
+      .all(sessionId, 'assistant', lastUserMessage.id) as Array<{ id: number; model?: string }>;
+
+    return messages;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * リトライ回答を選択処理
+ * @param sessionId セッションID
+ * @param adoptedMessageId 採用するメッセージID（is_adopted=1）
+ * @param keepMessageIds 履歴に残すメッセージID群（is_adopted=0）
+ * @param discardMessageIds 破棄するメッセージID群（削除）
+ */
+export function selectRetryAnswer(
+  sessionId: number,
+  adoptedMessageId: number,
+  keepMessageIds: number[],
+  discardMessageIds: number[]
+): boolean {
+  const db = initDatabase();
+  const now = new Date().toISOString();
+
+  try {
+    // トランザクション開始
+    db.exec('BEGIN TRANSACTION');
+
+    // 1. 採用するメッセージを is_adopted=1 に設定
+    db.prepare('UPDATE messages SET is_adopted = 1 WHERE id = ? AND session_id = ?')
+      .run(adoptedMessageId, sessionId);
+
+    // 2. 履歴に残すメッセージを is_adopted=0 に設定
+    for (const messageId of keepMessageIds) {
+      db.prepare('UPDATE messages SET is_adopted = 0 WHERE id = ? AND session_id = ?')
+        .run(messageId, sessionId);
+    }
+
+    // 3. 破棄するメッセージを削除
+    for (const messageId of discardMessageIds) {
+      db.prepare('DELETE FROM messages WHERE id = ? AND session_id = ?')
+        .run(messageId, sessionId);
+    }
+
+    // セッションの更新日時を更新
+    db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
+
+    db.exec('COMMIT');
+    return true;
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
   } finally {
     db.close();
   }

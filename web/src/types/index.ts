@@ -42,6 +42,7 @@ export type Message = {
   content: string;
   model?: string;
   thinking?: string;
+  is_adopted?: boolean;
 };
 
 // インポート用の型
@@ -62,5 +63,6 @@ export type ImportedSession = {
     content: string;
     model?: string;
     thinking?: string;
+    is_adopted?: boolean;
   }[];
 };

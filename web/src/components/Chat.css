@@ -330,10 +330,32 @@
   margin-right: auto;
 }
 
+/* 履歴のみ（is_adopted=false）のメッセージ */
+.message.kept-only {
+  opacity: 0.7;
+}
+
+.message.kept-only .message-content {
+  background: #1a1a2e;
+  border: 1px dashed #555;
+}
+
+.kept-badge {
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+  background: #ffc107;
+  color: #000;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
 .message-role {
   font-size: 0.8rem;
   color: #888;
   margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
 }
 
 .message-content {
@@ -812,7 +834,7 @@
   border-radius: 3px;
 }
 
-/* 回答選択ビュー（複数候補対応） */
+/* 回答選択ビュー（複数候補対応・3択） */
 .answer-selector {
   margin: 1rem 0;
   padding: 1rem;
@@ -830,6 +852,13 @@
   font-weight: 500;
 }
 
+.answer-selector-hint {
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 0.5rem;
+  font-weight: normal;
+}
+
 .answer-candidates {
   display: flex;
   flex-direction: column;
@@ -838,11 +867,12 @@
 
 .answer-card {
   background: #16213e;
-  border: 1px solid #333;
+  border: 2px solid #333;
   border-radius: 8px;
   padding: 1rem;
   display: flex;
   flex-direction: column;
+  transition: border-color 0.2s;
 }
 
 .answer-card.original {
@@ -853,6 +883,23 @@
   border-color: #4a9eff;
 }
 
+/* 選択状態のカードスタイル */
+.answer-card.adopt {
+  border-color: #28a745;
+  background: #1a2e1a;
+}
+
+.answer-card.keep {
+  border-color: #ffc107;
+  background: #2e2a1a;
+}
+
+.answer-card.discard {
+  border-color: #dc3545;
+  background: #2e1a1a;
+  opacity: 0.7;
+}
+
 .answer-card-header {
   display: flex;
   justify-content: space-between;
@@ -860,6 +907,8 @@
   margin-bottom: 0.75rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid #333;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .answer-label {
@@ -883,6 +932,28 @@
   border-radius: 3px;
 }
 
+.answer-status {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.answer-status.adopt {
+  background: #28a745;
+  color: #fff;
+}
+
+.answer-status.keep {
+  background: #ffc107;
+  color: #000;
+}
+
+.answer-status.discard {
+  background: #dc3545;
+  color: #fff;
+}
+
 .answer-content {
   flex: 1;
   color: #ccc;
@@ -895,46 +966,64 @@
   margin-bottom: 1rem;
 }
 
-.answer-btn {
-  width: 100%;
-  padding: 0.75rem;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s;
+/* 3択アクションボタン */
+.answer-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
-.answer-btn.original {
+.answer-action-btn {
+  flex: 1;
+  padding: 0.6rem 0.5rem;
+  border: 1px solid #444;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  background: #222;
+  color: #aaa;
+}
+
+.answer-action-btn:hover:not(:disabled) {
   background: #333;
   color: #fff;
 }
 
-.answer-btn.original:hover {
-  background: #444;
-}
-
-.answer-btn.select {
-  background: #4a9eff;
-  color: #fff;
-}
-
-.answer-btn.select:hover {
-  background: #3a8eef;
-}
-
-.answer-btn:disabled {
+.answer-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.answer-selector-actions {
+.answer-action-btn.adopt:hover:not(:disabled),
+.answer-action-btn.adopt.active {
+  background: #28a745;
+  border-color: #28a745;
+  color: #fff;
+}
+
+.answer-action-btn.keep:hover:not(:disabled),
+.answer-action-btn.keep.active {
+  background: #ffc107;
+  border-color: #ffc107;
+  color: #000;
+}
+
+.answer-action-btn.discard:hover:not(:disabled),
+.answer-action-btn.discard.active {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
+}
+
+/* フッター（ボタンエリア） */
+.answer-selector-footer {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid #333;
   display: flex;
   justify-content: center;
+  gap: 1rem;
 }
 
 .retry-more-btn {
@@ -963,6 +1052,28 @@
 .retry-more-btn:disabled:hover {
   background: transparent;
   color: #555;
+}
+
+.confirm-btn {
+  padding: 0.75rem 2rem;
+  background: #28a745;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-btn:hover:not(:disabled) {
+  background: #218838;
+}
+
+.confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #555;
 }
 
 /* リトライ中のストリーミング */

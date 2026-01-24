@@ -9,6 +9,8 @@ import {
   updateSessionModel,
   deleteLastAssistantMessage,
   deleteSecondLastAssistantMessage,
+  getRetryAssistantMessages,
+  selectRetryAnswer,
 } from '../../utils/database.js';
 import { chatStream, chatStreamWithTools, ChatMessage, ToolCall } from '../../utils/ollama.js';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
@@ -138,9 +140,11 @@ router.post('/send', authMiddleware, async (req: AuthenticatedRequest, res: Resp
       messages.push({ role: 'system', content: getProjectSystemPromptAddition(projectPath) });
     }
 
-    // 過去のメッセージ
+    // 過去のメッセージ（is_adopted === true のみ）
     for (const msg of sessionData.messages) {
-      messages.push({ role: msg.role, content: msg.content });
+      if (msg.is_adopted !== false) {
+        messages.push({ role: msg.role, content: msg.content });
+      }
     }
 
     // 新しいユーザーメッセージ
@@ -259,7 +263,7 @@ router.post('/retry', authMiddleware, async (req: AuthenticatedRequest, res: Res
     // プロジェクトパスを取得
     const projectPath = sessionData.session.project_path || null;
 
-    // メッセージ履歴を構築（最後のアシスタントメッセージを除く）
+    // メッセージ履歴を構築（最後のユーザーメッセージ以降のアシスタントメッセージをすべて除外）
     const messages: ChatMessage[] = [];
     
     // システムプロンプト
@@ -273,17 +277,27 @@ router.post('/retry', authMiddleware, async (req: AuthenticatedRequest, res: Res
       messages.push({ role: 'system', content: getProjectSystemPromptAddition(projectPath) });
     }
 
-    // 最後のアシスタントメッセージを除外してメッセージを構築
-    const messagesWithoutLastAssistant = [...sessionData.messages];
-    for (let i = messagesWithoutLastAssistant.length - 1; i >= 0; i--) {
-      if (messagesWithoutLastAssistant[i].role === 'assistant') {
-        messagesWithoutLastAssistant.splice(i, 1);
+    // 最後のユーザーメッセージのインデックスを見つける
+    let lastUserIndex = -1;
+    for (let i = sessionData.messages.length - 1; i >= 0; i--) {
+      if (sessionData.messages[i].role === 'user') {
+        lastUserIndex = i;
         break;
       }
     }
 
-    for (const msg of messagesWithoutLastAssistant) {
-      messages.push({ role: msg.role, content: msg.content });
+    // 最後のユーザーメッセージまでを含め、それ以降のアシスタントメッセージは除外
+    // （is_adopted === true のメッセージのみLLMコンテキストに含める）
+    for (let i = 0; i < sessionData.messages.length; i++) {
+      const msg = sessionData.messages[i];
+      
+      // 最後のユーザーメッセージまでは、採用されたメッセージのみ含める
+      if (i <= lastUserIndex) {
+        if (msg.is_adopted !== false) {
+          messages.push({ role: msg.role, content: msg.content });
+        }
+      }
+      // 最後のユーザーメッセージ以降のアシスタントメッセージは除外
     }
 
     // SSEヘッダー設定
@@ -424,6 +438,73 @@ router.post('/retry/reject', authMiddleware, (req: AuthenticatedRequest, res: Re
   } catch (error) {
     console.error('Reject retry error:', error);
     res.status(500).json({ error: 'Failed to reject retry', code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * POST /api/chat/retry/select - 複数のリトライ回答から選択
+ * 
+ * Request body:
+ * - sessionId: セッションID
+ * - adoptedIndex: 採用する回答のインデックス（0が元の回答）
+ * - keepIndices: 履歴に残す回答のインデックス配列
+ * - discardIndices: 破棄する回答のインデックス配列
+ */
+router.post('/retry/select', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { sessionId, adoptedIndex, keepIndices = [], discardIndices = [] } = req.body;
+
+    // バリデーション
+    if (!sessionId || adoptedIndex === undefined) {
+      res.status(400).json({ 
+        error: 'Session ID and adoptedIndex are required', 
+        code: 'VALIDATION_ERROR' 
+      });
+      return;
+    }
+
+    // セッション所有者チェック
+    const sessionData = getSession(sessionId, req.user?.userId);
+    if (!sessionData) {
+      res.status(404).json({ error: 'Session not found', code: 'NOT_FOUND' });
+      return;
+    }
+
+    // リトライ候補のメッセージIDを取得
+    const retryMessages = getRetryAssistantMessages(sessionId);
+    
+    if (retryMessages.length === 0) {
+      res.status(400).json({ 
+        error: 'No retry messages found', 
+        code: 'NO_RETRY_MESSAGES' 
+      });
+      return;
+    }
+
+    // インデックスが範囲内かチェック
+    const allIndices = [adoptedIndex, ...keepIndices, ...discardIndices];
+    for (const idx of allIndices) {
+      if (idx < 0 || idx >= retryMessages.length) {
+        res.status(400).json({ 
+          error: `Invalid index: ${idx}. Valid range: 0-${retryMessages.length - 1}`, 
+          code: 'INVALID_INDEX' 
+        });
+        return;
+      }
+    }
+
+    // インデックスをメッセージIDに変換
+    const adoptedMessageId = retryMessages[adoptedIndex].id;
+    const keepMessageIds = keepIndices.map((idx: number) => retryMessages[idx].id);
+    const discardMessageIds = discardIndices.map((idx: number) => retryMessages[idx].id);
+
+    // 選択処理を実行
+    const success = selectRetryAnswer(sessionId, adoptedMessageId, keepMessageIds, discardMessageIds);
+
+    res.json({ success, sessionId });
+  } catch (error) {
+    console.error('Select retry error:', error);
+    res.status(500).json({ error: 'Failed to select retry', code: 'INTERNAL_ERROR' });
   }
 });
 

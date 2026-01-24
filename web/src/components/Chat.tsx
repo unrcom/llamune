@@ -330,35 +330,107 @@ function DirectoryTreeModal({
 }
 
 /**
- * 回答選択コンポーネント（複数回答スタック対応）
+ * 回答の選択状態
+ */
+type AnswerAction = 'adopt' | 'keep' | 'discard' | null;
+
+/**
+ * 回答選択コンポーネント（複数回答スタック対応・3択）
  */
 function AnswerSelector({
   candidates,
-  onSelect,
+  onConfirm,
   onRetryMore,
   isRetrying,
   maxCandidates = 8,
 }: {
   candidates: Message[];
-  onSelect: (index: number) => void;
+  onConfirm: (adoptedIndex: number, keepIndices: number[], discardIndices: number[]) => void;
   onRetryMore: () => void;
   isRetrying: boolean;
   maxCandidates?: number;
 }) {
+  // 各候補の選択状態を管理
+  const [actions, setActions] = useState<AnswerAction[]>(() => 
+    candidates.map(() => null)
+  );
+
+  // 候補数が変わったらactionsを更新
+  useEffect(() => {
+    setActions(prev => {
+      if (prev.length < candidates.length) {
+        return [...prev, ...Array(candidates.length - prev.length).fill(null)];
+      }
+      return prev.slice(0, candidates.length);
+    });
+  }, [candidates.length]);
+
+  // 採用が1つ選択されているか
+  const hasAdopted = actions.includes('adopt');
+  
+  // 全候補にアクションが設定されているか
+  const allSelected = actions.every(a => a !== null);
+  
+  // 確定可能か
+  const canConfirm = hasAdopted && allSelected && !isRetrying;
+
+  // アクションを設定
+  const setAction = (index: number, action: AnswerAction) => {
+    setActions(prev => {
+      const newActions = [...prev];
+      // 採用は1つだけなので、他の採用を解除
+      if (action === 'adopt') {
+        for (let i = 0; i < newActions.length; i++) {
+          if (newActions[i] === 'adopt') {
+            newActions[i] = null;
+          }
+        }
+      }
+      newActions[index] = action;
+      return newActions;
+    });
+  };
+
+  // 確定処理
+  const handleConfirm = () => {
+    const adoptedIndex = actions.findIndex(a => a === 'adopt');
+    const keepIndices = actions
+      .map((a, i) => a === 'keep' ? i : -1)
+      .filter(i => i !== -1);
+    const discardIndices = actions
+      .map((a, i) => a === 'discard' ? i : -1)
+      .filter(i => i !== -1);
+    
+    onConfirm(adoptedIndex, keepIndices, discardIndices);
+  };
+
   return (
     <div className="answer-selector">
       <div className="answer-selector-header">
-        <span>💡 どの回答を採用しますか？（{candidates.length}個の候補）</span>
+        <span>💡 各回答のアクションを選択してください（{candidates.length}個の候補）</span>
+        <div className="answer-selector-hint">
+          ※「採用」は1つ必須です
+        </div>
       </div>
       <div className="answer-candidates">
         {candidates.map((candidate, index) => (
-          <div key={index} className={`answer-card ${index === 0 ? 'original' : 'retry'}`}>
+          <div 
+            key={index} 
+            className={`answer-card ${actions[index] || ''} ${index === 0 ? 'original' : 'retry'}`}
+          >
             <div className="answer-card-header">
               <span className="answer-label">
                 {index === 0 ? '元の回答' : `回答 ${index + 1}`}
               </span>
               {candidate.model && (
                 <span className="answer-model">{candidate.model}</span>
+              )}
+              {actions[index] && (
+                <span className={`answer-status ${actions[index]}`}>
+                  {actions[index] === 'adopt' && '✓ 採用'}
+                  {actions[index] === 'keep' && '📋 履歴に残す'}
+                  {actions[index] === 'discard' && '🗑️ 破棄'}
+                </span>
               )}
             </div>
             {candidate.thinking && (
@@ -367,18 +439,34 @@ function AnswerSelector({
             <div className="answer-content">
               {candidate.content}
             </div>
-            <button
-              className={`answer-btn ${index === 0 ? 'original' : 'select'}`}
-              onClick={() => onSelect(index)}
-              disabled={isRetrying}
-            >
-              こちらを採用
-            </button>
+            <div className="answer-actions">
+              <button
+                className={`answer-action-btn adopt ${actions[index] === 'adopt' ? 'active' : ''}`}
+                onClick={() => setAction(index, 'adopt')}
+                disabled={isRetrying}
+              >
+                ✓ 採用
+              </button>
+              <button
+                className={`answer-action-btn keep ${actions[index] === 'keep' ? 'active' : ''}`}
+                onClick={() => setAction(index, 'keep')}
+                disabled={isRetrying}
+              >
+                📋 履歴に残す
+              </button>
+              <button
+                className={`answer-action-btn discard ${actions[index] === 'discard' ? 'active' : ''}`}
+                onClick={() => setAction(index, 'discard')}
+                disabled={isRetrying}
+              >
+                🗑️ 破棄
+              </button>
+            </div>
           </div>
         ))}
       </div>
-      {candidates.length < maxCandidates && (
-        <div className="answer-selector-actions">
+      <div className="answer-selector-footer">
+        {candidates.length < maxCandidates && (
           <button
             className="retry-more-btn"
             onClick={onRetryMore}
@@ -386,8 +474,15 @@ function AnswerSelector({
           >
             {isRetrying ? '生成中...' : '🔄 別のモデルでもう1つ生成'}
           </button>
-        </div>
-      )}
+        )}
+        <button
+          className="confirm-btn"
+          onClick={handleConfirm}
+          disabled={!canConfirm}
+        >
+          決定
+        </button>
+      </div>
     </div>
   );
 }
@@ -462,6 +557,13 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
 
   // セッション選択時にメッセージを取得
   useEffect(() => {
+    // セッション切り替え時にリトライ関連stateをリセット
+    setRetryPending(false);
+    setAnswerCandidates([]);
+    setIsRetrying(false);
+    setStreamingContent('');
+    setStreamingThinking('');
+    
     if (currentSession) {
       const fetchMessages = async () => {
         try {
@@ -776,38 +878,55 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     setShowRetryModal(true);
   };
 
-  // 回答を選択（採用）
-  const handleSelectAnswer = async (index: number) => {
+  // 回答選択を確定
+  const handleConfirmSelection = async (
+    adoptedIndex: number, 
+    keepIndices: number[], 
+    discardIndices: number[]
+  ) => {
     if (!currentSession || answerCandidates.length === 0) return;
 
-    const selectedAnswer = answerCandidates[index];
+    const adoptedAnswer = answerCandidates[adoptedIndex];
+    const keptAnswers = keepIndices.map(i => answerCandidates[i]);
     
     try {
-      // index === 0 の場合は元の回答を採用（rejectRetry）
-      // それ以外は新しい回答を採用（acceptRetry）
-      if (index === 0) {
-        await api.rejectRetry(currentSession);
-        // メッセージはそのまま
-      } else {
-        await api.acceptRetry(currentSession);
-        // メッセージを更新（選択した回答に置き換え）
-        setMessages(prev => {
-          const newMessages = [...prev];
-          for (let i = newMessages.length - 1; i >= 0; i--) {
-            if (newMessages[i].role === 'assistant') {
-              newMessages[i] = selectedAnswer;
-              break;
-            }
+      // 新しいAPIを呼び出し
+      await api.selectRetry(currentSession, adoptedIndex, keepIndices, discardIndices);
+      
+      // メッセージを更新
+      setMessages(prev => {
+        const newMessages = [...prev];
+        // 最後のアシスタントメッセージを探す
+        let lastAssistantIdx = -1;
+        for (let i = newMessages.length - 1; i >= 0; i--) {
+          if (newMessages[i].role === 'assistant') {
+            lastAssistantIdx = i;
+            break;
           }
-          return newMessages;
-        });
-      }
+        }
+        
+        if (lastAssistantIdx !== -1) {
+          // 採用した回答で置き換え
+          newMessages[lastAssistantIdx] = { ...adoptedAnswer, is_adopted: true };
+          
+          // 履歴に残す回答を追加（is_adopted: false）
+          const keptMessages = keptAnswers.map(answer => ({
+            ...answer,
+            is_adopted: false,
+          }));
+          
+          // 採用した回答の後に履歴に残す回答を挿入
+          newMessages.splice(lastAssistantIdx + 1, 0, ...keptMessages);
+        }
+        
+        return newMessages;
+      });
 
       // 状態をリセット
       setRetryPending(false);
       setAnswerCandidates([]);
     } catch (err) {
-      console.error('Failed to select answer:', err);
+      console.error('Failed to confirm selection:', err);
     }
   };
 
@@ -983,22 +1102,26 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                   model={importedData.session.model}
                 />
               )}
-              {importedData.messages.map((msg, i) => (
-                <div key={i} className={`message ${msg.role}`}>
-                  <div className="message-header">
-                    <div className="message-role">
-                      {msg.role === 'user' ? '👤 You' : '🤖 AI'}
+              {importedData.messages.map((msg, i) => {
+                const isKeptOnly = msg.role === 'assistant' && msg.is_adopted === false;
+                return (
+                  <div key={i} className={`message ${msg.role} ${isKeptOnly ? 'kept-only' : ''}`}>
+                    <div className="message-header">
+                      <div className="message-role">
+                        {msg.role === 'user' ? '👤 You' : '🤖 AI'}
+                        {isKeptOnly && <span className="kept-badge">📋 履歴のみ</span>}
+                      </div>
+                      {msg.model && msg.role === 'assistant' && (
+                        <span className="message-model">{msg.model}</span>
+                      )}
                     </div>
-                    {msg.model && msg.role === 'assistant' && (
-                      <span className="message-model">{msg.model}</span>
-                    )}
+                    {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
+                    <div className="message-content markdown-body">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                    </div>
                   </div>
-                  {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
-                  <div className="message-content markdown-body">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
           </>
@@ -1021,12 +1144,14 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
                 }
 
                 const isLastAssistant = i === lastAssistantIndex && msg.role === 'assistant';
+                const isKeptOnly = msg.role === 'assistant' && msg.is_adopted === false;
 
                 return (
-                  <div key={i} className={`message ${msg.role}`}>
+                  <div key={i} className={`message ${msg.role} ${isKeptOnly ? 'kept-only' : ''}`}>
                     <div className="message-header">
                       <div className="message-role">
                         {msg.role === 'user' ? '👤 You' : '🤖 AI'}
+                        {isKeptOnly && <span className="kept-badge">📋 履歴のみ</span>}
                       </div>
                       {msg.model && msg.role === 'assistant' && (
                         <span className="message-model">{msg.model}</span>
@@ -1053,7 +1178,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
               {retryPending && answerCandidates.length > 0 && (
                 <AnswerSelector
                   candidates={answerCandidates}
-                  onSelect={handleSelectAnswer}
+                  onConfirm={handleConfirmSelection}
                   onRetryMore={handleRetryMore}
                   isRetrying={isRetrying}
                   maxCandidates={MAX_CANDIDATES}

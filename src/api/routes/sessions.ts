@@ -181,6 +181,7 @@ router.get('/:id/export', authMiddleware, (req: AuthenticatedRequest, res: Respo
         content: msg.content,
         model: msg.model,
         thinking: msg.thinking,
+        is_adopted: msg.is_adopted,
       })),
     };
 

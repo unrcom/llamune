@@ -419,6 +419,29 @@ export async function rejectRetry(sessionId: number): Promise<boolean> {
   return data.success;
 }
 
+/**
+ * 複数のリトライ回答から選択
+ * @param sessionId セッションID
+ * @param adoptedIndex 採用する回答のインデックス
+ * @param keepIndices 履歴に残す回答のインデックス配列
+ * @param discardIndices 破棄する回答のインデックス配列
+ */
+export async function selectRetry(
+  sessionId: number,
+  adoptedIndex: number,
+  keepIndices: number[] = [],
+  discardIndices: number[] = []
+): Promise<boolean> {
+  const response = await authFetch(`${API_BASE}/chat/retry/select`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, adoptedIndex, keepIndices, discardIndices }),
+  });
+  if (!response.ok) throw new Error('Failed to select retry');
+  const data = await response.json();
+  return data.success;
+}
+
 // ========================================
 // ファイルシステム API
 // ========================================
