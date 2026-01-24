@@ -284,6 +284,8 @@
   display: flex;
   flex-direction: column;
   position: relative;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .sidebar-open-btn {
@@ -314,12 +316,14 @@
 .messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1rem;
 }
 
 .message {
   margin-bottom: 1rem;
   max-width: 80%;
+  overflow: hidden;
 }
 
 .message.user {
@@ -363,6 +367,7 @@
   padding: 1rem;
   border-radius: 12px;
   word-wrap: break-word;
+  overflow-wrap: break-word;
   line-height: 1.6;
 }
 
@@ -425,6 +430,7 @@
   border-radius: 8px;
   overflow-x: auto;
   margin: 1em 0;
+  max-width: 100%;
 }
 
 .markdown-body pre code {

@@ -507,8 +507,12 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // 自動スクロール制御
+  const [userScrolled, setUserScrolled] = useState(false);
 
   // プロジェクトフォルダ関連の状態
   const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null);
@@ -529,6 +533,12 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
   // インポート（閲覧モード）関連の状態
   const [importedData, setImportedData] = useState<ImportedSession | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 新規セッション作成直後はメッセージ再取得をスキップするフラグ
+  const skipFetchMessagesRef = useRef(false);
+  
+  // セッション切り替え時は自動スクロールをスキップするフラグ
+  const skipAutoScrollRef = useRef(false);
 
   // 新規チャット準備状態（DBに未作成）
   const [pendingNewChat, setPendingNewChat] = useState<{
@@ -575,11 +585,20 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     setStreamingThinking('');
     
     if (currentSession) {
+      // 新規セッション作成直後はメッセージ再取得をスキップ
+      if (skipFetchMessagesRef.current) {
+        skipFetchMessagesRef.current = false;
+        return;
+      }
+      
       // 既存セッション選択時はpendingNewChatをクリア
       setPendingNewChat(null);
       
       const fetchMessages = async () => {
         try {
+          // セッション切り替え時は自動スクロールをスキップし、先頭にスクロール
+          skipAutoScrollRef.current = true;
+          
           const data = await api.getSession(currentSession);
           setMessages(data.messages || []);
           setSystemPrompt(data.systemPrompt || null);
@@ -588,6 +607,7 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           setModeIcon(data.modeIcon || null);
         } catch (err) {
           console.error('Failed to fetch messages:', err);
+          skipAutoScrollRef.current = false;
         }
       };
       fetchMessages();
@@ -600,10 +620,37 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
     }
   }, [currentSession]);
 
-  // 自動スクロール
+  // スクロールイベントハンドラ（ユーザーが手動スクロールしたかを検出）
+  const handleMessagesScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    
+    // 最下部から50px以内なら自動スクロール有効、それ以外はユーザーがスクロール中
+    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+    setUserScrolled(!isAtBottom);
+  };
+
+  // 自動スクロール（ユーザーが手動スクロール中でなければ実行）
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent]);
+    // セッション切り替え時は先頭にスクロール
+    if (skipAutoScrollRef.current) {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = 0;
+      }
+      skipAutoScrollRef.current = false;
+      return;
+    }
+    if (!userScrolled) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, streamingContent, userScrolled]);
+
+  // loading終了時にuserScrolledをリセット
+  useEffect(() => {
+    if (!loading && !isRetrying) {
+      setUserScrolled(false);
+    }
+  }, [loading, isRetrying]);
 
   // 新しいチャット作成（準備状態にするだけ、DBには作成しない）
   const handleNewChat = async () => {
@@ -666,6 +713,8 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           pendingNewChat.projectPath || undefined
         );
         sessionId = data.session.id;
+        // 新規作成直後はuseEffectでのメッセージ再取得をスキップ
+        skipFetchMessagesRef.current = true;
         setCurrentSession(sessionId);
         setPendingNewChat(null); // 準備状態をクリア
       }
@@ -1171,7 +1220,11 @@ export function Chat({ onNavigateToModes }: { onNavigateToModes: () => void }) {
           </>
         ) : (currentSession || pendingNewChat) ? (
           <>
-            <div className="messages">
+            <div 
+              className="messages"
+              ref={messagesContainerRef}
+              onScroll={handleMessagesScroll}
+            >
               {systemPrompt && (
                 <SystemPromptBlock 
                   systemPrompt={systemPrompt}
