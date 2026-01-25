@@ -8,7 +8,8 @@ import { randomBytes } from 'crypto';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
-const ENV_FILE = resolve(process.cwd(), '.env');
+// ENV_FILE環境変数が設定されていればそれを使用、なければデフォルト
+const ENV_FILE = process.env.ENV_FILE || resolve(process.cwd(), '.env');
 
 function generateSecret() {
   // 32バイト（256ビット）のランダムキーを生成
@@ -18,18 +19,18 @@ function generateSecret() {
 function setupSecrets() {
   let envContent = '';
   let updated = false;
-  
+
   // .envファイルが存在する場合は読み込む
   if (existsSync(ENV_FILE)) {
     envContent = readFileSync(ENV_FILE, 'utf8');
   } else {
-    console.error('❌ Error: .env file not found. Please run: cp .env.example .env');
+    console.error(`❌ Error: .env file not found at ${ENV_FILE}`);
     process.exit(1);
   }
-  
+
   // JWT_SECRETの処理
   const defaultJwtSecret = 'your-jwt-secret-here';
-  if (envContent.includes(`JWT_SECRET=${defaultJwtSecret}`) || 
+  if (envContent.includes(`JWT_SECRET=${defaultJwtSecret}`) ||
       envContent.match(/JWT_SECRET=\s*$/m)) {
     const newJwtSecret = generateSecret();
     if (envContent.includes(`JWT_SECRET=${defaultJwtSecret}`)) {
@@ -42,7 +43,7 @@ function setupSecrets() {
   } else if (envContent.includes('JWT_SECRET=') && envContent.match(/JWT_SECRET=.+/m)) {
     console.log('✅ JWT_SECRET already exists in .env');
   }
-  
+
   // ENCRYPTION_KEYの処理
   const defaultEncryptionKey = 'your-32-byte-hex-encryption-key-here';
   if (envContent.includes(`ENCRYPTION_KEY=${defaultEncryptionKey}`) ||
@@ -58,7 +59,7 @@ function setupSecrets() {
   } else if (envContent.includes('ENCRYPTION_KEY=') && envContent.match(/ENCRYPTION_KEY=.+/m)) {
     console.log('✅ ENCRYPTION_KEY already exists in .env');
   }
-  
+
   // ファイルに書き込み
   if (updated) {
     writeFileSync(ENV_FILE, envContent, 'utf8');

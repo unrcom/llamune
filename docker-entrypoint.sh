@@ -3,14 +3,22 @@ set -e
 
 echo "🚀 Starting llamune backend setup..."
 
+# データベースディレクトリの確認
+echo "📁 Checking database directory..."
+mkdir -p /root/.llamune
+
 # .envファイルがない場合は作成
-if [ ! -f .env ]; then
-  echo "📝 Creating .env file from .env.example..."
-  cp .env.example .env
-  
-  echo "🔑 Generating secrets..."
-  node scripts/generate-secrets.js
+if [ ! -f /root/.llamune/.env ]; then
+  echo "📝 Creating .env file..."
+  cp .env.example /root/.llamune/.env
 fi
+
+# シークレットキーの確認と生成
+echo "🔑 Checking secrets..."
+ENV_FILE=/root/.llamune/.env node scripts/generate-secrets.js
+
+# .envファイルを読み込む（OLLAMA_API_URLとENCRYPTION_KEYは除外）
+export $(cat /root/.llamune/.env | grep -v '^#' | grep -v 'OLLAMA_API_URL' | grep -v 'ENCRYPTION_KEY' | xargs)
 
 # Ollamaの起動を待つ
 echo "⏳ Waiting for Ollama to be ready..."
@@ -19,18 +27,6 @@ until curl -s ${OLLAMA_API_URL}/api/tags > /dev/null 2>&1; do
   sleep 10
 done
 echo "✅ Ollama is ready!"
-
-# データベースディレクトリの確認
-echo "📁 Checking database directory..."
-mkdir -p ~/.llamune
-
-# adminユーザーの存在確認と作成
-echo "👤 Checking for admin user..."
-if npm run dev:cli -- create-user admin admin admin 2>&1 | grep -q "already exists"; then
-  echo "✅ Admin user already exists"
-else
-  echo "✅ Admin user created (username: admin, password: admin)"
-fi
 
 echo "🎉 Setup complete! Starting API server..."
 echo ""

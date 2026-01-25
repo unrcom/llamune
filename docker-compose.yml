@@ -1,5 +1,5 @@
 # llamune Docker Compose
-# 
+#
 # 使い方:
 #   1. Ollamaを起動: ollama serve
 #   2. Docker Desktopを起動
@@ -14,9 +14,6 @@ services:
       - OLLAMA_API_URL=http://host.docker.internal:11434
       - NODE_ENV=production
       - PORT=3000
-      - JWT_SECRET=your-secret-key-change-this-in-production
-      - JWT_ACCESS_EXPIRY=15m
-      - JWT_REFRESH_EXPIRY=7d
     volumes:
       - ~/.llamune:/root/.llamune
     ports:
