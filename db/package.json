@@ -1,0 +1,20 @@
+{
+  "name": "db",
+  "version": "1.0.0",
+  "description": "llamune database migrations",
+  "main": "index.js",
+  "scripts": {
+    "migrate:up": "node-pg-migrate up",
+    "migrate:down": "node-pg-migrate down",
+    "migrate:create": "node-pg-migrate create"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^17.4.1",
+    "node-pg-migrate": "^8.0.4",
+    "pg": "^8.20.0"
+  }
+}
