@@ -10,6 +10,8 @@ class ExecutionResultResponse(BaseModel):
     answers_id: Optional[int]
     status: int
     error_message: Optional[str]
+    question_text: Optional[str] = None
+    answer_text: Optional[str] = None
 
     class Config:
         from_attributes = True

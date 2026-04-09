@@ -74,6 +74,8 @@ export interface ExecutionResult {
   answers_id: number | null
   status: number
   error_message: string | null
+  question_text: string | null
+  answer_text: string | null
 }
 
 export interface Execution {

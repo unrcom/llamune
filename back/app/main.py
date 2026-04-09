@@ -12,7 +12,7 @@ from app.core.allowed_apps import get_allowed_apps
 from app.api.routes import (
     auth, users, models, poc, system_prompts,
     questions, question_sets, question_set_executions,
-    answers, jobs, learning_texts,
+    answers, jobs, learning_texts, chat,
 )
 
 
@@ -104,6 +104,7 @@ app.include_router(question_set_executions.router)
 app.include_router(answers.router)
 app.include_router(jobs.router)
 app.include_router(learning_texts.router)
+app.include_router(chat.router)
 
 
 @app.get("/health")

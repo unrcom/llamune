@@ -23,26 +23,24 @@ export default function HomePage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">PoC 一覧</h2>
-        <p className="text-muted-foreground text-sm mt-1">学習プロジェクトを選択してください</p>
+        <h2 className="text-2xl font-bold">プロジェクト一覧</h2>
+        <p className="text-muted-foreground text-sm mt-1">プロジェクトを選択してください</p>
       </div>
 
       {pocs.length === 0 ? (
-        <p className="text-muted-foreground">PoC がありません。設定から作成してください。</p>
+        <p className="text-muted-foreground">プロジェクトがありません。設定から作成してください。</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {pocs.map(poc => (
             <Card key={poc.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-base">{poc.display_name}</CardTitle>
-                  {poc.model_display_name && (
-                    <Badge variant="secondary" className="text-xs">
-                      {poc.model_display_name}
-                    </Badge>
-                  )}
-                </div>
+                <CardTitle className="text-base">{poc.display_name}</CardTitle>
                 <p className="text-xs text-muted-foreground">{poc.name}</p>
+                {poc.model_display_name && (
+                  <Badge variant="secondary" className="text-xs w-fit mt-1">
+                    {poc.model_display_name}
+                  </Badge>
+                )}
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
@@ -71,7 +69,7 @@ export default function HomePage() {
                     onClick={() => navigate(`/poc/${poc.id}/executions`)}
                   >
                     <PlayCircle className="h-3 w-3 mr-1" />
-                    実行
+                    履歴
                   </Button>
                   <Button
                     variant="outline"

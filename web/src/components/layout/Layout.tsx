@@ -1,19 +1,15 @@
+import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { apiClient, clearTokens } from '@/api/client'
+import { apiClient } from '@/api/client'
 import {
-  Home, MessageSquare, BookOpen, Layers, PlayCircle,
-  BrainCircuit, FileText, LogOut, Settings,
+  Home, MessageSquare, BrainCircuit, FileText, LogOut, Settings, Menu, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/', label: 'ホーム', icon: Home },
   { to: '/chat', label: 'チャット', icon: MessageSquare },
-  { to: '/questions', label: '質問管理', icon: BookOpen },
-  { to: '/question-sets', label: '質問セット', icon: Layers },
-  { to: '/executions', label: '実行履歴', icon: PlayCircle },
-  { to: '/answers', label: '回答入力', icon: BookOpen },
   { to: '/jobs', label: '訓練ジョブ', icon: BrainCircuit },
   { to: '/learning-texts', label: 'テキスト管理', icon: FileText },
   { to: '/setup', label: '設定', icon: Settings },
@@ -22,6 +18,7 @@ const navItems = [
 export default function Layout() {
   const { handleLogout } = useAuth()
   const navigate = useNavigate()
+  const [open, setOpen] = useState(true)
 
   async function onLogout() {
     try {
@@ -39,37 +36,59 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-background">
       {/* サイドバー */}
-      <aside className="w-56 border-r bg-muted/30 flex flex-col">
-        <div className="p-4 border-b">
-          <h1 className="text-lg font-bold text-primary">llamune</h1>
+      <aside
+        className={cn(
+          'border-r bg-muted/30 flex flex-col transition-all duration-200',
+          open ? 'w-48' : 'w-12'
+        )}
+      >
+        {/* ヘッダー */}
+        <div className="flex items-center justify-between p-3 border-b h-14">
+          {open && <h1 className="text-base font-bold text-primary">llamune</h1>}
+          <button
+            onClick={() => setOpen(o => !o)}
+            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
+
+        {/* ナビ */}
         <nav className="flex-1 p-2 space-y-1">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
+              title={!open ? label : undefined}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                  'flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors',
+                  open ? 'px-3' : 'justify-center',
                   isActive
                     ? 'bg-primary text-primary-foreground'
                     : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                 )
               }
             >
-              <Icon className="h-4 w-4" />
-              {label}
+              <Icon className="h-4 w-4 shrink-0" />
+              {open && label}
             </NavLink>
           ))}
         </nav>
+
+        {/* ログアウト */}
         <div className="p-2 border-t">
           <button
             onClick={onLogout}
-            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full transition-colors"
+            title={!open ? 'ログアウト' : undefined}
+            className={cn(
+              'flex items-center gap-2 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full transition-colors',
+              open ? 'px-3' : 'justify-center px-2'
+            )}
           >
-            <LogOut className="h-4 w-4" />
-            ログアウト
+            <LogOut className="h-4 w-4 shrink-0" />
+            {open && 'ログアウト'}
           </button>
         </div>
       </aside>

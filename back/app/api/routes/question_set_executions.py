@@ -7,7 +7,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from app.db.database import get_db
 from app.models.base import (
-    Poc, QuestionSet, QuestionSetItem, Question, SystemPrompt,
+    Poc, QuestionSet, QuestionSetItem, Question, SystemPrompt, Answer,
     QuestionSetSnapshot, QuestionSetItemSnapshot, QuestionSnapshot,
     SystemPromptSnapshot, QuestionSetExecution, QuestionSetExecutionResult,
 )
@@ -26,6 +26,20 @@ def _build_response(exe: QuestionSetExecution, db: Session) -> ExecutionResponse
     results = db.query(QuestionSetExecutionResult).filter(
         QuestionSetExecutionResult.question_set_executions_id == exe.id
     ).all()
+    result_responses = []
+    for r in results:
+        q_snapshot = db.query(QuestionSnapshot).filter(QuestionSnapshot.id == r.question_snapshots_id).first()
+        answer = db.query(Answer).filter(Answer.id == r.answers_id).first() if r.answers_id else None
+        result_responses.append(ExecutionResultResponse(
+            id=r.id,
+            question_set_executions_id=r.question_set_executions_id,
+            question_snapshots_id=r.question_snapshots_id,
+            answers_id=r.answers_id,
+            status=r.status,
+            error_message=r.error_message,
+            question_text=q_snapshot.question if q_snapshot else None,
+            answer_text=answer.answer if answer else None,
+        ))
     return ExecutionResponse(
         id=exe.id,
         question_set_snapshots_id=exe.question_set_snapshots_id,
@@ -33,7 +47,7 @@ def _build_response(exe: QuestionSetExecution, db: Session) -> ExecutionResponse
         status=exe.status,
         executed_at=exe.executed_at,
         finished_at=exe.finished_at,
-        results=[ExecutionResultResponse.model_validate(r) for r in results],
+        results=result_responses,
     )
 
 
