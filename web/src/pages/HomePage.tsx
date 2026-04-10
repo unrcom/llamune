@@ -75,7 +75,7 @@ export default function HomePage() {
                     variant="outline"
                     size="sm"
                     className="w-full"
-                    onClick={() => navigate(`/poc/${poc.id}/jobs`)}
+                    onClick={() => navigate(`/jobs?pocId=${poc.id}`)}
                   >
                     <BrainCircuit className="h-3 w-3 mr-1" />
                     訓練

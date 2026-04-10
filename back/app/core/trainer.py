@@ -20,12 +20,17 @@ def get_qa_training_data(db, job: TrainingJob) -> list[tuple[str, str]]:
 
     rows = []
     for item in items:
+        from app.models.base import QuestionSnapshot
+        q_snapshot = db.query(QuestionSnapshot).filter(
+            QuestionSnapshot.id == item.question_snapshots_id
+        ).first()
+        if not q_snapshot:
+            continue
         answer_snapshot = db.query(AnswerSnapshot).filter(
-            AnswerSnapshot.questions_id == item.question_snapshots_id,
+            AnswerSnapshot.questions_id == q_snapshot.questions_id,
             AnswerSnapshot.answer_type == "human",
         ).first()
         if answer_snapshot:
-            from app.models.base import QuestionSnapshot
             q_snapshot = db.query(QuestionSnapshot).filter(
                 QuestionSnapshot.id == item.question_snapshots_id
             ).first()
@@ -249,7 +254,7 @@ def run_training(job_id: int):
             # テキスト学習モード
             chunks = get_text_training_data(db, job)
             if not chunks:
-                raise ValueError("No text chunks found")
+                raise ValueError("訓練データが見つかりません（テキストチャンクがありません）")
             run_lora_text(job, chunks, base_model_path, adapter_path,
                           log_path=log_path, resume_adapter=resume_adapter_path)
 
@@ -257,7 +262,7 @@ def run_training(job_id: int):
             # LoRAノーマルモード
             rows = get_qa_training_data(db, job)
             if not rows:
-                raise ValueError("No training data found (no human answers)")
+                raise ValueError("訓練データが見つかりません（human回答が登録されていません）")
             run_lora_normal(job, rows, base_model_path, adapter_path,
                             log_path=log_path, resume_adapter=resume_adapter_path)
 
@@ -265,7 +270,7 @@ def run_training(job_id: int):
             # llamuneオリジナルモード
             rows = get_qa_training_data(db, job)
             if not rows:
-                raise ValueError("No training data found (no human answers)")
+                raise ValueError("訓練データが見つかりません（human回答が登録されていません）")
             run_lora_one_by_one(job, rows, base_model_path, adapter_path,
                                 resume_adapter=resume_adapter_path)
 
