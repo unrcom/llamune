@@ -42,6 +42,7 @@ export default function JobsPage() {
   const [showForm, setShowForm] = useState(false)
   const [creatingSnapshot, setCreatingSnapshot] = useState(false)
 
+
   const [pocId, setPocId] = useState('')
   const [modelsId, setModelsId] = useState('')
   const [qsId, setQsId] = useState('')
@@ -109,6 +110,10 @@ export default function JobsPage() {
     if (pid) {
       setPocId(pid)
       setShowForm(true)
+    }
+    const expandId = searchParams.get('expandId')
+    if (expandId) {
+      setExpandedId(parseInt(expandId))
     }
   }, [])
   useEffect(() => {
@@ -329,6 +334,7 @@ export default function JobsPage() {
                   onClick={() => setExpandedId(isExpanded ? null : job.id)}
                 >
                   <div className="space-y-1 flex-1">
+                    <div className="text-xs text-muted-foreground mb-1">訓練ジョブ #{job.id}</div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">{job.name}</span>
                       <Badge variant={STATUS_VARIANTS[job.status] || 'outline'} className="text-xs">
@@ -378,6 +384,14 @@ export default function JobsPage() {
                         {job.error_message}
                       </div>
                     )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={e => { e.stopPropagation(); navigate('/jobs/' + job.id + '/log') }}
+                    >
+                      ログを見る
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -388,6 +402,7 @@ export default function JobsPage() {
           <p className="text-muted-foreground text-sm">訓練ジョブがありません</p>
         )}
       </div>
+
     </div>
   )
 }

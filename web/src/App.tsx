@@ -13,6 +13,7 @@ import ExecutionsPage from '@/pages/ExecutionsPage'
 import JobsPage from '@/pages/JobsPage'
 import LearningTextsPage from '@/pages/LearningTextsPage'
 import ChatPage from '@/pages/ChatPage'
+import JobLogPage from '@/pages/JobLogPage'
 
 function AppRoutes() {
   const { loggedIn } = useAuth()
@@ -40,6 +41,7 @@ function AppRoutes() {
           <Route path="/jobs" element={<JobsPage />} />
           <Route path="/learning-texts" element={<LearningTextsPage />} />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/jobs/:jobId/log" element={<JobLogPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
         <Route path="/login" element={<Navigate to="/" replace />} />
