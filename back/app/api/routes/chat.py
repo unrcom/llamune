@@ -54,10 +54,17 @@ def chat(
             if sp:
                 system_prompt_content = sp.content
 
-    # モデルロード
-    if model.model_type == 'fine-tuned' and model.adapter_path and model.parent_models_id:
-        parent = db.query(Model).filter(Model.id == model.parent_models_id).first()
-        base_model_name = parent.name if parent else model.name
+    # モデルロード（再帰的にbaseモデルを探す）
+    def get_base_model(m):
+        if m.model_type == 'fine-tuned' and m.parent_models_id:
+            parent = db.query(Model).filter(Model.id == m.parent_models_id).first()
+            if parent:
+                return get_base_model(parent)
+        return m
+
+    if model.model_type == 'fine-tuned' and model.adapter_path:
+        base = get_base_model(model)
+        base_model_name = base.name
         adapter_path = model.adapter_path
     else:
         base_model_name = model.name

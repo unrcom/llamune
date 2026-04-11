@@ -27,7 +27,14 @@ export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_KEY)
 }
 
-// リクエストインターセプター：Authorizationヘッダー自動付与
+let isRefreshing = false
+let refreshQueue: ((token: string) => void)[] = []
+
+function onRefreshed(token: string) {
+  refreshQueue.forEach(cb => cb(token))
+  refreshQueue = []
+}
+
 apiClient.interceptors.request.use((config) => {
   const token = getToken()
   if (token) {
@@ -36,27 +43,44 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-// レスポンスインターセプター：401時にリフレッシュ
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true
+
+      if (isRefreshing) {
+        // リフレッシュ中なら完了を待つ
+        return new Promise((resolve) => {
+          refreshQueue.push((token: string) => {
+            original.headers.Authorization = `Bearer ${token}`
+            resolve(apiClient(original))
+          })
+        })
+      }
+
+      isRefreshing = true
       const refreshToken = getRefreshToken()
+
       if (refreshToken) {
         try {
           const res = await axios.post(`${API_URL}/auth/refresh`, {
             refresh_token: refreshToken,
           })
-          setTokens(res.data.access_token, res.data.refresh_token)
-          original.headers.Authorization = `Bearer ${res.data.access_token}`
+          const newToken = res.data.access_token
+          setTokens(newToken, res.data.refresh_token)
+          onRefreshed(newToken)
+          original.headers.Authorization = `Bearer ${newToken}`
           return apiClient(original)
         } catch {
           clearTokens()
           window.location.href = '/login'
+        } finally {
+          isRefreshing = false
         }
       } else {
+        isRefreshing = false
         clearTokens()
         window.location.href = '/login'
       }
