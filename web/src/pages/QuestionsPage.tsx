@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { apiClient } from '@/api/client'
-import { Question, Poc } from '@/types'
+import { Question, Poc, Answer } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, Plus, ArrowLeft, Pencil, Check, X } from 'lucide-react'
+import { Trash2, Plus, ArrowLeft, Pencil, Check, X, Save } from 'lucide-react'
 
 const TRAINING_ROLES: Record<number, string> = {
   1: '訓練',
@@ -30,6 +30,8 @@ export default function QuestionsPage() {
   const [editId, setEditId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
   const [editRole, setEditRole] = useState('')
+  const [humanAnswers, setHumanAnswers] = useState<Record<number, Answer | null>>({})
+  const [answerTexts, setAnswerTexts] = useState<Record<number, string>>({})
 
   async function load() {
     const [pocRes, qRes] = await Promise.all([
@@ -37,7 +39,25 @@ export default function QuestionsPage() {
       apiClient.get(`/poc/${pocId}/questions`),
     ])
     setPoc(pocRes.data)
-    setQuestions(qRes.data)
+    const qs: Question[] = qRes.data
+    setQuestions(qs)
+
+    // 各質問の human 回答を取得
+    const answers: Record<number, Answer | null> = {}
+    const texts: Record<number, string> = {}
+    await Promise.all(qs.map(async q => {
+      try {
+        const aRes = await apiClient.get(`/poc/${pocId}/questions/${q.id}/answers`)
+        const human = aRes.data.find((a: Answer) => a.answer_type === 'human') || null
+        answers[q.id] = human
+        texts[q.id] = human?.answer || ''
+      } catch {
+        answers[q.id] = null
+        texts[q.id] = ''
+      }
+    }))
+    setHumanAnswers(answers)
+    setAnswerTexts(texts)
     setLoading(false)
   }
 
@@ -51,6 +71,24 @@ export default function QuestionsPage() {
     })
     setNewQuestion('')
     setNewRole('')
+    load()
+  }
+
+  async function saveAnswer(questionId: number) {
+    const text = answerTexts[questionId]?.trim()
+    if (!text) return
+    await apiClient.post(`/poc/${pocId}/questions/${questionId}/answers`, {
+      answer: text,
+      answer_type: 'human',
+    })
+    load()
+  }
+
+  async function deleteAnswer(questionId: number) {
+    if (!confirm('回答を削除しますか？')) return
+    const answer = humanAnswers[questionId]
+    if (!answer) return
+    await apiClient.delete(`/poc/${pocId}/questions/${questionId}/answers`)
     load()
   }
 
@@ -150,6 +188,7 @@ export default function QuestionsPage() {
                   </div>
                 </div>
               ) : (
+                <>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 space-y-1">
                     <p className="text-sm">{q.question}</p>
@@ -179,6 +218,31 @@ export default function QuestionsPage() {
                     </Button>
                   </div>
                 </div>
+                {/* human 回答入力 */}
+                <div className="mt-3 pt-3 border-t space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">正解回答（human）</p>
+                    {humanAnswers[q.id] && (
+                      <Button size="sm" variant="ghost" onClick={() => deleteAnswer(q.id)}>
+                        <Trash2 className="h-3 w-3 mr-1 text-destructive" /> 削除
+                      </Button>
+                    )}
+                  </div>
+                  <Textarea
+                    value={answerTexts[q.id] || ''}
+                    onChange={e => setAnswerTexts(prev => ({ ...prev, [q.id]: e.target.value }))}
+                    placeholder="正解回答を入力してください"
+                    rows={3}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => saveAnswer(q.id)}
+                    disabled={!answerTexts[q.id]?.trim()}
+                  >
+                    <Save className="h-4 w-4 mr-1" /> 保存
+                  </Button>
+                </div>
+                </>
               )}
             </CardContent>
           </Card>
