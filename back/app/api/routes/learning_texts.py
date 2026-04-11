@@ -80,7 +80,7 @@ def get_learning_texts(
     return db.query(LearningText).filter(
         LearningText.poc_id == poc_id,
         LearningText.status == "active",
-    ).order_by(LearningText.id).all()
+    ).order_by(LearningText.id.desc()).all()
 
 
 @router.get("/{lt_id}", response_model=LearningTextResponse)

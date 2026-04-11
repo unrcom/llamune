@@ -47,7 +47,7 @@ export default function LearningTextsPage() {
 
   async function createText() {
     if (!newTitle.trim() || !pocId) return
-    await apiClient.post(`/poc/${pocId}/learning_texts`, {
+    const res = await apiClient.post(`/poc/${pocId}/learning_texts`, {
       title: newTitle.trim(),
       source_url: newSourceUrl || null,
       raw_text: newRawText || null,
@@ -55,7 +55,11 @@ export default function LearningTextsPage() {
     setNewTitle('')
     setNewSourceUrl('')
     setNewRawText('')
-    loadTexts(pocId)
+    await loadTexts(pocId)
+    // 追加したテキストを自動展開
+    const newId = res.data.id
+    setExpandedId(newId)
+    await loadChunks(newId)
   }
 
   async function deleteText(id: number) {
@@ -96,7 +100,7 @@ export default function LearningTextsPage() {
 
       {/* PoC選択 */}
       <div className="space-y-1 max-w-xs">
-        <Label>PoC</Label>
+        <Label>プロジェクト</Label>
         <select
           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
           value={pocId}
@@ -155,9 +159,14 @@ export default function LearningTextsPage() {
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">訓練用テキスト #{lt.id}</Badge>
                           <span className="font-medium text-sm">{lt.title}</span>
-                          <Badge variant="outline" className="text-xs">#{lt.id}</Badge>
                         </div>
+                        {lt.raw_text && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {lt.raw_text.length > 80 ? lt.raw_text.slice(0, 80) + '...' : lt.raw_text}
+                          </p>
+                        )}
                         {lt.source_url && (
                           <a
                             href={lt.source_url}
