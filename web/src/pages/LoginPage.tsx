@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAppStore } from '@/store'
 import { apiClient, setTokens } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { handleLogin } = useAuth()
+  const setLoggedIn = useAppStore(state => state.setLoggedIn)
   const navigate = useNavigate()
 
   async function onSubmit(e: React.FormEvent) {
@@ -22,7 +22,7 @@ export default function LoginPage() {
     try {
       const res = await apiClient.post('/auth/login', { username, password })
       setTokens(res.data.access_token, res.data.refresh_token)
-      handleLogin()
+      setLoggedIn(true)
       navigate('/')
     } catch {
       setError('ユーザー名またはパスワードが正しくありません')

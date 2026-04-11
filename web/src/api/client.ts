@@ -85,6 +85,10 @@ apiClient.interceptors.response.use(
         window.location.href = '/login'
       }
     }
+    // ネットワークエラー（バックエンド無応答）
+    if (!error.response) {
+      import('@/store').then(({ useAppStore }) => useAppStore.getState().setBackendDown(true))
+    }
     return Promise.reject(error)
   }
 )

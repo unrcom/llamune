@@ -11,6 +11,62 @@ from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/poc/{poc_id}/learning_texts", tags=["learning_texts"])
 
+def split_into_chunks(text: str, min_tokens: int = 512, max_tokens: int = 1024) -> list[str]:
+    """テキストを段落単位で512〜1024トークンのチャンクに分割する（文字数÷2でトークン数を近似）"""
+    # split by double newline, then by single newline if paragraph is too long
+    paras_raw = [p.strip() for p in text.split("\n\n") if p.strip()]
+    paragraphs = []
+    for p in paras_raw:
+        if len(p) // 2 > max_tokens:
+            sub = [s.strip() for s in p.split("\n") if s.strip()]
+            paragraphs.extend(sub)
+        else:
+            paragraphs.append(p)
+    
+    chunks = []
+    current = []
+    current_tokens = 0
+
+    for para in paragraphs:
+        para_tokens = len(para) // 2
+
+        if para_tokens > max_tokens:
+            if current:
+                chunks.append("\n\n".join(current))
+                current = []
+                current_tokens = 0
+            sentences = para.replace("。", "。\n").replace("．", "．\n").split("\n")
+            sentences = [s.strip() for s in sentences if s.strip()]
+            sent_current = []
+            sent_tokens = 0
+            for sent in sentences:
+                st = len(sent) // 2
+                if sent_tokens + st > max_tokens and sent_current:
+                    chunks.append("".join(sent_current))
+                    sent_current = [sent]
+                    sent_tokens = st
+                else:
+                    sent_current.append(sent)
+                    sent_tokens += st
+            if sent_current:
+                chunks.append("".join(sent_current))
+        elif current_tokens + para_tokens > max_tokens:
+            if current:
+                chunks.append("\n\n".join(current))
+            current = [para]
+            current_tokens = para_tokens
+        else:
+            current.append(para)
+            current_tokens += para_tokens
+            if current_tokens >= min_tokens:
+                chunks.append("\n\n".join(current))
+                current = []
+                current_tokens = 0
+
+    if current:
+        chunks.append("\n\n".join(current))
+
+    return chunks
 
 @router.get("", response_model=List[LearningTextResponse])
 def get_learning_texts(
@@ -179,3 +235,43 @@ def delete_chunk(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chunk not found")
     db.delete(chunk)
     db.commit()
+
+
+@router.post("/{lt_id}/auto-chunk", response_model=List[LearningTextChunkResponse], status_code=status.HTTP_201_CREATED)
+def auto_chunk(
+    poc_id: int,
+    lt_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    lt = db.query(LearningText).filter(
+        LearningText.id == lt_id,
+        LearningText.poc_id == poc_id,
+    ).first()
+    if not lt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="LearningText not found")
+    if not lt.raw_text:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="raw_text がありません")
+
+    # 既存チャンクを削除
+    db.query(LearningTextChunk).filter(
+        LearningTextChunk.learning_texts_id == lt_id
+    ).delete()
+
+    # 自動分割してチャンクを作成
+    chunks_text = split_into_chunks(lt.raw_text)
+    new_chunks = []
+    for i, content_text in enumerate(chunks_text):
+        chunk = LearningTextChunk(
+            learning_texts_id=lt_id,
+            chunk_index=i,
+            content=content_text,
+            token_count=len(content_text) // 2,
+        )
+        db.add(chunk)
+        new_chunks.append(chunk)
+
+    db.commit()
+    for chunk in new_chunks:
+        db.refresh(chunk)
+    return new_chunks

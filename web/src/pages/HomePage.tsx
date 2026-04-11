@@ -12,13 +12,18 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
+  const [error, setError] = useState('')
+
   useEffect(() => {
     apiClient.get('/poc').then(res => {
       setPocs(res.data)
+    }).catch(() => {
+      setError('サーバーに接続できません。バックエンドが起動しているか確認してください。')
     }).finally(() => setLoading(false))
   }, [])
 
   if (loading) return <div className="p-6 text-muted-foreground">読み込み中...</div>
+  if (error) return <div className="p-6 text-destructive">{error}</div>
 
   return (
     <div className="p-6 space-y-6">

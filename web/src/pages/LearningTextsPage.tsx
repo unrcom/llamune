@@ -126,7 +126,7 @@ export default function LearningTextsPage() {
                 <Input value={newSourceUrl} onChange={e => setNewSourceUrl(e.target.value)} placeholder="https://ja.wikipedia.org/wiki/..." />
               </div>
               <div className="space-y-1">
-                <Label>原文テキスト（任意）</Label>
+                <Label>原文テキスト</Label>
                 <Textarea
                   value={newRawText}
                   onChange={e => setNewRawText(e.target.value)}
@@ -187,9 +187,28 @@ export default function LearningTextsPage() {
 
                     {expandedId === lt.id && (
                       <div className="border-t pt-3 space-y-3">
-                        <p className="text-xs font-medium text-muted-foreground">
-                          チャンク（{chunks[lt.id]?.length || 0} 件）
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            チャンク（{chunks[lt.id]?.length || 0} 件）
+                          </p>
+                          {lt.raw_text && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                const hasChunks = (chunks[lt.id]?.length || 0) > 0
+                                const msg = hasChunks
+                                  ? '自動チャンク分割を実行しますか？（既存のチャンクは削除されます）'
+                                  : '自動チャンク分割を実行しますか？'
+                                if (!confirm(msg)) return
+                                await apiClient.post(`/poc/${pocId}/learning_texts/${lt.id}/auto-chunk`, {})
+                                await loadChunks(lt.id)
+                              }}
+                            >
+                              自動チャンク分割
+                            </Button>
+                          )}
+                        </div>
                         <div className="space-y-2">
                           {(chunks[lt.id] || []).map(chunk => (
                             <div key={chunk.id} className="flex items-start gap-2 p-2 border rounded-md">

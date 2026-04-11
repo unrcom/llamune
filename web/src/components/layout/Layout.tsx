@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAppStore } from '@/store'
 import { apiClient } from '@/api/client'
 import {
   Home, MessageSquare, BrainCircuit, FileText, LogOut, Settings, Menu, X,
@@ -16,7 +16,8 @@ const navItems = [
 ]
 
 export default function Layout() {
-  const { handleLogout } = useAuth()
+  const setLoggedIn = useAppStore(state => state.setLoggedIn)
+  const backendDown = useAppStore(state => state.backendDown)
   const navigate = useNavigate()
   const [open, setOpen] = useState(true)
 
@@ -29,7 +30,7 @@ export default function Layout() {
     } catch {
       // ignore
     }
-    handleLogout()
+    setLoggedIn(false)
     navigate('/login')
   }
 
@@ -94,8 +95,15 @@ export default function Layout() {
       </aside>
 
       {/* メインコンテンツ */}
-      <main className="flex-1 overflow-auto">
-        <Outlet />
+      <main className="flex-1 overflow-auto flex flex-col">
+        {backendDown && (
+          <div className="bg-destructive text-destructive-foreground text-sm px-4 py-2 text-center">
+            ⚠️ サーバーに接続できません。バックエンドが起動しているか確認してください。
+          </div>
+        )}
+        <div className="flex-1 overflow-auto">
+          <Outlet />
+        </div>
       </main>
     </div>
   )

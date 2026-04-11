@@ -5,12 +5,15 @@ interface AuthContextType {
   loggedIn: boolean
   handleLogin: () => void
   handleLogout: () => void
+  backendDown: boolean
+  setBackendDown: (v: boolean) => void
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loggedIn, setLoggedIn] = useState(() => !!getToken())
+  const [backendDown, setBackendDown] = useState(false)
 
   function handleLogin() {
     setLoggedIn(true)
@@ -22,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ loggedIn, handleLogin, handleLogout }}>
+    <AuthContext.Provider value={{ loggedIn, handleLogin, handleLogout, backendDown, setBackendDown }}>
       {children}
     </AuthContext.Provider>
   )
