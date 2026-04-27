@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from app.rag import search, embed_model
 from app.auth import get_current_user
 from app.dummy_data import get_facilities
-from app.dataset import get_sources, delete_source, add_wikipedia, refresh_source
+from app.dataset import get_sources, delete_source, add_wikipedia, refresh_source, get_chunks, update_chunk, delete_chunk, add_text
 
 app = FastAPI(title="llamune API")
 
@@ -20,9 +20,16 @@ app.add_middleware(
 class SearchRequest(BaseModel):
     symptom: str
 
-
 class WikipediaAddRequest(BaseModel):
     title: str
+
+class TextAddRequest(BaseModel):
+    source: str
+    text: str
+    separator: str = "@@@"
+
+class ChunkUpdateRequest(BaseModel):
+    text: str
 
 
 @app.get("/api/health")
@@ -36,11 +43,7 @@ def drug_search(
     current_user: str = Depends(get_current_user)
 ):
     result = search(req.symptom)
-    return {
-        "user": current_user,
-        "symptom": req.symptom,
-        **result
-    }
+    return {"user": current_user, "symptom": req.symptom, **result}
 
 
 @app.get("/api/facilities")
@@ -54,6 +57,14 @@ def facilities(
 @app.get("/api/dataset/sources")
 def dataset_sources(current_user: str = Depends(get_current_user)):
     return get_sources()
+
+
+@app.get("/api/dataset/sources/{source}/chunks")
+def dataset_chunks(source: str, current_user: str = Depends(get_current_user)):
+    chunks = get_chunks(source)
+    if not chunks:
+        raise HTTPException(status_code=404, detail=f"ソース「{source}」が見つかりません")
+    return chunks
 
 
 @app.delete("/api/dataset/sources/{source}")
@@ -75,9 +86,40 @@ def dataset_add_wikipedia(
     return result
 
 
+@app.post("/api/dataset/sources/text")
+def dataset_add_text(
+    req: TextAddRequest,
+    current_user: str = Depends(get_current_user)
+):
+    result = add_text(req.source, req.text, embed_model, req.separator)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
+
+
 @app.post("/api/dataset/sources/refresh/{source}")
 def dataset_refresh(source: str, current_user: str = Depends(get_current_user)):
     result = refresh_source(source, embed_model)
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["message"])
+    return result
+
+
+@app.put("/api/dataset/chunks/{chunk_id:path}")
+def chunk_update(
+    chunk_id: str,
+    req: ChunkUpdateRequest,
+    current_user: str = Depends(get_current_user)
+):
+    result = update_chunk(chunk_id, req.text, embed_model)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
+    return result
+
+
+@app.delete("/api/dataset/chunks/{chunk_id:path}")
+def chunk_delete(chunk_id: str, current_user: str = Depends(get_current_user)):
+    result = delete_chunk(chunk_id)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
     return result

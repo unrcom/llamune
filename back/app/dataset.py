@@ -91,3 +91,118 @@ def refresh_source(title: str, embed_model: FlagModel) -> dict:
     result = add_wikipedia(title, embed_model)
     result["deleted_count"] = deleted
     return result
+
+
+def get_chunks(source: str) -> list[dict]:
+    """指定ソースのチャンク一覧をID・見出し・テキスト付きで返す"""
+    all_items = collection.get()
+    chunks = []
+    for id_, meta, doc in zip(all_items["ids"], all_items["metadatas"], all_items["documents"]):
+        if meta.get("source") == source:
+            parts = id_.split("__")
+            index = parts[-1] if len(parts) >= 3 else "0"
+            chunks.append({
+                "id": id_,
+                "heading": meta.get("heading", ""),
+                "index": int(index),
+                "text": doc
+            })
+    chunks.sort(key=lambda x: x["index"])
+    return chunks
+
+
+def update_chunk(chunk_id: str, new_text: str, embed_model: FlagModel) -> dict:
+    """チャンクのテキストを更新する"""
+    all_items = collection.get()
+    if chunk_id not in all_items["ids"]:
+        return {"success": False, "message": "チャンクが見つかりません"}
+
+    idx = all_items["ids"].index(chunk_id)
+    meta = all_items["metadatas"][idx]
+
+    embedding = embed_model.encode([new_text]).tolist()
+    collection.update(
+        ids=[chunk_id],
+        documents=[new_text],
+        embeddings=embedding,
+        metadatas=[meta]
+    )
+    return {"success": True, "message": "チャンクを更新しました"}
+
+
+def delete_chunk(chunk_id: str) -> dict:
+    """チャンクを1件削除する"""
+    all_items = collection.get()
+    if chunk_id not in all_items["ids"]:
+        return {"success": False, "message": "チャンクが見つかりません"}
+    collection.delete(ids=[chunk_id])
+    return {"success": True, "message": "チャンクを削除しました"}
+
+
+def chunk_text(text: str, separator: str = "@@@") -> list[str]:
+    """テキストをチャンクに分割する"""
+    # セパレータが含まれている場合はそれで分割
+    if separator in text:
+        chunks = [c.strip() for c in text.split(separator)]
+        return [c for c in chunks if len(c) >= MIN_CHARS]
+
+    # 自動チャンキング：空行で分割
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    chunks = []
+    for para in paragraphs:
+        if len(para) <= 500:
+            if len(para) >= MIN_CHARS:
+                chunks.append(para)
+        elif len(para) <= 700:
+            # 改行で分割
+            lines = [l.strip() for l in para.split("\n") if l.strip()]
+            current = ""
+            for line in lines:
+                if len(current) + len(line) > 500 and current:
+                    if len(current) >= MIN_CHARS:
+                        chunks.append(current)
+                    current = line
+                else:
+                    current = current + "\n" + line if current else line
+            if len(current) >= MIN_CHARS:
+                chunks.append(current)
+        else:
+            # 句読点で分割
+            import re
+            sentences = re.split(r'(?<=。)', para)
+            current = ""
+            for sentence in sentences:
+                if len(current) + len(sentence) > 700 and current:
+                    if len(current) >= MIN_CHARS:
+                        chunks.append(current)
+                    current = sentence
+                else:
+                    current += sentence
+            if len(current) >= MIN_CHARS:
+                chunks.append(current)
+    return chunks
+
+
+def add_text(source: str, text: str, embed_model: FlagModel, separator: str = "@@@") -> dict:
+    """手入力テキストをチャンキングしてDBに追加する"""
+    chunks = chunk_text(text, separator)
+    if not chunks:
+        return {"success": False, "message": "チャンクが生成されませんでした"}
+
+    existing_ids = set(collection.get()["ids"])
+    prefix = source.replace(" ", "_")
+    new_texts, new_ids, new_metadatas = [], [], []
+
+    for i, chunk in enumerate(chunks):
+        cid = f"{prefix}__テキスト__{i}"
+        if cid not in existing_ids:
+            new_texts.append(chunk)
+            new_ids.append(cid)
+            new_metadatas.append({"source": source, "heading": "テキスト"})
+
+    if not new_texts:
+        return {"success": False, "message": f"「{source}」は既に登録済みです"}
+
+    embeddings = embed_model.encode(new_texts).tolist()
+    collection.add(documents=new_texts, embeddings=embeddings, ids=new_ids, metadatas=new_metadatas)
+    return {"success": True, "message": f"「{source}」を追加しました", "chunk_count": len(new_texts)}
