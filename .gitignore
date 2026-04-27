@@ -1,0 +1,14 @@
+# Python
+back/.venv/
+back/__pycache__/
+back/app/__pycache__/
+**/__pycache__/
+*.pyc
+
+# Node
+web/node_modules/
+web/dist/
+
+# 環境変数
+back/.env
+web/.env
