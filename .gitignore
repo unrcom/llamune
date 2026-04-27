@@ -12,3 +12,4 @@ web/dist/
 # 環境変数
 back/.env
 web/.env
+back/chroma_db_drug/

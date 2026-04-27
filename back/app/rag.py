@@ -6,7 +6,7 @@ from app.prompts import DRUG_SEARCH_PROMPT
 
 EMBED_MODEL = "BAAI/bge-m3"
 LLM_MODEL = "mlx-community/Qwen2.5-7B-Instruct-4bit"
-CHROMA_PATH = str(Path.home() / "dev/rag_eval/chroma_db_drug")
+CHROMA_PATH = str(Path.home() / "dev/llamune/back/chroma_db_drug")
 
 print("[RAG] Embeddingモデルをロード中...")
 embed_model = FlagModel(EMBED_MODEL, use_fp16=True)
