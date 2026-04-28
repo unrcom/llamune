@@ -1,10 +1,12 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import List
 from app.rag import search, embed_model
 from app.auth import get_current_user
 from app.dummy_data import get_facilities
 from app.dataset import get_sources, delete_source, add_wikipedia, refresh_source, get_chunks, update_chunk, delete_chunk, add_text
+from app.prompt_manager import get_prompts, add_prompt, update_prompt, delete_prompt, reorder_prompts
 
 app = FastAPI(title="llamune API")
 
@@ -19,6 +21,7 @@ app.add_middleware(
 
 class SearchRequest(BaseModel):
     symptom: str
+    prompt_order: int = 1
 
 class WikipediaAddRequest(BaseModel):
     title: str
@@ -31,6 +34,17 @@ class TextAddRequest(BaseModel):
 class ChunkUpdateRequest(BaseModel):
     text: str
 
+class PromptAddRequest(BaseModel):
+    name: str
+    content: str
+
+class PromptUpdateRequest(BaseModel):
+    name: str
+    content: str
+
+class PromptReorderRequest(BaseModel):
+    orders: List[dict]
+
 
 @app.get("/api/health")
 def health():
@@ -42,7 +56,7 @@ def drug_search(
     req: SearchRequest,
     current_user: str = Depends(get_current_user)
 ):
-    result = search(req.symptom)
+    result = search(req.symptom, req.prompt_order)
     return {"user": current_user, "symptom": req.symptom, **result}
 
 
@@ -122,4 +136,52 @@ def chunk_delete(chunk_id: str, current_user: str = Depends(get_current_user)):
     result = delete_chunk(chunk_id)
     if not result["success"]:
         raise HTTPException(status_code=404, detail=result["message"])
+    return result
+
+
+@app.get("/api/prompts")
+def prompts_list(current_user: str = Depends(get_current_user)):
+    return get_prompts()
+
+
+@app.post("/api/prompts")
+def prompt_add(
+    req: PromptAddRequest,
+    current_user: str = Depends(get_current_user)
+):
+    result = add_prompt(req.name, req.content)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
+
+
+@app.put("/api/prompts/{file:path}")
+def prompt_update(
+    file: str,
+    req: PromptUpdateRequest,
+    current_user: str = Depends(get_current_user)
+):
+    result = update_prompt(file, req.name, req.content)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
+    return result
+
+
+@app.delete("/api/prompts/{file:path}")
+def prompt_delete(
+    file: str,
+    current_user: str = Depends(get_current_user)
+):
+    result = delete_prompt(file)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
+
+
+@app.post("/api/prompts/reorder")
+def prompt_reorder(
+    req: PromptReorderRequest,
+    current_user: str = Depends(get_current_user)
+):
+    result = reorder_prompts(req.orders)
     return result

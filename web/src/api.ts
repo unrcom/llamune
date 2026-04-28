@@ -90,3 +90,34 @@ export const addText = async (source: string, text: string, separator: string = 
   const res = await client.post('/api/dataset/sources/text', { source, text, separator })
   return res.data
 }
+
+export interface Prompt {
+  order: number
+  file: string
+  name: string
+  content: string
+}
+
+export const getPrompts = async (): Promise<Prompt[]> => {
+  const res = await client.get('/api/prompts')
+  return res.data
+}
+
+export const addPrompt = async (name: string, content: string): Promise<{ message: string }> => {
+  const res = await client.post('/api/prompts', { name, content })
+  return res.data
+}
+
+export const updatePrompt = async (file: string, name: string, content: string): Promise<{ message: string }> => {
+  const res = await client.put(`/api/prompts/${encodeURIComponent(file)}`, { name, content })
+  return res.data
+}
+
+export const deletePrompt = async (file: string): Promise<{ message: string }> => {
+  const res = await client.delete(`/api/prompts/${encodeURIComponent(file)}`)
+  return res.data
+}
+
+export const reorderPrompts = async (orders: { file: string; order: number }[]): Promise<void> => {
+  await client.post('/api/prompts/reorder', { orders })
+}

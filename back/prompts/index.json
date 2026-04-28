@@ -1,0 +1,12 @@
+[
+  {
+    "order": 1,
+    "file": "drug_search.txt",
+    "name": "標準"
+  },
+  {
+    "order": 2,
+    "file": "シンプル版.txt",
+    "name": "シンプル版"
+  }
+]

@@ -2,7 +2,7 @@ import chromadb
 from FlagEmbedding import FlagModel
 from mlx_lm import load, generate
 from pathlib import Path
-from app.prompts import DRUG_SEARCH_PROMPT
+from app.prompt_manager import get_active_prompt
 
 EMBED_MODEL = "BAAI/bge-m3"
 LLM_MODEL = "mlx-community/Qwen2.5-7B-Instruct-4bit"
@@ -18,7 +18,7 @@ client = chromadb.PersistentClient(path=CHROMA_PATH)
 collection = client.get_or_create_collection("drug_rag")
 
 
-def search(symptom: str, n_results: int = 5) -> dict:
+def search(symptom: str, prompt_order: int = 1, n_results: int = 5) -> dict:
     query_embedding = embed_model.encode([symptom]).tolist()
     results = collection.query(
         query_embeddings=query_embedding,
@@ -38,7 +38,8 @@ def search(symptom: str, n_results: int = 5) -> dict:
         [f"【{meta['source']}】\n{doc}" for doc, meta in zip(retrieved_docs, metadatas)]
     )
 
-    prompt_text = DRUG_SEARCH_PROMPT.format(context=context, symptom=symptom)
+    prompt_template = get_active_prompt(prompt_order)
+    prompt_text = prompt_template.format(context=context, symptom=symptom)
 
     messages = [{"role": "user", "content": prompt_text}]
     prompt = tokenizer.apply_chat_template(
