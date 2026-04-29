@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: "",
   headers: {
     'X-API-Key': import.meta.env.VITE_API_KEY,
   },
@@ -31,8 +31,8 @@ export interface Facility {
   has_pharmacist?: boolean
 }
 
-export const searchDrug = async (symptom: string): Promise<SearchResult> => {
-  const res = await client.post('/api/search', { symptom })
+export const searchDrug = async (symptom: string, promptOrder: number = 1): Promise<SearchResult> => {
+  const res = await client.post('/api/search', { symptom, prompt_order: promptOrder })
   return res.data
 }
 
