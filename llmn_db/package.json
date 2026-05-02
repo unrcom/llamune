@@ -1,0 +1,14 @@
+{
+  "name": "llmn_db",
+  "version": "1.0.0",
+  "scripts": {
+    "migrate:up": "node-pg-migrate up",
+    "migrate:down": "node-pg-migrate down",
+    "migrate:create": "node-pg-migrate create"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "node-pg-migrate": "^7.0.0",
+    "pg": "^8.0.0"
+  }
+}

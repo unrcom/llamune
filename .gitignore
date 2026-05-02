@@ -1,0 +1,19 @@
+# Python
+back/.venv/
+**/__pycache__/
+*.pyc
+
+# Node
+web/node_modules/
+llmn_db/node_modules/
+
+# 環境変数
+.env
+back/.env
+llmn_db/.env
+
+# Mac
+.DS_Store
+
+# MLX
+adapters/
