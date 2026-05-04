@@ -39,6 +39,29 @@ class LocalModelResponse(BaseModel):
     registered: bool  # DBに登録済みかどうか
 
 
+@router.get("/local-adapters")
+def get_local_adapters(
+    _=Depends(get_current_user),
+):
+    """~/llmn_adapters/ 以下のアダプター一覧を返す"""
+    adapters_dir = Path.home() / "llmn_adapters"
+    if not adapters_dir.exists():
+        return []
+
+    adapters = []
+    for entry in sorted(adapters_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        # adapters.safetensors が存在するか確認
+        if (entry / "adapters.safetensors").exists():
+            adapters.append({
+                "path": str(entry),
+                "name": entry.name,
+            })
+
+    return adapters
+
+
 @router.get("/local", response_model=list[LocalModelResponse])
 def get_local_models(
     db: Session = Depends(get_db),
@@ -101,6 +124,29 @@ def create_model(
         parent_models_id=model_in.parent_models_id,
     )
     db.add(model)
+    db.commit()
+    db.refresh(model)
+    return model
+
+
+class ModelUpdate(BaseModel):
+    display_name: str
+    adapter_path: Optional[str] = None
+
+
+@router.put("/{model_id}", response_model=ModelResponse)
+def update_model(
+    model_id: int,
+    model_in: ModelUpdate,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    model = db.query(Model).filter(Model.id == model_id).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="モデルが見つかりません")
+    model.display_name = model_in.display_name
+    if model.model_type == "fine-tuned":
+        model.adapter_path = model_in.adapter_path
     db.commit()
     db.refresh(model)
     return model

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import auth, models, projects, question_sets, ft_conversations
+from app.api.routes import auth, models, projects, question_sets, ft_conversations, training_jobs
 
 app = FastAPI(title="llmn API", version="1.0.0")
 
@@ -17,6 +17,7 @@ app.include_router(models.router)
 app.include_router(projects.router)
 app.include_router(question_sets.router)
 app.include_router(ft_conversations.router)
+app.include_router(training_jobs.router)
 
 
 @app.get("/health")

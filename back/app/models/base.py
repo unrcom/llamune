@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, Boolean, ForeignKey, Float
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
@@ -91,3 +91,24 @@ class FtConversation(Base):
     split      = Column(String(10), nullable=False, default="train")
     messages   = Column(JSONB, nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+
+
+class TrainingJob(Base):
+    __tablename__ = "training_jobs"
+    __table_args__ = {"schema": SCHEMA}
+
+    id             = Column(Integer, primary_key=True)
+    project_id     = Column(Integer, ForeignKey(f"{SCHEMA}.projects.id", ondelete="CASCADE"), nullable=False)
+    models_id      = Column(Integer, ForeignKey(f"{SCHEMA}.models.id"), nullable=False)
+    status         = Column(String(20), nullable=False, default="pending")
+    training_mode  = Column(Integer, nullable=False, default=2)
+    max_seq_length = Column(Integer, nullable=False, default=8192)
+    iters          = Column(Integer, nullable=False, default=100)
+    batch_size     = Column(Integer, nullable=False, default=1)
+    learning_rate  = Column(Float, nullable=True)
+    adapter_path   = Column(Text, nullable=True)
+    error_message  = Column(Text, nullable=True)
+    log            = Column(Text, nullable=True)
+    started_at     = Column(TIMESTAMP, nullable=True)
+    finished_at    = Column(TIMESTAMP, nullable=True)
+    created_at     = Column(TIMESTAMP, server_default=func.now(), nullable=False)

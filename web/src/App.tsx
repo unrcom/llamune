@@ -5,6 +5,7 @@ import LoginPage from '@/pages/LoginPage'
 import ProjectsPage from '@/pages/ProjectsPage'
 import ModelsPage from '@/pages/ModelsPage'
 import FtDataPage from '@/pages/FtDataPage'
+import JobsPage from '@/pages/JobsPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   return getToken() ? <>{children}</> : <Navigate to="/login" replace />
@@ -24,9 +25,7 @@ function DatasetPage() {
   return <div className="p-6 text-gray-500">データセット管理（未実装）</div>
 }
 
-function JobsPage() {
-  return <div className="p-6 text-gray-500">訓練ジョブ（未実装）</div>
-}
+
 
 export default function App() {
   return (
@@ -40,7 +39,7 @@ export default function App() {
           <Route path="/admin/projects" element={<RequireAdmin><ProjectsPage /></RequireAdmin>} />
           <Route path="/admin/models"   element={<RequireAdmin><ModelsPage /></RequireAdmin>} />
           <Route path="/admin/ft-data"  element={<RequireAdmin><FtDataPage /></RequireAdmin>} />
-          <Route path="/admin/jobs"     element={<RequireAdmin><JobsPage /></RequireAdmin>} />
+          <Route path="/admin/jobs" element={<RequireAdmin><JobsPage /></RequireAdmin>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

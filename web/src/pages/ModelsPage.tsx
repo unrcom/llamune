@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, Search, Loader2, HardDrive } from 'lucide-react'
+import { Plus, Trash2, Search, Loader2, HardDrive, Pencil, Check, X } from 'lucide-react'
 
 interface Model {
   id: number
@@ -20,6 +20,11 @@ interface LocalModel {
   name: string
   display_name: string
   registered: boolean
+}
+
+interface LocalAdapter {
+  path: string
+  name: string
 }
 
 interface HFModel {
@@ -51,6 +56,10 @@ export default function ModelsPage() {
   const [adapterPath, setAdapterPath] = useState('')
   const [parentModelId, setParentModelId] = useState<number | null>(null)
   const [adding, setAdding] = useState(false)
+  const [localAdapters, setLocalAdapters] = useState<LocalAdapter[]>([])
+  const [editingModelId, setEditingModelId] = useState<number | null>(null)
+  const [editDisplayName, setEditDisplayName] = useState('')
+  const [editAdapterPath, setEditAdapterPath] = useState('')
 
   // ローカルモデル
   const [localModels, setLocalModels] = useState<LocalModel[]>([])
@@ -91,6 +100,9 @@ export default function ModelsPage() {
   useEffect(() => {
     load()
     loadLocal()
+    apiClient.get('/models/local-adapters')
+      .then(res => setLocalAdapters(res.data))
+      .catch(() => {})
   }, [])
 
   function selectLocal(m: LocalModel) {
@@ -140,6 +152,29 @@ export default function ModelsPage() {
       setFileSize('取得失敗')
     } finally {
       setFileSizeLoading(false)
+    }
+  }
+
+  function startEdit(m: Model) {
+    setEditingModelId(m.id)
+    setEditDisplayName(m.display_name)
+    setEditAdapterPath(m.adapter_path || '')
+  }
+
+  function cancelEdit() {
+    setEditingModelId(null)
+  }
+
+  async function handleUpdate(m: Model) {
+    try {
+      await apiClient.put(`/models/${m.id}`, {
+        display_name: editDisplayName,
+        adapter_path: editAdapterPath || null,
+      })
+      setEditingModelId(null)
+      await load()
+    } catch (e: any) {
+      setError(e.response?.data?.detail || '更新に失敗しました')
     }
   }
 
@@ -347,11 +382,16 @@ export default function ModelsPage() {
             <>
               <div className="space-y-1">
                 <Label>アダプターパス</Label>
-                <Input
+                <select
+                  className="w-full border rounded px-3 py-2 text-sm bg-white"
                   value={adapterPath}
                   onChange={e => setAdapterPath(e.target.value)}
-                  placeholder="~/llmn_models/1"
-                />
+                >
+                  <option value="">選択してください</option>
+                  {localAdapters.map(a => (
+                    <option key={a.path} value={a.path}>{a.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1">
                 <Label>ベースモデル</Label>
@@ -383,22 +423,62 @@ export default function ModelsPage() {
         ) : (
           models.map(m => (
             <Card key={m.id}>
-              <CardContent className="flex items-center justify-between py-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{m.display_name}</span>
-                    <Badge variant={m.model_type === 'base' ? 'outline' : 'secondary'}>
-                      {m.model_type === 'base' ? 'ベース' : 'FT済み'}
-                    </Badge>
+              <CardContent className="py-3">
+                {editingModelId === m.id ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        className="flex-1 border rounded px-2 py-1 text-sm"
+                        value={editDisplayName}
+                        onChange={e => setEditDisplayName(e.target.value)}
+                        placeholder="表示名"
+                      />
+                    </div>
+                    {m.model_type === 'fine-tuned' && (
+                      <select
+                        className="w-full border rounded px-2 py-1 text-sm bg-white"
+                        value={editAdapterPath}
+                        onChange={e => setEditAdapterPath(e.target.value)}
+                      >
+                        <option value="">なし</option>
+                        {localAdapters.map(a => (
+                          <option key={a.path} value={a.path}>{a.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleUpdate(m)}>
+                        <Check className="h-3 w-3 mr-1" />保存
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                        <X className="h-3 w-3 mr-1" />キャンセル
+                      </Button>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 font-mono">{m.name}</p>
-                  {m.adapter_path && (
-                    <p className="text-xs text-gray-400">adapter: {m.adapter_path}</p>
-                  )}
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => handleDelete(m.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{m.display_name}</span>
+                        <Badge variant={m.model_type === 'base' ? 'outline' : 'secondary'}>
+                          {m.model_type === 'base' ? 'ベース' : 'FT済み'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-500 font-mono">{m.name}</p>
+                      {m.adapter_path && (
+                        <p className="text-xs text-gray-400">adapter: {m.adapter_path}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => startEdit(m)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(m.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))
