@@ -112,3 +112,15 @@ class TrainingJob(Base):
     started_at     = Column(TIMESTAMP, nullable=True)
     finished_at    = Column(TIMESTAMP, nullable=True)
     created_at     = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+
+
+class Dataset(Base):
+    __tablename__ = "datasets"
+    __table_args__ = {"schema": SCHEMA}
+
+    id           = Column(Integer, primary_key=True)
+    project_id   = Column(Integer, ForeignKey(f"{SCHEMA}.projects.id", ondelete="CASCADE"), nullable=False)
+    name         = Column(String(100), nullable=False, unique=True)
+    display_name = Column(String(100), nullable=False)
+    description  = Column(Text, nullable=True)
+    created_at   = Column(TIMESTAMP, server_default=func.now(), nullable=False)
