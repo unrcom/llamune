@@ -11,16 +11,31 @@ interface Model {
   display_name: string
   model_type: string
   adapter_path: string | null
+  system_prompt: string | null
+}
+
+interface Dataset {
+  id: number
+  display_name: string
+}
+
+interface Project {
+  id: number
+  display_name: string
 }
 
 interface Message {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'tool'
   content: string
 }
 
 export default function ChatPage() {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
   const [models, setModels] = useState<Model[]>([])
+  const [datasets, setDatasets] = useState<Dataset[]>([])
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null)
+  const [selectedDatasetId, setSelectedDatasetId] = useState<number | null>(null)
   const [systemPrompt, setSystemPrompt] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -32,6 +47,7 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    apiClient.get('/projects').then(res => setProjects(res.data))
     apiClient.get('/models').then(res => setModels(res.data))
     apiClient.get('/validate/status').then(res => {
       if (res.data.loaded) {
@@ -42,10 +58,38 @@ export default function ChatPage() {
   }, [])
 
   useEffect(() => {
+    if (!selectedProjectId) { setDatasets([]); return }
+    apiClient.get(`/datasets?project_id=${selectedProjectId}`).then(res => setDatasets(res.data))
+  }, [selectedProjectId])
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const selectedModel = models.find(m => m.id === selectedModelId)
+
+  useEffect(() => {
+    if (!selectedModel) return
+    if (selectedModel.system_prompt) {
+      setSystemPrompt(selectedModel.system_prompt)
+    } else {
+      setSystemPrompt('')
+    }
+    setLoadingModel(true)
+    setError(null)
+    apiClient.post('/validate/load', {
+      model_name: selectedModel.name,
+      adapter_path: selectedModel.adapter_path,
+    }).then(() => {
+      setLoadedModelName(selectedModel.name)
+      setLoadedAdapterPath(selectedModel.adapter_path)
+      setMessages([])
+    }).catch((e: any) => {
+      setError(e.response?.data?.detail || 'モデルのロードに失敗しました')
+    }).finally(() => {
+      setLoadingModel(false)
+    })
+  }, [selectedModelId])
 
   async function handleLoadModel() {
     if (!selectedModel) return
@@ -76,11 +120,14 @@ export default function ChatPage() {
     setError(null)
     try {
       const res = await apiClient.post('/validate/generate', {
-        messages: newMessages,
+        messages: newMessages.filter(m => m.role !== 'tool'),
         system_prompt: systemPrompt || null,
         max_tokens: 512,
+        dataset_id: selectedDatasetId || null,
       })
-      setMessages([...newMessages, { role: 'assistant', content: res.data.result }])
+      // バックエンドから返ってきたmessages（tool含む）で更新
+      const assistantMsg: Message = { role: 'assistant', content: res.data.result }
+      setMessages([...newMessages, assistantMsg])
     } catch (e: any) {
       setError(e.response?.data?.detail || '生成に失敗しました')
     } finally {
@@ -108,21 +155,12 @@ export default function ChatPage() {
           >
             <option value="">-- 選択 --</option>
             {models.map(m => (
-              <option key={m.id} value={m.id}>
-                {m.display_name}
-              </option>
+              <option key={m.id} value={m.id}>{m.display_name}</option>
             ))}
           </select>
         </div>
 
-        <Button
-          size="sm"
-          onClick={handleLoadModel}
-          disabled={!selectedModelId || loadingModel}
-          className="w-full"
-        >
-          {loadingModel ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />ロード中...</> : 'モデルをロード'}
-        </Button>
+
 
         {loadedModelName && (
           <div className="text-xs text-green-600 bg-green-50 rounded p-2 break-all space-y-1">
@@ -135,10 +173,36 @@ export default function ChatPage() {
         )}
 
         <div>
+          <Label className="text-xs text-gray-500 mb-1 block">プロジェクト</Label>
+          <select
+            className="w-full border rounded px-2 py-1.5 text-sm"
+            value={selectedProjectId ?? ''}
+            onChange={e => setSelectedProjectId(Number(e.target.value) || null)}
+          >
+            <option value="">-- 選択 --</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.display_name}</option>)}
+          </select>
+        </div>
+
+        {selectedProjectId && (
+          <div>
+            <Label className="text-xs text-gray-500 mb-1 block">データセット（省略可）</Label>
+            <select
+              className="w-full border rounded px-2 py-1.5 text-sm"
+              value={selectedDatasetId ?? ''}
+              onChange={e => setSelectedDatasetId(Number(e.target.value) || null)}
+            >
+              <option value="">-- なし --</option>
+              {datasets.map(d => <option key={d.id} value={d.id}>{d.display_name}</option>)}
+            </select>
+          </div>
+        )}
+
+        <div>
           <Label className="text-xs text-gray-500 mb-1 block">システムプロンプト</Label>
           <Textarea
             className="text-sm"
-            rows={6}
+            rows={5}
             placeholder="省略可"
             value={systemPrompt}
             onChange={e => setSystemPrompt(e.target.value)}
@@ -168,8 +232,11 @@ export default function ChatPage() {
               <div className={`max-w-[75%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap ${
                 msg.role === 'user'
                   ? 'bg-blue-600 text-white'
+                  : msg.role === 'tool'
+                  ? 'bg-gray-100 text-gray-500 text-xs font-mono'
                   : 'bg-white border text-gray-800'
               }`}>
+                {msg.role === 'tool' && <div className="text-xs text-gray-400 mb-1">🔍 検索結果</div>}
                 {msg.content}
               </div>
             </div>

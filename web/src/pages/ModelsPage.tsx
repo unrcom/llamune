@@ -171,6 +171,7 @@ export default function ModelsPage() {
         display_name: editDisplayName,
         adapter_path: editAdapterPath || null,
       })
+      setError(null)
       setEditingModelId(null)
       await load()
     } catch (e: any) {

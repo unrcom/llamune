@@ -3,7 +3,14 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 
-Base = declarative_base()
+class StrictBase:
+    def __setattr__(self, key, value):
+        if not key.startswith('_') and hasattr(self.__class__, '__table__'):
+            if key not in self.__class__.__table__.columns.keys():
+                raise AttributeError(f"Column '{key}' does not exist in {self.__class__.__name__}")
+        super().__setattr__(key, value)
+
+Base = declarative_base(cls=StrictBase)
 SCHEMA = "llmn"
 
 

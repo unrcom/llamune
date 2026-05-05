@@ -1,6 +1,8 @@
+import re
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from app.core.auth import get_current_user
 from app.core import llm
 
@@ -16,12 +18,32 @@ class GenerateRequest(BaseModel):
     messages: list
     system_prompt: Optional[str] = None
     max_tokens: int = 512
+    dataset_id: Optional[int] = None
 
 
 class StatusResponse(BaseModel):
     loaded: bool
     model_name: Optional[str]
     adapter_path: Optional[str]
+
+
+def _search_chroma(query: str, dataset_id: int, db) -> str:
+    import chromadb
+    from app.models.base import Dataset
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+    if not dataset:
+        return "検索結果なし"
+    chroma_path = os.path.expanduser("~/dev/llmn/chroma_db")
+    client = chromadb.PersistentClient(path=chroma_path)
+    try:
+        collection = client.get_collection(dataset.name)
+        results = collection.query(query_texts=[query], n_results=3)
+        docs = results.get("documents", [[]])[0]
+        if not docs:
+            return "検索結果なし"
+        return "検索結果: [ " + ", ".join(docs) + " ]"
+    except Exception as e:
+        return f"検索エラー: {str(e)}"
 
 
 @router.get("/status", response_model=StatusResponse)
@@ -44,12 +66,42 @@ def load_model(req: LoadRequest, _=Depends(get_current_user)):
 
 @router.post("/generate")
 def generate(req: GenerateRequest, _=Depends(get_current_user)):
+    from app.db.database import get_db
+    from sqlalchemy.orm import Session
+
     if not llm.is_model_loaded():
         raise HTTPException(status_code=400, detail="モデルがロードされていません")
+
     try:
-        # 最後のuserメッセージを取得
-        user_msg = next((m["content"] for m in reversed(req.messages) if m["role"] == "user"), "")
-        result = llm.generate(user_msg, req.system_prompt, req.max_tokens)
-        return {"result": result}
+        # メッセージ履歴を構築
+        messages = []
+        if req.system_prompt:
+            messages.append({"role": "system", "content": req.system_prompt})
+        messages.extend(req.messages)
+
+        # 1回目の推論
+        result = llm.generate_with_messages(messages, req.max_tokens)
+
+        # [SEARCH]...[/SEARCH] を検出
+        search_match = re.search(r'\[SEARCH\](.*?)\[/SEARCH\]', result)
+        if search_match and req.dataset_id:
+            query = search_match.group(1)
+
+            # assistantメッセージ（検索トークン）を追加
+            messages.append({"role": "assistant", "content": result})
+
+            # ChromaDB検索
+            db_gen = get_db()
+            db = next(db_gen)
+            search_result = _search_chroma(query, req.dataset_id, db)
+
+            # toolメッセージを追加
+            messages.append({"role": "tool", "content": f'"content": "{search_result}"'})
+
+            # 2回目の推論（最終回答）
+            result = llm.generate_with_messages(messages, req.max_tokens)
+
+        return {"result": result, "messages": messages}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

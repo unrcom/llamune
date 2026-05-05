@@ -17,7 +17,7 @@ class ModelCreate(BaseModel):
     name: str
     display_name: str
     model_type: str = "base"
-    adapter_path: Optional[str] = None
+    adapter_path: Optional[str]
     parent_models_id: Optional[int] = None
 
 
@@ -27,7 +27,7 @@ class ModelResponse(BaseModel):
     display_name: str
     model_type: str
     adapter_path: Optional[str]
-    parent_models_id: Optional[int]
+    parent_models_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -131,7 +131,7 @@ def create_model(
 
 class ModelUpdate(BaseModel):
     display_name: str
-    adapter_path: Optional[str] = None
+    adapter_path: Optional[str]
 
 
 @router.put("/{model_id}", response_model=ModelResponse)

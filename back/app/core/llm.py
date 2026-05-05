@@ -64,3 +64,24 @@ def get_current_adapter_path() -> Optional[str]:
 
 def is_model_loaded() -> bool:
     return _model is not None
+
+
+def generate_with_messages(messages: list, max_tokens: int = 512) -> str:
+    global _model, _tokenizer
+    with _lock:
+        if _model is None or _tokenizer is None:
+            raise RuntimeError("モデルがロードされていません")
+        from mlx_lm import generate as mlx_generate
+        template_kwargs = {"tokenize": False, "add_generation_prompt": True}
+        formatted = _tokenizer.apply_chat_template(messages, **template_kwargs)
+        result = mlx_generate(
+            _model,
+            _tokenizer,
+            prompt=formatted,
+            max_tokens=max_tokens,
+            verbose=False,
+        )
+        if "<|channel|>final<|message|>" in result:
+            result = result.split("<|channel|>final<|message|>")[-1]
+            result = result.replace("<|end|>", "").strip()
+        return result
