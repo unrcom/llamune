@@ -18,6 +18,7 @@ interface FtConversation {
   messages: MessageTurn[]
   created_at: string
 }
+interface SystemPrompt { id: number; project_id: number; name: string; content: string }
 
 const ROLES = ['system', 'user', 'assistant', 'tool'] as const
 type Role = typeof ROLES[number]
@@ -41,6 +42,7 @@ export default function FtDataPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
   const [conversations, setConversations] = useState<FtConversation[]>([])
   const [bases, setBases] = useState<FtConversation[]>([])
+  const [systemPrompt, setSystemPrompt] = useState<SystemPrompt | null>(null)
 
   // 編集エリア
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -50,14 +52,16 @@ export default function FtDataPage() {
 
   function handleSplitChange(newSplit: 'train' | 'valid') {
     if (newSplit === 'valid') {
-      // validに切り替えたらsystem/userのみ残す
       setMessages(prev => prev.filter(m => m.role === 'system' || m.role === 'user'))
     }
     setSplit(newSplit)
   }
+
   const [messages, setMessages] = useState<MessageTurn[]>([
     { role: 'system', content: '' },
     { role: 'user', content: '' },
+    { role: 'assistant', content: '' },
+    { role: 'tool', content: '' },
     { role: 'assistant', content: '' },
   ])
   const [saving, setSaving] = useState(false)
@@ -78,25 +82,58 @@ export default function FtDataPage() {
     }
   }
 
+  async function loadSystemPrompt(projectId: number) {
+    try {
+      const res = await apiClient.get(`/system-prompts?project_id=${projectId}`)
+      const list: SystemPrompt[] = res.data
+      setSystemPrompt(list.length > 0 ? list[0] : null)
+    } catch {
+      setSystemPrompt(null)
+    }
+  }
+
   useEffect(() => {
-    if (!selectedProjectId) return
+    if (!selectedProjectId) {
+      setSystemPrompt(null)
+      return
+    }
     loadConversations(selectedProjectId)
+    loadSystemPrompt(selectedProjectId)
   }, [selectedProjectId])
+
+  // systemPromptが取得されたら編集エリアのsystemメッセージを更新
+  useEffect(() => {
+    if (!systemPrompt) return
+    setMessages(prev => prev.map(m =>
+      m.role === 'system' ? { ...m, content: systemPrompt.content } : m
+    ))
+  }, [systemPrompt])
+
+  function buildInitialMessages(): MessageTurn[] {
+    return [
+      { role: 'system', content: systemPrompt?.content ?? '' },
+      { role: 'user', content: '' },
+      { role: 'assistant', content: '' },
+      { role: 'tool', content: '' },
+      { role: 'assistant', content: '' },
+    ]
+  }
 
   function newPattern() {
     setEditingId(null)
     setIsBase(false)
     setBaseId(null)
     setSplit('train')
-    setMessages([
-      { role: 'user', content: '' },
-      { role: 'assistant', content: '' },
-    ])
+    setMessages(buildInitialMessages())
     setError('')
   }
 
   function newBase() {
+    setEditingId(null)
     setIsBase(true)
+    setBaseId(null)
+    setSplit('train')
+    setMessages(buildInitialMessages())
     setError('')
   }
 
@@ -105,7 +142,11 @@ export default function FtDataPage() {
     setIsBase(conv.is_base)
     setBaseId(conv.base_id)
     setSplit(conv.split as 'train' | 'valid')
-    setMessages(conv.messages)
+    // systemロールの内容はプロジェクトのシステムプロンプトで上書き
+    const msgs = conv.messages.map(m =>
+      m.role === 'system' ? { ...m, content: systemPrompt?.content ?? m.content } : m
+    )
+    setMessages(msgs)
     setError('')
   }
 
@@ -113,7 +154,10 @@ export default function FtDataPage() {
     setEditingId(null)
     setIsBase(false)
     setBaseId(base.id)
-    setMessages([...base.messages])
+    const msgs = base.messages.map(m =>
+      m.role === 'system' ? { ...m, content: systemPrompt?.content ?? m.content } : m
+    )
+    setMessages(msgs)
     setError('')
   }
 
@@ -132,7 +176,6 @@ export default function FtDataPage() {
   }
 
   async function handleSave() {
-    console.log("[save] selectedProjectId:", selectedProjectId, "editingId:", editingId, "isBase:", isBase)
     if (!selectedProjectId) return
     setSaving(true)
     setError('')
@@ -163,7 +206,10 @@ export default function FtDataPage() {
     setIsBase(false)
     setBaseId(conv.base_id)
     setSplit('train')
-    setMessages([...conv.messages])
+    const msgs = conv.messages.map(m =>
+      m.role === 'system' ? { ...m, content: systemPrompt?.content ?? m.content } : m
+    )
+    setMessages(msgs)
     setError('')
   }
 
@@ -271,26 +317,33 @@ export default function FtDataPage() {
               {messages.map((msg, i) => (
                 <div key={i} className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <select
-                      className="border rounded px-2 py-1 text-xs bg-white w-28"
-                      value={msg.role}
-                      onChange={e => updateMessage(i, 'role', e.target.value)}
-                    >
-                      {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
+                    {msg.role === 'system' ? (
+                      <span className="border rounded px-2 py-1 text-xs bg-gray-50 w-28 text-gray-500">system</span>
+                    ) : (
+                      <select
+                        className="border rounded px-2 py-1 text-xs bg-white w-28"
+                        value={msg.role}
+                        onChange={e => updateMessage(i, 'role', e.target.value)}
+                      >
+                        {ROLES.filter(r => r !== 'system').map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    )}
                     <span className={`text-xs px-2 py-0.5 rounded ${ROLE_COLORS[msg.role] || ''}`}>
                       {ROLE_LABELS[msg.role] || msg.role}
                     </span>
-                    <Button variant="ghost" size="sm" className="ml-auto h-6 w-6 p-0" onClick={() => deleteTurn(i)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    {msg.role !== 'system' && (
+                      <Button variant="ghost" size="sm" className="ml-auto h-6 w-6 p-0" onClick={() => deleteTurn(i)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                   <Textarea
                     value={msg.content}
-                    onChange={e => updateMessage(i, 'content', e.target.value)}
-                    rows={3}
-                    className="text-sm font-mono"
-                    placeholder={`${msg.role}の内容を入力`}
+                    onChange={e => msg.role !== 'system' && updateMessage(i, 'content', e.target.value)}
+                    rows={msg.role === 'system' ? 3 : 3}
+                    className={`text-sm font-mono ${msg.role === 'system' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                    placeholder={msg.role === 'system' ? '（システムプロンプトが設定されていません）' : `${msg.role}の内容を入力`}
+                    readOnly={msg.role === 'system'}
                   />
                 </div>
               ))}

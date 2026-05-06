@@ -26,7 +26,6 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const [name, setName] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [adding, setAdding] = useState(false)
 
@@ -37,7 +36,6 @@ export default function ProjectsPage() {
     try {
       const res = await apiClient.get('/projects')
       setProjects(res.data)
-      // 各プロジェクトのシステムプロンプトを取得
       const spMap: Record<number, SystemPrompt> = {}
       await Promise.all(res.data.map(async (p: Project) => {
         const spRes = await apiClient.get(`/system-prompts?project_id=${p.id}`)
@@ -54,11 +52,10 @@ export default function ProjectsPage() {
   useEffect(() => { load() }, [])
 
   async function handleAdd() {
-    if (!name.trim() || !displayName.trim()) return
+    if (!displayName.trim()) return
     setAdding(true)
     try {
-      await apiClient.post('/projects', { name, display_name: displayName })
-      setName('')
+      await apiClient.post('/projects', { display_name: displayName })
       setDisplayName('')
       await load()
     } catch (e: any) {
@@ -112,25 +109,15 @@ export default function ProjectsPage() {
       <Card>
         <CardHeader><CardTitle className="text-base">プロジェクトを追加</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>プロジェクト名（英数字）</Label>
-              <Input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="medical_rag"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>表示名</Label>
-              <Input
-                value={displayName}
-                onChange={e => setDisplayName(e.target.value)}
-                placeholder="医療相談RAG"
-              />
-            </div>
+          <div className="space-y-1">
+            <Label>表示名</Label>
+            <Input
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              placeholder="医療相談RAG"
+            />
           </div>
-          <Button onClick={handleAdd} disabled={adding || !name.trim() || !displayName.trim()}>
+          <Button onClick={handleAdd} disabled={adding || !displayName.trim()}>
             <Plus className="h-4 w-4 mr-2" />
             {adding ? '追加中...' : '追加'}
           </Button>
@@ -146,10 +133,7 @@ export default function ProjectsPage() {
             <Card key={p.id}>
               <CardContent className="py-3 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-sm">{p.display_name}</p>
-                    <p className="text-xs text-gray-500">{p.name}</p>
-                  </div>
+                  <p className="font-medium text-sm">{p.display_name}</p>
                   <Button variant="ghost" size="sm" onClick={() => handleDelete(p.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>

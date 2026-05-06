@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -9,7 +10,6 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 
 class ProjectCreate(BaseModel):
-    name: str
     display_name: str
 
 
@@ -36,10 +36,8 @@ def create_project(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    existing = db.query(Project).filter(Project.name == project_in.name).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="同じ名前のプロジェクトが既に存在します")
-    project = Project(name=project_in.name, display_name=project_in.display_name)
+    auto_name = f"proj-{uuid.uuid4().hex[:12]}"
+    project = Project(name=auto_name, display_name=project_in.display_name)
     db.add(project)
     db.commit()
     db.refresh(project)
