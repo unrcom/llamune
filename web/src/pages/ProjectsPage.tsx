@@ -110,7 +110,7 @@ export default function ProjectsPage() {
         <CardHeader><CardTitle className="text-base">プロジェクトを追加</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1">
-            <Label>表示名</Label>
+            <Label>プロジェクト名</Label>
             <Input
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
