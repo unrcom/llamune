@@ -15,6 +15,9 @@ export default function DatasetPage() {
   const [dataset, setDataset] = useState<Dataset | null>(null)
   const [documents, setDocuments] = useState<Document[]>([])
 
+  // データセット作成
+  const [creatingDataset, setCreatingDataset] = useState(false)
+
   // ドキュメント追加
   const [newDocContent, setNewDocContent] = useState('')
   const [showAddDoc, setShowAddDoc] = useState(false)
@@ -56,6 +59,38 @@ export default function DatasetPage() {
       .catch(() => setError('データの読み込みに失敗しました'))
       .finally(() => setLoading(false))
   }, [selectedProjectId])
+
+  async function createDataset() {
+    if (!selectedProjectId) return
+    const project = projects.find(p => p.id === selectedProjectId)
+    if (!project) return
+    setCreatingDataset(true)
+    setError(null)
+    try {
+      const res = await apiClient.post('/datasets', {
+        project_id: selectedProjectId,
+        display_name: project.display_name,
+      })
+      setDataset(res.data)
+      setDocuments([])
+    } catch (e: any) {
+      setError(e.response?.data?.detail || 'データセットの作成に失敗しました')
+    } finally {
+      setCreatingDataset(false)
+    }
+  }
+
+  async function deleteDataset() {
+    if (!dataset || !confirm(`データセット「${dataset.display_name}」を削除しますか？\nドキュメントもすべて削除されます。`)) return
+    setError(null)
+    try {
+      await apiClient.delete(`/datasets/${dataset.id}`)
+      setDataset(null)
+      setDocuments([])
+    } catch (e: any) {
+      setError(e.response?.data?.detail || 'データセットの削除に失敗しました')
+    }
+  }
 
   async function addDocument() {
     if (!newDocContent.trim() || !dataset) return
@@ -112,7 +147,13 @@ export default function DatasetPage() {
           {loading ? (
             <div className="text-sm text-gray-400">読み込み中...</div>
           ) : !dataset ? (
-            <div className="text-sm text-gray-400">このプロジェクトにはデータセットがありません</div>
+            <div className="border rounded p-4 bg-gray-50 space-y-3">
+              <p className="text-sm text-gray-500">このプロジェクトにはデータセットがありません。</p>
+              <Button size="sm" onClick={createDataset} disabled={creatingDataset}>
+                <Plus className="h-3 w-3 mr-1" />{creatingDataset ? '作成中...' : 'データセットを作成'}
+              </Button>
+              {error && <div className="text-red-500 text-sm">{error}</div>}
+            </div>
           ) : (
             <div className="space-y-4">
 
@@ -122,9 +163,14 @@ export default function DatasetPage() {
                   <span className="text-sm font-medium text-gray-700">{dataset.display_name}</span>
                   <span className="ml-2 text-xs text-gray-400">{documents.length} 件</span>
                 </div>
-                <Button size="sm" onClick={() => { setShowAddDoc(v => !v); setError(null) }}>
-                  <Plus className="h-3 w-3 mr-1" /> 追加
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => { setShowAddDoc(v => !v); setError(null) }}>
+                    <Plus className="h-3 w-3 mr-1" /> 追加
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={deleteDataset} className="text-red-500 hover:text-red-700 hover:border-red-300">
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
 
               {error && <div className="text-red-500 text-sm">{error}</div>}

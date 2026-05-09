@@ -8,3 +8,4 @@ passlib[bcrypt]
 mlx-lm
 python-multipart
 mlx-vlm
+chromadb
