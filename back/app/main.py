@@ -1,8 +1,21 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import auth, models, projects, question_sets, ft_conversations, training_jobs, validate, datasets, system_prompts
 
-app = FastAPI(title="llmn API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # uvicorn メインスレッドで mlx_vlm.generate をインポートし
+    # generation_stream をメインスレッドに初期化する
+    try:
+        import mlx_vlm.generate  # noqa: F401
+    except Exception:
+        pass
+    yield
+
+
+app = FastAPI(title="llmn API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
