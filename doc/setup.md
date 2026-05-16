@@ -159,9 +159,12 @@ cp .env.example .env
 DATABASE_URL=postgresql://llmn:llmn@localhost:5434/llmndb
 JWT_SECRET=your-secret-key-here
 JWT_EXPIRE_MINUTES=60
+CHROMA_DB_DIR=/path/to/llamune/chroma_db
+ADAPTER_DIR=/path/to/llamune/adapters
 ```
 
 > ⚠️ バックエンド（SQLAlchemy）では `postgresql://` を使用してください。`postgres://` ではエラーになります。
+> 💡 `CHROMA_DB_DIR` と `ADAPTER_DIR` はデータの保存先です。llamune リポジトリ内の任意のパスを指定してください。
 
 ### 初期ユーザーの作成
 
