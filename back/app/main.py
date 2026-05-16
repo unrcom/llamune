@@ -6,12 +6,6 @@ from app.api.routes import auth, models, projects, question_sets, ft_conversatio
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # uvicorn メインスレッドで mlx_vlm.generate をインポートし
-    # generation_stream をメインスレッドに初期化する
-    try:
-        import mlx_vlm.generate  # noqa: F401
-    except Exception:
-        pass
     yield
 
 

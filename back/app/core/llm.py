@@ -38,14 +38,12 @@ def load_model(model_name: str, adapter_path: Optional[str] = None):
         _backend = _detect_backend(model_name)
         print(f"🔄 Loading model: {model_name} (backend: {_backend})" + (f" adapter: {adapter_path}" if adapter_path else ""))
         if _backend == "mlx_vlm":
-            from mlx_vlm import load
-            _model, _tokenizer = load(model_name)
+            raise NotImplementedError("mlx_vlm モデルのチャットは将来対応予定です")
+        from mlx_lm import load
+        if adapter_path:
+            _model, _tokenizer = load(model_name, adapter_path=adapter_path)
         else:
-            from mlx_lm import load
-            if adapter_path:
-                _model, _tokenizer = load(model_name, adapter_path=adapter_path)
-            else:
-                _model, _tokenizer = load(model_name)
+            _model, _tokenizer = load(model_name)
         _current_model_name = model_name
         _current_adapter_path = adapter_path
         print(f"✅ Model loaded: {model_name}" + (f" + adapter" if adapter_path else ""))
@@ -57,23 +55,16 @@ def _generate_impl(messages: list, max_tokens: int = 512) -> str:
         raise RuntimeError("モデルがロードされていません")
 
     if _backend == "mlx_vlm":
-        from mlx_vlm import generate as vlm_generate
-        prompt = _tokenizer.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-        result_obj = vlm_generate(
-            _model, _tokenizer, prompt, max_tokens=max_tokens
-        )
-        result = result_obj.text if hasattr(result_obj, 'text') else str(result_obj)
-    else:
-        from mlx_lm import generate as mlx_generate
-        formatted = _tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-        result = mlx_generate(
-            _model, _tokenizer, prompt=formatted,
-            max_tokens=max_tokens, verbose=False,
-        )
+        raise NotImplementedError("mlx_vlm モデルのチャットは将来対応予定です")
+
+    from mlx_lm import generate as mlx_generate
+    formatted = _tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+    result = mlx_generate(
+        _model, _tokenizer, prompt=formatted,
+        max_tokens=max_tokens, verbose=False,
+    )
 
     # gpt-ossのfinal出力を抽出
     if '<|channel|>final<|message|>' in result:

@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+from app.core.config import ADAPTER_DIR
 import tempfile
 import threading
 from datetime import datetime
@@ -104,7 +105,7 @@ def _run_training(job_id: int, model_name: str, train_data: str, valid_data: str
         db.commit()
 
         import shutil
-        adapter_path = os.path.expanduser(f"~/llmn_adapters/{job_id}")
+        adapter_path = os.path.join(ADAPTER_DIR, str(job_id))
         if os.path.exists(adapter_path):
             shutil.rmtree(adapter_path)
         os.makedirs(adapter_path, exist_ok=True)
@@ -118,32 +119,20 @@ def _run_training(job_id: int, model_name: str, train_data: str, valid_data: str
             is_vlm = (_detect_backend(model_name) == "mlx_vlm")
 
             if is_vlm:
-                output_file = os.path.join(adapter_path, "adapters.safetensors")
-                cmd = [
-                    "python", "-m", "mlx_vlm.lora",
-                    "--model-path", model_name,
-                    "--dataset", tmpdir,
-                    "--split", "all",
-                    "--iters", str(iters),
-                    "--batch-size", str(batch_size),
-                    "--max-seq-length", str(max_seq_length),
-                    "--output-path", output_file,
-                ]
-                if learning_rate:
-                    cmd += ["--learning-rate", str(learning_rate)]
-            else:
-                cmd = [
-                    "mlx_lm.lora",
-                    "--model", model_name,
-                    "--train",
-                    "--data", tmpdir,
-                    "--max-seq-length", str(max_seq_length),
-                    "--iters", str(iters),
-                    "--batch-size", str(batch_size),
-                    "--adapter-path", adapter_path,
-                ]
-                if learning_rate:
-                    cmd += ["--learning-rate", str(learning_rate)]
+                raise NotImplementedError("mlx_vlm モデルの訓練は将来対応予定です")
+
+            cmd = [
+                "mlx_lm.lora",
+                "--model", model_name,
+                "--train",
+                "--data", tmpdir,
+                "--max-seq-length", str(max_seq_length),
+                "--iters", str(iters),
+                "--batch-size", str(batch_size),
+                "--adapter-path", adapter_path,
+            ]
+            if learning_rate:
+                cmd += ["--learning-rate", str(learning_rate)]
 
             process = subprocess.Popen(
                 cmd,

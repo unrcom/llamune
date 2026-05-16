@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from app.db.database import get_db
+from app.core.config import CHROMA_DB_DIR
 from app.core.auth import get_current_user
 from app.models.base import Dataset
 
@@ -52,7 +53,7 @@ def create_dataset(req: DatasetCreate, db: Session = Depends(get_db), _=Depends(
     auto_name = f"ds-{uuid.uuid4().hex[:12]}"
 
     # ChromaDBにコレクション作成
-    chroma_path = os.path.expanduser("~/dev/llmn/chroma_db")
+    chroma_path = CHROMA_DB_DIR
     client = chromadb.PersistentClient(path=chroma_path)
     client.get_or_create_collection(auto_name)
 
@@ -79,7 +80,7 @@ def delete_dataset(dataset_id: int, db: Session = Depends(get_db), _=Depends(get
         raise HTTPException(status_code=404, detail="データセットが見つかりません")
 
     # ChromaDBのコレクション削除
-    chroma_path = os.path.expanduser("~/dev/llmn/chroma_db")
+    chroma_path = CHROMA_DB_DIR
     client = chromadb.PersistentClient(path=chroma_path)
     try:
         client.delete_collection(dataset.name)
@@ -111,7 +112,7 @@ def add_document(
     if not dataset:
         raise HTTPException(status_code=404, detail="データセットが見つかりません")
 
-    chroma_path = os.path.expanduser("~/dev/llmn/chroma_db")
+    chroma_path = CHROMA_DB_DIR
     client = chromadb.PersistentClient(path=chroma_path)
     collection = client.get_or_create_collection(dataset.name)
 
@@ -137,7 +138,7 @@ def get_documents(
     if not dataset:
         raise HTTPException(status_code=404, detail="データセットが見つかりません")
 
-    chroma_path = os.path.expanduser("~/dev/llmn/chroma_db")
+    chroma_path = CHROMA_DB_DIR
     client = chromadb.PersistentClient(path=chroma_path)
     collection = client.get_or_create_collection(dataset.name)
 
@@ -163,7 +164,7 @@ def delete_document(
     if not dataset:
         raise HTTPException(status_code=404, detail="データセットが見つかりません")
 
-    chroma_path = os.path.expanduser("~/dev/llmn/chroma_db")
+    chroma_path = CHROMA_DB_DIR
     client = chromadb.PersistentClient(path=chroma_path)
     collection = client.get_or_create_collection(dataset.name)
     collection.delete(ids=[doc_id])
@@ -189,7 +190,7 @@ def update_document(
     if not dataset:
         raise HTTPException(status_code=404, detail="データセットが見つかりません")
 
-    chroma_path = os.path.expanduser("~/dev/llmn/chroma_db")
+    chroma_path = CHROMA_DB_DIR
     client = chromadb.PersistentClient(path=chroma_path)
     collection = client.get_or_create_collection(dataset.name)
     collection.update(

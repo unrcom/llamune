@@ -3,6 +3,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
+from app.core.config import CHROMA_DB_DIR
 from app.core.auth import get_current_user
 from app.core import llm
 
@@ -33,7 +34,7 @@ def _search_chroma(query: str, dataset_id: int, db) -> str:
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
         return "検索結果なし"
-    chroma_path = os.path.expanduser("~/dev/llmn/chroma_db")
+    chroma_path = CHROMA_DB_DIR
     client = chromadb.PersistentClient(path=chroma_path)
     try:
         collection = client.get_collection(dataset.name)
@@ -41,7 +42,7 @@ def _search_chroma(query: str, dataset_id: int, db) -> str:
         docs = results.get("documents", [[]])[0]
         if not docs:
             return "検索結果なし"
-        return "検索結果: [ " + ", ".join(docs) + " ]"
+        return "\n".join(docs)
     except Exception as e:
         return f"検索エラー: {str(e)}"
 
@@ -94,8 +95,8 @@ def generate(req: GenerateRequest, _=Depends(get_current_user)):
             db = next(db_gen)
             search_result = _search_chroma(query, req.dataset_id, db)
 
-            # toolメッセージを追加
-            messages.append({"role": "tool", "content": f'"content": "{search_result}"'})
+            # toolメッセージを追加（Gemma4はtoolロール非対応のためuserで渡す）
+            messages.append({"role": "user", "content": f'検索結果: {search_result}'})
 
             # 2回目の推論（最終回答）
             result = llm.generate_with_messages(messages, req.max_tokens)
@@ -103,8 +104,6 @@ def generate(req: GenerateRequest, _=Depends(get_current_user)):
         return {"result": result, "messages": messages}
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
