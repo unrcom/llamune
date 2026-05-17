@@ -97,6 +97,7 @@ def delete_dataset(dataset_id: int, db: Session = Depends(get_db), _=Depends(get
 
 
 class DocumentAdd(BaseModel):
+    title: Optional[str] = None
     content: str  # JSON文字列 or テキスト
     doc_id: Optional[str] = None
 
@@ -117,6 +118,21 @@ def add_document(
         raise HTTPException(status_code=400, detail="本文は700文字以内にしてください")
 
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="データセットが見つかりません")
+
+    chroma_path = CHROMA_DB_DIR
+    client = chromadb.PersistentClient(path=chroma_path)
+    collection = client.get_or_create_collection(dataset.name)
+
+    doc_id = req.doc_id or str(uuid.uuid4())
+    meta = {"title": req.title} if req.title else None
+    collection.add(
+        documents=[req.content],
+        metadatas=[meta] if meta else None,
+        ids=[doc_id],
+    )
+    return {"ok": True, "id": doc_id}
 
 
 @router.get("/{dataset_id}/documents")
@@ -140,8 +156,13 @@ def get_documents(
     result = collection.get()
     docs = []
     for i, doc_id in enumerate(result["ids"]):
-        docs.append({"id": doc_id, "content": result["documents"][i]})
-    return docs
+        meta = result["metadatas"][i] if result["metadatas"] else {}
+        docs.append({
+            "id": doc_id,
+            "title": meta.get("title", ""),
+            "content": result["documents"][i]
+        })
+    return list(reversed(docs))
 
 
 @router.delete("/{dataset_id}/documents/{doc_id}", status_code=204)

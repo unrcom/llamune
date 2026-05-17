@@ -115,8 +115,73 @@ export default function DatasetPage() {
     }
   }
 
+  // 一括登録
+  const [showBulkImport, setShowBulkImport] = useState(false)
+  const [bulkText, setBulkText] = useState('')
+  const [bulkTitlePrefix, setBulkTitlePrefix] = useState('')
+  const [chunks, setChunks] = useState<string[]>([])
+  const [bulkSaving, setBulkSaving] = useState(false)
+
+  function splitIntoChunks(text: string, maxLen = 500): string[] {
+    const result: string[] = []
+    // 空行で段落分割
+    const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
+    let current = ''
+    for (const para of paragraphs) {
+      if ((current + '\n\n' + para).trim().length <= maxLen) {
+        current = current ? current + '\n\n' + para : para
+      } else {
+        if (current) result.push(current.trim())
+        // 段落自体が長い場合は句読点で分割
+        if (para.length > maxLen) {
+          const sentences = para.split(/(?<=[。！？\n])/)
+          let sub = ''
+          for (const s of sentences) {
+            if ((sub + s).length <= maxLen) {
+              sub += s
+            } else {
+              if (sub) result.push(sub.trim())
+              sub = s.length > maxLen ? s.slice(0, maxLen) : s
+            }
+          }
+          if (sub) current = sub.trim()
+          else current = ''
+        } else {
+          current = para
+        }
+      }
+    }
+    if (current.trim()) result.push(current.trim())
+    return result.filter(Boolean)
+  }
+
+  async function bulkRegister() {
+    if (!dataset || chunks.length === 0) return
+    setBulkSaving(true)
+    setError(null)
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i]
+        if (!chunk.trim()) continue
+        const title = bulkTitlePrefix.trim()
+          ? `${bulkTitlePrefix.trim()} #${i + 1}`
+          : chunk.slice(0, 20).replace(/\n/g, ' ')
+        await apiClient.post(`/datasets/${dataset.id}/documents`, { title, content: chunk })
+      }
+      const res = await apiClient.get(`/datasets/${dataset.id}/documents`)
+      setDocuments(res.data)
+      setShowBulkImport(false)
+      setBulkText('')
+      setBulkTitlePrefix('')
+      setChunks([])
+    } catch (e: any) {
+      setError(e.response?.data?.detail || '一括登録に失敗しました')
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
   async function updateDocument(docId: string) {
-    if (!dataset) return
     setError(null)
     try {
       await apiClient.put(`/datasets/${dataset.id}/documents/${docId}`, { content: editingContent })
@@ -173,7 +238,10 @@ export default function DatasetPage() {
                   <span className="ml-2 text-xs text-gray-400">{documents.length} 件</span>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => { setShowAddDoc(v => !v); setError(null) }}>
+                  <Button size="sm" variant="outline" onClick={() => { setShowBulkImport(v => !v); setShowAddDoc(false); setChunks([]); setBulkText(''); setBulkTitlePrefix('') }}>
+                    一括登録
+                  </Button>
+                  <Button size="sm" onClick={() => { setShowAddDoc(v => !v); setShowBulkImport(false); setError(null) }}>
                     <Plus className="h-3 w-3 mr-1" /> 追加
                   </Button>
                   <Button size="sm" variant="outline" onClick={deleteDataset} className="text-red-500 hover:text-red-700 hover:border-red-300">
@@ -183,6 +251,69 @@ export default function DatasetPage() {
               </div>
 
               {error && <div className="text-red-500 text-sm">{error}</div>}
+
+              {/* 一括登録フォーム */}
+              {showBulkImport && (
+                <div className="border rounded p-3 bg-gray-50 space-y-3">
+                  <div className="text-xs text-gray-500 font-medium">一括登録（長文を自動分割）</div>
+                  <input
+                    type="text"
+                    placeholder="タイトルプレフィックス（例：ホログラフィー原理）→ 「ホログラフィー原理 #1」「ホログラフィー原理 #2」..."
+                    value={bulkTitlePrefix}
+                    onChange={e => setBulkTitlePrefix(e.target.value)}
+                    className="w-full border rounded px-3 py-1.5 text-sm bg-white"
+                  />
+                  <Textarea
+                    rows={6}
+                    placeholder="長文テキストを貼り付けてください"
+                    value={bulkText}
+                    onChange={e => { setBulkText(e.target.value); setChunks([]) }}
+                    className="text-sm"
+                  />
+                  <div className="flex gap-2 flex-wrap">
+                    <Button size="sm" variant="outline" onClick={() => setChunks(splitIntoChunks(bulkText))} disabled={!bulkText.trim()}>
+                      分割プレビュー
+                    </Button>
+                    {chunks.length > 0 && (
+                      <Button size="sm" onClick={bulkRegister} disabled={bulkSaving || chunks.some(c => c.length >= 700)}>
+                        {bulkSaving ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />登録中...</> : `まとめて登録（${chunks.length}件）`}
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => { setShowBulkImport(false); setBulkText(''); setBulkTitlePrefix(''); setChunks([]) }}>キャンセル</Button>
+                  </div>
+                  {chunks.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-gray-400">{chunks.length}件に分割されました。登録前に編集できます。</div>
+                      {chunks.map((chunk, i) => (
+                        <div key={i} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-400">#{i + 1}</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs ${chunk.length >= 700 ? 'text-red-500 font-medium' : chunk.length >= 500 ? 'text-yellow-600' : 'text-gray-400'}`}>
+                                {chunk.length} 文字{chunk.length >= 700 ? '　要修正' : ''}
+                              </span>
+                              <button onClick={() => setChunks(prev => prev.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                          <Textarea
+                            rows={6}
+                            value={chunk}
+                            onChange={e => setChunks(prev => prev.map((c, j) => j === i ? e.target.value : c))}
+                            onFocus={e => {
+                              // 前のチャンクのTextareaを末尾にスクロール
+                              const prev = e.currentTarget.closest('.space-y-1')?.previousElementSibling?.querySelector('textarea')
+                              if (prev) prev.scrollTop = prev.scrollHeight
+                            }}
+                            className={`text-sm ${chunk.length >= 700 ? 'border-red-400' : chunk.length >= 500 ? 'border-yellow-400' : ''}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ドキュメント追加フォーム */}
               {showAddDoc && (
