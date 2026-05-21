@@ -125,7 +125,7 @@ def add_document(
         "title": req.title or "",
         "source_id": req.source_id or str(uuid.uuid4()),
         "source_data": req.source_data or "",
-        "created_at": req.created_at or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "created_at": (req.created_at + ":00" if req.created_at and len(req.created_at) == 16 else req.created_at) or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     collection.add(
         documents=[req.content],

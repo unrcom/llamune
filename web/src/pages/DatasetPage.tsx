@@ -26,7 +26,7 @@ export default function DatasetPage() {
   const [newDocContent, setNewDocContent] = useState('')
   const [newDocSourceId, setNewDocSourceId] = useState('new')
   const [newDocSourceData, setNewDocSourceData] = useState('')
-  const [newDocCreatedAt, setNewDocCreatedAt] = useState(today())
+  const [newDocCreatedAt, setNewDocCreatedAt] = useState(() => today())
 
   // ドキュメント編集
   const [editingDocId, setEditingDocId] = useState<string | null>(null)
@@ -43,7 +43,7 @@ export default function DatasetPage() {
   const importInputRef = useRef<HTMLInputElement>(null)
 
   function today() {
-    return new Date().toISOString().slice(0, 19)
+    return new Date().toISOString().slice(0, 19).replace('Z', '')
   }
 
   useEffect(() => {
@@ -135,13 +135,14 @@ export default function DatasetPage() {
     setError(null)
     setSavingDoc(true)
     try {
+      console.log('created_at:', newDocCreatedAt)
       const source_id = newDocSourceId === 'new' ? undefined : newDocSourceId
       await apiClient.post(`/datasets/${dataset.id}/documents`, {
         title: newDocTitle.trim() || undefined,
         content: newDocContent,
         source_id,
         source_data: newDocSourceData.trim() || undefined,
-        created_at: newDocCreatedAt || undefined,
+        created_at: newDocCreatedAt ? (newDocCreatedAt.length === 16 ? newDocCreatedAt + ':00' : newDocCreatedAt) : undefined,
       })
       setNewDocTitle('')
       setNewDocContent('')
@@ -163,7 +164,7 @@ export default function DatasetPage() {
   const [bulkTitlePrefix, setBulkTitlePrefix] = useState('')
   const [bulkSourceId, setBulkSourceId] = useState('new')
   const [bulkSourceData, setBulkSourceData] = useState('')
-  const [bulkCreatedAt, setBulkCreatedAt] = useState(today())
+  const [bulkCreatedAt, setBulkCreatedAt] = useState(() => today())
   const [chunks, setChunks] = useState<string[]>([])
   const [bulkSaving, setBulkSaving] = useState(false)
 
@@ -238,7 +239,7 @@ export default function DatasetPage() {
       await apiClient.put(`/datasets/${dataset!.id}/documents/${docId}`, {
         content: editingContent,
         source_data: editingSourceData,
-        created_at: editingCreatedAt,
+        created_at: editingCreatedAt ? (editingCreatedAt.length === 16 ? editingCreatedAt + ':00' : editingCreatedAt) : undefined,
       })
       setEditingDocId(null)
       await refreshDocs()
@@ -396,7 +397,7 @@ export default function DatasetPage() {
                         </div>
                         <div>
                           <Label className="text-xs text-gray-500">登録日時</Label>
-                          <input type="datetime-local" step="1" value={bulkCreatedAt} onChange={e => setBulkCreatedAt(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
+                          <input type="text" placeholder="2026-05-21T10:00:00" value={bulkCreatedAt} onChange={e => setBulkCreatedAt(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
                         </div>
                       </>
                     )}
@@ -452,7 +453,7 @@ export default function DatasetPage() {
                       </div>
                       <div>
                         <Label className="text-xs text-gray-500">登録日時</Label>
-                        <input type="datetime-local" step="1" value={newDocCreatedAt} onChange={e => setNewDocCreatedAt(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
+                        <input type="text" placeholder="2026-05-21T10:00:00" value={newDocCreatedAt} onChange={e => setNewDocCreatedAt(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
                       </div>
                     </>
                   )}
@@ -488,7 +489,7 @@ export default function DatasetPage() {
                           </div>
                           <div>
                             <Label className="text-xs text-gray-500">登録日時</Label>
-                            <input type="datetime-local" step="1" value={editingCreatedAt} onChange={e => setEditingCreatedAt(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
+                            <input type="text" placeholder="2026-05-21T10:00:00" value={editingCreatedAt} onChange={e => setEditingCreatedAt(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
                           </div>
                           <Textarea rows={4} value={editingContent} onChange={e => setEditingContent(e.target.value)} className="text-sm font-mono" />
                           <div className="flex gap-2">
