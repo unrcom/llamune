@@ -185,6 +185,7 @@ def delete_document(
 
 
 class DocumentUpdate(BaseModel):
+    title: Optional[str] = None
     content: str
     source_data: Optional[str] = None
     created_at: Optional[str] = None
@@ -207,8 +208,13 @@ def update_document(
     client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
     collection = client.get_or_create_collection(dataset.name)
 
+    if len(req.content) > 700:
+        raise HTTPException(status_code=400, detail="本文は700文字以内にしてください")
+
     existing = collection.get(ids=[doc_id])
     meta = existing["metadatas"][0] if existing["metadatas"] else {}
+    if req.title is not None:
+        meta["title"] = req.title
     if req.source_data is not None:
         meta["source_data"] = req.source_data
     if req.created_at is not None:

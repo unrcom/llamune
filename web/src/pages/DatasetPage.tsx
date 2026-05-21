@@ -30,6 +30,7 @@ export default function DatasetPage() {
 
   // ドキュメント編集
   const [editingDocId, setEditingDocId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
   const [editingContent, setEditingContent] = useState('')
   const [editingSourceData, setEditingSourceData] = useState('')
   const [editingCreatedAt, setEditingCreatedAt] = useState('')
@@ -237,6 +238,7 @@ export default function DatasetPage() {
     setError(null)
     try {
       await apiClient.put(`/datasets/${dataset!.id}/documents/${docId}`, {
+        title: editingTitle,
         content: editingContent,
         source_data: editingSourceData,
         created_at: editingCreatedAt ? (editingCreatedAt.length === 16 ? editingCreatedAt + ':00' : editingCreatedAt) : undefined,
@@ -387,7 +389,7 @@ export default function DatasetPage() {
                   <div className="space-y-2">
                     <div>
                       <Label className="text-xs text-gray-500">資料</Label>
-                      <SourceSelector value={bulkSourceId} onChange={v => { setBulkSourceId(v); if (v !== 'new') { const s = sources.find(s => s.source_id === v); if (s) { setBulkSourceData(s.source_data); setBulkCreatedAt(s.created_at.slice(0, 10)) } } }} />
+                      <SourceSelector value={bulkSourceId} onChange={v => { setBulkSourceId(v); if (v !== 'new') { const s = sources.find(s => s.source_id === v); if (s) { setBulkSourceData(s.source_data); setBulkCreatedAt(today()) } } }} />
                     </div>
                     {bulkSourceId === 'new' && (
                       <>
@@ -443,7 +445,7 @@ export default function DatasetPage() {
                 <div className="border rounded p-3 bg-gray-50 space-y-2">
                   <div>
                     <Label className="text-xs text-gray-500">資料</Label>
-                    <SourceSelector value={newDocSourceId} onChange={v => { setNewDocSourceId(v); if (v !== 'new') { const s = sources.find(s => s.source_id === v); if (s) { setNewDocSourceData(s.source_data); setNewDocCreatedAt(s.created_at.slice(0, 10)) } } }} />
+                    <SourceSelector value={newDocSourceId} onChange={v => { setNewDocSourceId(v); if (v !== 'new') { const s = sources.find(s => s.source_id === v); if (s) { setNewDocSourceData(s.source_data); setNewDocCreatedAt(today()) } } }} />
                   </div>
                   {newDocSourceId === 'new' && (
                     <>
@@ -484,6 +486,10 @@ export default function DatasetPage() {
                       {editingDocId === doc.id ? (
                         <div className="space-y-2">
                           <div>
+                            <Label className="text-xs text-gray-500">タイトル</Label>
+                            <input type="text" value={editingTitle} onChange={e => setEditingTitle(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
+                          </div>
+                          <div>
                             <Label className="text-xs text-gray-500">資料情報</Label>
                             <input type="text" value={editingSourceData} onChange={e => setEditingSourceData(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
                           </div>
@@ -491,9 +497,10 @@ export default function DatasetPage() {
                             <Label className="text-xs text-gray-500">登録日時</Label>
                             <input type="text" placeholder="2026-05-21T10:00:00" value={editingCreatedAt} onChange={e => setEditingCreatedAt(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
                           </div>
-                          <Textarea rows={4} value={editingContent} onChange={e => setEditingContent(e.target.value)} className="text-sm font-mono" />
+                          <Textarea rows={4} value={editingContent} onChange={e => setEditingContent(e.target.value)} className={`text-sm font-mono ${editingContent.length >= 700 ? 'border-red-400' : editingContent.length >= 500 ? 'border-yellow-400' : ''}`} />
+                          <div className={`text-xs text-right ${editingContent.length >= 700 ? 'text-red-500 font-medium' : editingContent.length >= 500 ? 'text-yellow-600' : 'text-gray-400'}`}>{editingContent.length} 文字{editingContent.length >= 700 && '　700文字以上は保存できません'}</div>
                           <div className="flex gap-2">
-                            <Button size="sm" onClick={() => updateDocument(doc.id)}><Check className="h-3 w-3 mr-1" />保存</Button>
+                            <Button size="sm" onClick={() => updateDocument(doc.id)} disabled={editingContent.length >= 700}><Check className="h-3 w-3 mr-1" />保存</Button>
                             <Button size="sm" variant="outline" onClick={() => setEditingDocId(null)}><X className="h-3 w-3 mr-1" />キャンセル</Button>
                           </div>
                         </div>
@@ -508,7 +515,7 @@ export default function DatasetPage() {
                             <p className="text-sm text-gray-800 whitespace-pre-wrap break-all">{doc.content}</p>
                           </div>
                           <div className="flex gap-1 shrink-0">
-                            <button onClick={() => { setEditingDocId(doc.id); setEditingContent(doc.content); setEditingSourceData(doc.source_data); setEditingCreatedAt(doc.created_at.replace('Z', '').slice(0, 19)) }} className="text-gray-400 hover:text-blue-500">
+                            <button onClick={() => { setEditingDocId(doc.id); setEditingTitle(doc.title); setEditingContent(doc.content); setEditingSourceData(doc.source_data); setEditingCreatedAt(doc.created_at.replace('Z', '').slice(0, 19)) }} className="text-gray-400 hover:text-blue-500">
                               <Pencil className="h-3 w-3" />
                             </button>
                             <button onClick={() => deleteDocument(doc.id)} className="text-gray-400 hover:text-red-500">
