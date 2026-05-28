@@ -19,3 +19,5 @@ llmn_db/.env
 adapters/
 chroma_db/
 backups/
+.scannerwork/
+sonar-project.properties
