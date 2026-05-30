@@ -96,6 +96,88 @@ function useSidebar() {
   return { sidebarOpen, adminOpen, toggleSidebar, toggleAdmin }
 }
 
+
+interface SidebarNavProps {
+  sidebarOpen: boolean
+  isAdmin: boolean
+  adminOpen: boolean
+  toggleAdmin: () => void
+}
+
+function SidebarNav({ sidebarOpen, isAdmin, adminOpen, toggleAdmin }: Readonly<SidebarNavProps>) {
+  return (
+    <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+      <NavLink to="/chat" title={sidebarOpen ? undefined : 'チャット'} className={({ isActive }) => navLinkClass(isActive, sidebarOpen)}>
+        <MessageSquare className="h-4 w-4 shrink-0" />
+        {sidebarOpen && 'チャット'}
+      </NavLink>
+      <NavLink to="/dataset" title={sidebarOpen ? undefined : 'データセット'} className={({ isActive }) => navLinkClass(isActive, sidebarOpen)}>
+        <Database className="h-4 w-4 shrink-0" />
+        {sidebarOpen && 'データセット'}
+      </NavLink>
+      {isAdmin && (
+        <div>
+          {sidebarOpen && (
+            <button onClick={toggleAdmin} className="flex items-center gap-2 px-3 py-2 rounded text-sm text-gray-500 hover:bg-gray-100 w-full mt-2">
+              {adminOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              管理
+            </button>
+          )}
+          {(adminOpen || !sidebarOpen) && (
+            <div className={sidebarOpen ? 'ml-2 space-y-1' : 'space-y-1 mt-1'}>
+              {adminItems.map(({ to, label, icon: Icon }) => (
+                <NavLink key={to} to={to} title={sidebarOpen ? undefined : label} className={({ isActive }) => navLinkClass(isActive, sidebarOpen)}>
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {sidebarOpen && label}
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </nav>
+  )
+}
+
+interface SidebarFooterProps {
+  sidebarOpen: boolean
+  backupMsg: string | null
+  setBackupMsg: (v: string | null) => void
+  exporting: boolean
+  importing: boolean
+  exportAll: () => void
+  importAllRef: React.RefObject<HTMLInputElement>
+  handleImportAll: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onLogout: () => void
+}
+
+function SidebarFooter({ sidebarOpen, backupMsg, setBackupMsg, exporting, importing, exportAll, importAllRef, handleImportAll, onLogout }: Readonly<SidebarFooterProps>) {
+  const btnClass = `flex items-center gap-2 py-2 rounded text-sm text-gray-600 hover:bg-gray-100 w-full ${sidebarOpen ? 'px-3' : 'justify-center px-2'}`
+  return (
+    <div className="p-2 border-t space-y-1">
+      {sidebarOpen && backupMsg && (
+        <div className={`text-xs px-2 pb-1 flex items-start justify-between gap-1 ${backupMsg.startsWith('⚠') ? 'text-red-500' : 'text-green-600'}`}>
+          <span>{backupMsg}</span>
+          <button onClick={() => setBackupMsg(null)} className="shrink-0 mt-0.5"><X className="h-3 w-3" /></button>
+        </div>
+      )}
+      <button onClick={exportAll} disabled={exporting} title={sidebarOpen ? undefined : '全体エクスポート'} className={btnClass}>
+        {exporting ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Download className="h-4 w-4 shrink-0" />}
+        {sidebarOpen && 'バックアップ'}
+      </button>
+      <button onClick={() => importAllRef.current?.click()} disabled={importing} title={sidebarOpen ? undefined : '全体インポート'} className={btnClass}>
+        {importing ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Upload className="h-4 w-4 shrink-0" />}
+        {sidebarOpen && 'リストア'}
+      </button>
+      <input ref={importAllRef} type="file" accept=".md" className="hidden" onChange={handleImportAll} />
+      <button onClick={onLogout} title={sidebarOpen ? undefined : 'ログアウト'} className={btnClass}>
+        <LogOut className="h-4 w-4 shrink-0" />
+        {sidebarOpen && 'ログアウト'}
+      </button>
+    </div>
+  )
+}
+
 export default function Layout() {
   const isAdmin = getIsAdmin()
   const { sidebarOpen, adminOpen, toggleSidebar, toggleAdmin } = useSidebar()
@@ -111,95 +193,13 @@ export default function Layout() {
             {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
         </div>
-
-        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          <NavLink
-            to="/chat"
-            title={sidebarOpen ? undefined : 'チャット'}
-            className={({ isActive }) => navLinkClass(isActive, sidebarOpen)}
-          >
-            <MessageSquare className="h-4 w-4 shrink-0" />
-            {sidebarOpen && 'チャット'}
-          </NavLink>
-
-          <NavLink
-            to="/dataset"
-            title={sidebarOpen ? undefined : 'データセット'}
-            className={({ isActive }) => navLinkClass(isActive, sidebarOpen)}
-          >
-            <Database className="h-4 w-4 shrink-0" />
-            {sidebarOpen && 'データセット'}
-          </NavLink>
-
-          {isAdmin && (
-            <div>
-              {sidebarOpen && (
-                <button
-                  onClick={toggleAdmin}
-                  className="flex items-center gap-2 px-3 py-2 rounded text-sm text-gray-500 hover:bg-gray-100 w-full mt-2"
-                >
-                  {adminOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                  管理
-                </button>
-              )}
-              {(adminOpen || !sidebarOpen) && (
-                <div className={sidebarOpen ? 'ml-2 space-y-1' : 'space-y-1 mt-1'}>
-                  {adminItems.map(({ to, label, icon: Icon }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      title={sidebarOpen ? undefined : label}
-                      className={({ isActive }) => navLinkClass(isActive, sidebarOpen)}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {sidebarOpen && label}
-                    </NavLink>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </nav>
-
-        {/* バックアップ・リストア */}
-        <div className="p-2 border-t space-y-1">
-          {sidebarOpen && backupMsg && (
-            <div className={`text-xs px-2 pb-1 flex items-start justify-between gap-1 ${backupMsg.startsWith('⚠') ? 'text-red-500' : 'text-green-600'}`}>
-              <span>{backupMsg}</span>
-              <button onClick={() => setBackupMsg(null)} className="shrink-0 mt-0.5"><X className="h-3 w-3" /></button>
-            </div>
-          )}
-          <button
-            onClick={exportAll}
-            disabled={exporting}
-            title={sidebarOpen ? undefined : '全体エクスポート'}
-            className={`flex items-center gap-2 py-2 rounded text-sm text-gray-600 hover:bg-gray-100 w-full ${sidebarOpen ? 'px-3' : 'justify-center px-2'}`}
-          >
-            {exporting ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Download className="h-4 w-4 shrink-0" />}
-            {sidebarOpen && 'バックアップ'}
-          </button>
-          <button
-            onClick={() => importAllRef.current?.click()}
-            disabled={importing}
-            title={sidebarOpen ? undefined : '全体インポート'}
-            className={`flex items-center gap-2 py-2 rounded text-sm text-gray-600 hover:bg-gray-100 w-full ${sidebarOpen ? 'px-3' : 'justify-center px-2'}`}
-          >
-            {importing ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Upload className="h-4 w-4 shrink-0" />}
-            {sidebarOpen && 'リストア'}
-          </button>
-          <input ref={importAllRef} type="file" accept=".md" className="hidden" onChange={handleImportAll} />
-
-          <button
-            onClick={onLogout}
-            title={sidebarOpen ? undefined : 'ログアウト'}
-            className={`flex items-center gap-2 py-2 rounded text-sm text-gray-600 hover:bg-gray-100 w-full ${sidebarOpen ? 'px-3' : 'justify-center px-2'}`}
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            {sidebarOpen && 'ログアウト'}
-          </button>
-        </div>
+        <SidebarNav sidebarOpen={sidebarOpen} isAdmin={isAdmin} adminOpen={adminOpen} toggleAdmin={toggleAdmin} />
+        <SidebarFooter
+          sidebarOpen={sidebarOpen} backupMsg={backupMsg} setBackupMsg={setBackupMsg}
+          exporting={exporting} importing={importing} exportAll={exportAll}
+          importAllRef={importAllRef} handleImportAll={handleImportAll} onLogout={onLogout}
+        />
       </aside>
-
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
