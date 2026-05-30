@@ -17,8 +17,14 @@ export default function LoginPage() {
       const res = await apiClient.post('/auth/login', form)
       setTokens(res.data.access_token, res.data.refresh_token)
       navigate('/')
-    } catch {
-      setError('ユーザー名またはパスワードが間違っています')
+    } catch (e: any) {
+      if (e.code === 'ERR_NETWORK' || e.code === 'ECONNREFUSED') {
+        setError('サーバーに接続できません。しばらく待ってから再試行してください。')
+      } else if (e.response?.status === 401) {
+        setError('ユーザー名またはパスワードが間違っています')
+      } else {
+        setError('ログインに失敗しました。サーバーが起動しているか確認してください。')
+      }
     }
   }
 
@@ -28,8 +34,9 @@ export default function LoginPage() {
         <h1 className="text-xl font-bold text-center">llmn</h1>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="space-y-2">
-          <label className="text-sm font-medium">ユーザー名</label>
+          <label htmlFor="username" className="text-sm font-medium">ユーザー名</label>
           <input
+            id="username"
             className="w-full border rounded px-3 py-2 text-sm"
             value={username}
             onChange={e => setUsername(e.target.value)}
@@ -37,8 +44,9 @@ export default function LoginPage() {
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">パスワード</label>
+          <label htmlFor="password" className="text-sm font-medium">パスワード</label>
           <input
+            id="password"
             type="password"
             className="w-full border rounded px-3 py-2 text-sm"
             value={password}

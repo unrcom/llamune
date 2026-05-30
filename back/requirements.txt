@@ -9,3 +9,4 @@ mlx-lm
 python-multipart
 mlx-vlm
 chromadb
+hnswlib

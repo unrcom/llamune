@@ -3,7 +3,6 @@ import { apiClient } from '@/api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Play, RefreshCw } from 'lucide-react'
 
 interface Project { id: number; name: string; display_name: string }
@@ -105,7 +104,7 @@ export default function JobsPage() {
         max_seq_length: maxSeqLength,
         iters,
         batch_size: batchSize,
-        learning_rate: parseFloat(learningRate),
+        learning_rate: Number.parseFloat(learningRate),
       })
       setJobs(prev => [res.data, ...prev])
       setExpandedJobId(res.data.id)

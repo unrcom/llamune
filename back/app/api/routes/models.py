@@ -1,12 +1,15 @@
 import os
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session as _Session
 from pydantic import BaseModel
-from typing import Optional
+from typing import Annotated, Optional
 from app.db.database import get_db
 from app.core.auth import get_current_user
-from app.models.base import Model
+from app.models.base import Model, User
+
+DB = Annotated[_Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 router = APIRouter(prefix="/models", tags=["models"])
 
@@ -17,7 +20,7 @@ class ModelCreate(BaseModel):
     name: str
     display_name: str
     model_type: str = "base"
-    adapter_path: Optional[str]
+    adapter_path: Optional[str] = None
     parent_models_id: Optional[int] = None
 
 
@@ -26,7 +29,7 @@ class ModelResponse(BaseModel):
     name: str
     display_name: str
     model_type: str
-    adapter_path: Optional[str]
+    adapter_path: Optional[str] = None
     parent_models_id: Optional[int] = None
 
     class Config:
@@ -39,9 +42,9 @@ class LocalModelResponse(BaseModel):
     registered: bool  # DBに登録済みかどうか
 
 
-@router.get("/local-adapters")
+@router.get("/local-adapters", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def get_local_adapters(
-    _=Depends(get_current_user),
+    _: CurrentUser,
 ):
     """~/llmn_adapters/ 以下のアダプター一覧を返す"""
     adapters_dir = Path.home() / "llmn_adapters"
@@ -62,10 +65,10 @@ def get_local_adapters(
     return adapters
 
 
-@router.get("/local", response_model=list[LocalModelResponse])
+@router.get("/local", response_model=list[LocalModelResponse], responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def get_local_models(
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     """~/.cache/huggingface/hub/ にあるモデルを一覧返す"""
     if not HF_CACHE_DIR.exists():
@@ -97,19 +100,19 @@ def get_local_models(
     return local_models
 
 
-@router.get("", response_model=list[ModelResponse])
+@router.get("", response_model=list[ModelResponse], responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def get_models(
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     return db.query(Model).order_by(Model.id).all()
 
 
-@router.post("", response_model=ModelResponse, status_code=201)
+@router.post("", response_model=ModelResponse, status_code=201, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def create_model(
     model_in: ModelCreate,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     if model_in.parent_models_id:
         parent = db.query(Model).filter(Model.id == model_in.parent_models_id).first()
@@ -131,15 +134,15 @@ def create_model(
 
 class ModelUpdate(BaseModel):
     display_name: str
-    adapter_path: Optional[str]
+    adapter_path: Optional[str] = None
 
 
-@router.put("/{model_id}", response_model=ModelResponse)
+@router.put("/{model_id}", response_model=ModelResponse, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def update_model(
     model_id: int,
     model_in: ModelUpdate,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     model = db.query(Model).filter(Model.id == model_id).first()
     if not model:
@@ -152,11 +155,11 @@ def update_model(
     return model
 
 
-@router.delete("/{model_id}", status_code=204)
+@router.delete("/{model_id}", status_code=204, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def delete_model(
     model_id: int,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     model = db.query(Model).filter(Model.id == model_id).first()
     if not model:

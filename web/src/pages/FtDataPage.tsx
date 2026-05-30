@@ -162,12 +162,14 @@ export default function FtDataPage() {
   }
 
   function updateMessage(index: number, field: 'role' | 'content', value: string) {
-    setMessages(prev => prev.map((m, i) => i !== index ? m : { ...m, [field]: value }))
+    setMessages(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } : m))
   }
 
   function addTurn() {
     const lastRole = messages[messages.length - 1]?.role
-    const nextRole = lastRole === 'user' ? 'assistant' : lastRole === 'assistant' ? 'tool' : 'user'
+    let nextRole = 'user'
+    if (lastRole === 'user') nextRole = 'assistant'
+    else if (lastRole === 'assistant') nextRole = 'tool'
     setMessages(prev => [...prev, { role: nextRole, content: '' }])
   }
 
@@ -291,12 +293,15 @@ export default function FtDataPage() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">
-                  {editingId ? `編集中 (ID: ${editingId})` : isBase ? '新規ベース' : '新規パターン'}
+                  {(() => {
+                    if (editingId) return `編集中 (ID: ${editingId})`
+                    return isBase ? '新規ベース' : '新規パターン'
+                  })()}
                   {isBase && <Badge className="ml-2" variant="secondary">ベース</Badge>}
                   {baseId && <Badge className="ml-2" variant="outline">ベースID: {baseId}</Badge>}
                 </CardTitle>
                 <div className="flex gap-2">
-                  <Button size="sm" variant={!isBase ? "default" : "outline"} onClick={newBase}>
+                  <Button size="sm" variant={isBase ? "outline" : "default"} onClick={newBase}>
                     ベース
                   </Button>
                   <Button size="sm" variant={isBase ? "default" : "outline"} onClick={newPattern}>
@@ -314,8 +319,10 @@ export default function FtDataPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {messages.map((msg, i) => (
-                <div key={i} className="space-y-1">
+              {messages.map((msg, i) => {
+                const fmKey = `${i}-${msg.role}`
+                return (
+                <div key={fmKey} className="space-y-1">
                   <div className="flex items-center gap-2">
                     {msg.role === 'system' ? (
                       <span className="border rounded px-2 py-1 text-xs bg-gray-50 w-28 text-gray-500">system</span>
@@ -340,13 +347,14 @@ export default function FtDataPage() {
                   <Textarea
                     value={msg.content}
                     onChange={e => msg.role !== 'system' && updateMessage(i, 'content', e.target.value)}
-                    rows={msg.role === 'system' ? 3 : 3}
+                    rows={3}
                     className={`text-sm font-mono ${msg.role === 'system' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
                     placeholder={msg.role === 'system' ? '（システムプロンプトが設定されていません）' : `${msg.role}の内容を入力`}
                     readOnly={msg.role === 'system'}
                   />
                 </div>
-              ))}
+              )
+              })}
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -369,7 +377,7 @@ export default function FtDataPage() {
               {bases.map(base => (
                 <Card key={base.id} className="cursor-pointer hover:bg-gray-50">
                   <CardContent className="flex items-center justify-between py-2 px-4">
-                    <div onClick={() => selectConversation(base)} className="flex-1">
+                    <button type="button" onClick={() => selectConversation(base)} className="flex-1 text-left">
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary">ベース</Badge>
                         <span className="text-sm text-gray-600">
@@ -377,7 +385,7 @@ export default function FtDataPage() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">{base.created_at}</p>
-                    </div>
+                    </button>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="sm" onClick={() => copyFromBase(base)} title="このベースからパターンを作成">
                         <Copy className="h-3 w-3" />
@@ -406,7 +414,7 @@ export default function FtDataPage() {
                   className={`cursor-pointer hover:bg-gray-50 ${editingId === conv.id ? 'border-blue-400' : ''}`}
                 >
                   <CardContent className="flex items-center justify-between py-2 px-4">
-                    <div onClick={() => selectConversation(conv)} className="flex-1">
+                    <button type="button" onClick={() => selectConversation(conv)} className="flex-1 text-left">
                       <div className="flex items-center gap-2">
                         {conv.base_id && <Badge variant="outline" className="text-xs">ベースID: {conv.base_id}</Badge>}
                         <Badge
@@ -418,7 +426,7 @@ export default function FtDataPage() {
                         <span className="text-sm">{getFirstUserContent(conv)}</span>
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">{conv.created_at}</p>
-                    </div>
+                    </button>
                     <Button variant="ghost" size="sm" onClick={() => copyPattern(conv)} title="コピー">
                       <Copy className="h-3 w-3" />
                     </Button>

@@ -1,12 +1,17 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session as _Session
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Annotated, Optional, List
 from app.db.database import get_db
 from app.core.auth import get_current_user
-from app.models.base import Project, FtConversation
+from app.models.base import Project, FtConversation, User
+
+DB = Annotated[_Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+CONV_NOT_FOUND = "会話が見つかりません"
 
 router = APIRouter(prefix="/ft-conversations", tags=["ft_conversations"])
 
@@ -34,7 +39,7 @@ class FtConversationResponse(BaseModel):
     id: int
     project_id: int
     is_base: bool
-    base_id: Optional[int]
+    base_id: Optional[int] = None
     split: str
     messages: list
     created_at: str
@@ -43,11 +48,11 @@ class FtConversationResponse(BaseModel):
         from_attributes = True
 
 
-@router.get("", response_model=List[FtConversationResponse])
+@router.get("", response_model=List[FtConversationResponse], responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def get_ft_conversations(
     project_id: int,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     convs = db.query(FtConversation).filter(
         FtConversation.project_id == project_id
@@ -67,11 +72,11 @@ def get_ft_conversations(
     ]
 
 
-@router.post("", response_model=FtConversationResponse, status_code=201)
+@router.post("", response_model=FtConversationResponse, status_code=201, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def create_ft_conversation(
     req: FtConversationCreate,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     project = db.query(Project).filter(Project.id == req.project_id).first()
     if not project:
@@ -108,16 +113,16 @@ def create_ft_conversation(
     )
 
 
-@router.put("/{conv_id}", response_model=FtConversationResponse)
+@router.put("/{conv_id}", response_model=FtConversationResponse, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def update_ft_conversation(
     conv_id: int,
     req: FtConversationUpdate,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     conv = db.query(FtConversation).filter(FtConversation.id == conv_id).first()
     if not conv:
-        raise HTTPException(status_code=404, detail="会話が見つかりません")
+        raise HTTPException(status_code=404, detail=CONV_NOT_FOUND)
 
     if req.is_base is not None:
         conv.is_base = req.is_base
@@ -138,16 +143,16 @@ def update_ft_conversation(
     )
 
 
-@router.patch("/{conv_id}/split", response_model=FtConversationResponse)
+@router.patch("/{conv_id}/split", response_model=FtConversationResponse, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def update_split(
     conv_id: int,
     split: str,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     conv = db.query(FtConversation).filter(FtConversation.id == conv_id).first()
     if not conv:
-        raise HTTPException(status_code=404, detail="会話が見つかりません")
+        raise HTTPException(status_code=404, detail=CONV_NOT_FOUND)
     if split not in ("train", "valid"):
         raise HTTPException(status_code=400, detail="split は train または valid を指定してください")
     conv.split = split
@@ -165,25 +170,25 @@ def update_split(
     )
 
 
-@router.delete("/{conv_id}", status_code=204)
+@router.delete("/{conv_id}", status_code=204, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def delete_ft_conversation(
     conv_id: int,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     conv = db.query(FtConversation).filter(FtConversation.id == conv_id).first()
     if not conv:
-        raise HTTPException(status_code=404, detail="会話が見つかりません")
+        raise HTTPException(status_code=404, detail=CONV_NOT_FOUND)
     db.delete(conv)
     db.commit()
 
 
-@router.get("/export", response_class=PlainTextResponse)
+@router.get("/export", response_class=PlainTextResponse, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def export_ft_conversations(
     project_id: int,
+    db: DB,
+    _: CurrentUser,
     split: str = "train",
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
 ):
     """ベース + パターンを結合してJSONL形式で出力"""
     if split not in ("train", "valid"):

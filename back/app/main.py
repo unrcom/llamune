@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+import logging
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import auth, models, projects, question_sets, ft_conversations, training_jobs, validate, datasets, system_prompts
@@ -6,6 +8,16 @@ from app.api.routes import auth, models, projects, question_sets, ft_conversatio
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # DB接続チェック
+    from sqlalchemy import text
+    from app.db.database import engine
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logging.info("DB connection: OK")
+    except Exception as e:
+        logging.critical(f"DB接続に失敗しました。起動を中止します: {e}")
+        sys.exit(1)
     yield
 
 

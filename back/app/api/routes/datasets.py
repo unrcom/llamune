@@ -4,15 +4,20 @@ from datetime import datetime, timezone
 import re as _re
 import os
 from pydantic import BaseModel
-from typing import Optional, List
-from sqlalchemy.orm import Session
+from typing import Annotated, Optional, List
+from sqlalchemy.orm import Session as _Session
 from app.db.database import get_db
 from app.core.config import CHROMA_DB_DIR
 from app.core.auth import get_current_user
-from app.models.base import Dataset
+from app.models.base import Dataset, User
+
+DB = Annotated[_Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
+DATASET_NOT_FOUND = "データセットが見つかりません"
+DT_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 BACKUP_DIR = os.path.expanduser("~/dev/llamune/backups")
 
 
@@ -42,14 +47,14 @@ def _to_response(d: Dataset) -> DatasetResponse:
     )
 
 
-@router.get("", response_model=List[DatasetResponse])
-def get_datasets(project_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+@router.get("", response_model=List[DatasetResponse], responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def get_datasets(project_id: int, db: DB, _: CurrentUser):
     datasets = db.query(Dataset).filter(Dataset.project_id == project_id).order_by(Dataset.created_at.desc()).all()
     return [_to_response(d) for d in datasets]
 
 
-@router.post("", response_model=DatasetResponse, status_code=201)
-def create_dataset(req: DatasetCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+@router.post("", response_model=DatasetResponse, status_code=201, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def create_dataset(req: DatasetCreate, db: DB, _: CurrentUser):
     import chromadb
     import uuid
 
@@ -73,13 +78,13 @@ def create_dataset(req: DatasetCreate, db: Session = Depends(get_db), _=Depends(
     return _to_response(dataset)
 
 
-@router.delete("/{dataset_id}", status_code=204)
-def delete_dataset(dataset_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+@router.delete("/{dataset_id}", status_code=204, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def delete_dataset(dataset_id: int, db: DB, _: CurrentUser):
     import chromadb
 
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        raise HTTPException(status_code=404, detail="データセットが見つかりません")
+        raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
     client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
     try:
@@ -100,12 +105,12 @@ class DocumentAdd(BaseModel):
     created_at: Optional[str] = None
 
 
-@router.post("/{dataset_id}/documents", status_code=201)
+@router.post("/{dataset_id}/documents", status_code=201, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def add_document(
     dataset_id: int,
     req: DocumentAdd,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     import chromadb
     import uuid
@@ -115,7 +120,7 @@ def add_document(
 
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        raise HTTPException(status_code=404, detail="データセットが見つかりません")
+        raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
     client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
     collection = client.get_or_create_collection(dataset.name)
@@ -125,7 +130,7 @@ def add_document(
         "title": req.title or "",
         "source_id": req.source_id or str(uuid.uuid4()),
         "source_data": req.source_data or "",
-        "created_at": (req.created_at + ":00" if req.created_at and len(req.created_at) == 16 else req.created_at) or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "created_at": (req.created_at + ":00" if req.created_at and len(req.created_at) == 16 else req.created_at) or datetime.now(timezone.utc).strftime(DT_FORMAT),
     }
     collection.add(
         documents=[req.content],
@@ -135,17 +140,17 @@ def add_document(
     return {"ok": True, "id": doc_id}
 
 
-@router.get("/{dataset_id}/documents")
+@router.get("/{dataset_id}/documents", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def get_documents(
     dataset_id: int,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     import chromadb
 
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        raise HTTPException(status_code=404, detail="データセットが見つかりません")
+        raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
     client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
     collection = client.get_or_create_collection(dataset.name)
@@ -166,18 +171,18 @@ def get_documents(
     return docs
 
 
-@router.delete("/{dataset_id}/documents/{doc_id}", status_code=204)
+@router.delete("/{dataset_id}/documents/{doc_id}", status_code=204, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def delete_document(
     dataset_id: int,
     doc_id: str,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     import chromadb
 
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        raise HTTPException(status_code=404, detail="データセットが見つかりません")
+        raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
     client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
     collection = client.get_or_create_collection(dataset.name)
@@ -191,19 +196,19 @@ class DocumentUpdate(BaseModel):
     created_at: Optional[str] = None
 
 
-@router.put("/{dataset_id}/documents/{doc_id}", status_code=200)
+@router.put("/{dataset_id}/documents/{doc_id}", status_code=200, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def update_document(
     dataset_id: int,
     doc_id: str,
     req: DocumentUpdate,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     import chromadb
 
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        raise HTTPException(status_code=404, detail="データセットが見つかりません")
+        raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
     client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
     collection = client.get_or_create_collection(dataset.name)
@@ -227,17 +232,17 @@ def update_document(
     return {"ok": True, "id": doc_id}
 
 
-@router.get("/{dataset_id}/sources")
+@router.get("/{dataset_id}/sources", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def get_sources(
     dataset_id: int,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     import chromadb
 
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        raise HTTPException(status_code=404, detail="データセットが見つかりません")
+        raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
     client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
     collection = client.get_or_create_collection(dataset.name)
@@ -262,16 +267,16 @@ class DatasetUpdate(BaseModel):
     description: Optional[str] = None
 
 
-@router.put("/{dataset_id}", response_model=DatasetResponse)
+@router.put("/{dataset_id}", response_model=DatasetResponse, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def update_dataset(
     dataset_id: int,
     req: DatasetUpdate,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        raise HTTPException(status_code=404, detail="データセットが見つかりません")
+        raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
     dataset.display_name = req.display_name
     dataset.description = req.description
     db.commit()
@@ -320,7 +325,7 @@ def _build_md_block(doc: dict) -> list:
 
 
 def _build_md(dataset, documents: list, export_type: str = "project") -> str:
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(timezone.utc).strftime(DT_FORMAT)
     lines = []
     lines.append("---")
     lines.append(f"type: {export_type}")
@@ -335,70 +340,69 @@ def _build_md(dataset, documents: list, export_type: str = "project") -> str:
     return "\n".join(lines)
 
 
+def _parse_md_header(lines: list) -> tuple:
+    if not lines or lines[0].strip() != "---":
+        return "", 0
+    md_type = ""
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return md_type, i + 1
+        m = _re.match(r'^type:\s+(.+)$', lines[i].strip())
+        if m:
+            md_type = m.group(1).strip()
+    return md_type, 0
+
+
+def _extract_doc_meta(rest: str) -> dict:
+    meta = {"title": "", "source_id": "", "source_data": "", "created_at": ""}
+    for key in meta:
+        m = _re.match(rf'^\*\*{key}:\*\*\s*(.+)$', rest, _re.MULTILINE)
+        if m:
+            meta[key] = m.group(1).strip()
+            rest = rest[m.end():].strip()
+    meta["content"] = rest.strip()
+    return meta
+
+
+def _parse_block(block: str, current_dataset_name: Optional[str]) -> Optional[dict]:
+    for line in block.splitlines():
+        m = _re.match(r'^#\s+dataset_name:\s+(.+)$', line.strip())
+        if m:
+            current_dataset_name = m.group(1).strip()
+
+    id_match = _re.search(r'^##\s+(.+)$', block, _re.MULTILINE)
+    if not id_match:
+        return None
+
+    doc_id = id_match.group(1).strip()
+    rest = block[id_match.end():].strip()
+    meta = _extract_doc_meta(rest)
+    if not meta["content"]:
+        return None
+
+    return {
+        "dataset_name": current_dataset_name,
+        "id": doc_id,
+        **meta,
+    }
+
+
 def _parse_md(text: str) -> tuple:
     lines = text.split("\n")
-    start = 0
-    md_type = ""
-    if lines and lines[0].strip() == "---":
-        for i in range(1, len(lines)):
-            if lines[i].strip() == "---":
-                start = i + 1
-                break
-            m = _re.match(r'^type:\s+(.+)$', lines[i].strip())
-            if m:
-                md_type = m.group(1).strip()
-
+    md_type, start = _parse_md_header(lines)
     body = "\n".join(lines[start:])
     current_dataset_name = None
     results = []
-    blocks = body.split("\n---")
 
-    for block in blocks:
+    for block in body.split("\n---"):
         block = block.strip()
         if not block:
             continue
-
-        for line in block.splitlines():
-            m = _re.match(r'^#\s+dataset_name:\s+(.+)$', line.strip())
-            if m:
-                current_dataset_name = m.group(1).strip()
-
-        id_match = _re.search(r'^##\s+(.+)$', block, _re.MULTILINE)
-        if not id_match:
-            continue
-
-        doc_id = id_match.group(1).strip()
-        rest = block[id_match.end():].strip()
-
-        title = source_id = source_data = created_at = ""
-
-        for key in ["title", "source_id", "source_data", "created_at"]:
-            m = _re.match(rf'^\*\*{key}:\*\*\s*(.+)$', rest, _re.MULTILINE)
-            if m:
-                val = m.group(1).strip()
-                if key == "title":
-                    title = val
-                elif key == "source_id":
-                    source_id = val
-                elif key == "source_data":
-                    source_data = val
-                elif key == "created_at":
-                    created_at = val
-                rest = rest[m.end():].strip()
-
-        content = rest.strip()
-        if not content:
-            continue
-
-        results.append({
-            "dataset_name": current_dataset_name,
-            "id": doc_id,
-            "title": title,
-            "source_id": source_id,
-            "source_data": source_data,
-            "created_at": created_at,
-            "content": content,
-        })
+        doc = _parse_block(block, current_dataset_name)
+        if doc:
+            if doc.get("dataset_name"):
+                current_dataset_name = doc["dataset_name"]
+            results.append(doc)
 
     return md_type, results
 
@@ -438,7 +442,7 @@ def _save_snapshot(md_text: str, filename: str):
         f.write(md_text)
 
 
-def _snapshot_dataset(dataset, db):
+def _snapshot_dataset(dataset):
     docs = _get_docs_from_collection(dataset)
     md_text = _build_md(dataset, docs, export_type="project")
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
@@ -447,7 +451,7 @@ def _snapshot_dataset(dataset, db):
 
 def _snapshot_all(db):
     datasets = db.query(Dataset).order_by(Dataset.id).all()
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(timezone.utc).strftime(DT_FORMAT)
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
     lines = ["---", "type: full", f"exported_at: {now}", "---", ""]
     for dataset in datasets:
@@ -462,13 +466,13 @@ def _snapshot_all(db):
 
 
 # ── エクスポート（全体）──────────────────────────────────────────
-@router.get("/export/all")
+@router.get("/export/all", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def export_all_datasets(
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     datasets = db.query(Dataset).order_by(Dataset.id).all()
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(timezone.utc).strftime(DT_FORMAT)
     now_str = now[:10]
     lines = ["---", "type: full", f"exported_at: {now}", "---", ""]
     for dataset in datasets:
@@ -489,11 +493,11 @@ def export_all_datasets(
 
 
 # ── インポート（全体）────────────────────────────────────────────
-@router.post("/import/all", status_code=200)
+@router.post("/import/all", status_code=200, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 async def import_all_datasets(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    file: Annotated[UploadFile, File(...)],
+    db: DB,
+    _: CurrentUser,
 ):
     import chromadb
 
@@ -535,15 +539,15 @@ async def import_all_datasets(
 
 
 # ── エクスポート（プロジェクト単位）──────────────────────────────
-@router.get("/{dataset_id}/export")
+@router.get("/{dataset_id}/export", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def export_dataset(
     dataset_id: int,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        raise HTTPException(status_code=404, detail="データセットが見つかりません")
+        raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
     docs = _get_docs_from_collection(dataset)
     md_text = _build_md(dataset, docs, export_type="project")
@@ -557,18 +561,18 @@ def export_dataset(
 
 
 # ── インポート（プロジェクト単位）────────────────────────────────
-@router.post("/{dataset_id}/import", status_code=200)
+@router.post("/{dataset_id}/import", status_code=200, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 async def import_dataset(
     dataset_id: int,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    file: Annotated[UploadFile, File(...)],
+    db: DB,
+    _: CurrentUser,
 ):
     import chromadb
 
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        raise HTTPException(status_code=404, detail="データセットが見つかりません")
+        raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
     raw = await file.read()
     text = raw.decode("utf-8")
@@ -580,7 +584,7 @@ async def import_dataset(
     if ds_names and dataset.name not in ds_names:
         raise HTTPException(status_code=400, detail=f"このファイルは別のデータセット（{', '.join(ds_names)}）のバックアップです")
 
-    _snapshot_dataset(dataset, db)
+    _snapshot_dataset(dataset)
 
     client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
     collection = client.get_or_create_collection(dataset.name)

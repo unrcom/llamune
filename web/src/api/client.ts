@@ -55,14 +55,14 @@ apiClient.interceptors.response.use(
         } catch (e) {
           console.log('[auth] refresh failed', e)
           clearTokens()
-          window.location.href = '/login'
+          globalThis.location.href = '/login'
         }
       } else {
         console.log('[auth] no refresh token, redirecting to login')
         clearTokens()
-        window.location.href = '/login'
+        globalThis.location.href = '/login'
       }
     }
-    return Promise.reject(error)
+    throw error
   }
 )

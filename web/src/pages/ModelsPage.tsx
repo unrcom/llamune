@@ -125,7 +125,7 @@ export default function ModelsPage() {
       })
       if (hfQuery.trim()) params.append('search', hfQuery.trim())
       const res = await fetch(`https://huggingface.co/api/models?${params}`)
-      if (!res.ok) throw new Error()
+      if (!res.ok) throw new Error("Failed to load")
       const data: HFModel[] = await res.json()
       data.sort((a, b) => a.id.localeCompare(b.id))
       setHfModels(data)
@@ -144,7 +144,7 @@ export default function ModelsPage() {
     setDisplayName(hfModel.id.split('/').pop() || hfModel.id)
     try {
       const res = await fetch(`https://huggingface.co/api/models/${hfModel.id}?blobs=true`)
-      if (!res.ok) throw new Error()
+      if (!res.ok) throw new Error("Failed to load")
       const detail: HFModelDetail = await res.json()
       const totalBytes = detail.siblings.reduce((sum, f) => sum + (f.size || 0), 0)
       setFileSize(formatBytes(totalBytes))
@@ -253,36 +253,33 @@ export default function ModelsPage() {
           {/* ローカルモデル */}
           {tab === 'local' && (
             <>
-              {localLoading ? (
+              {localLoading && (
                 <div className="flex items-center gap-2 text-gray-500 text-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />読み込み中...
                 </div>
-              ) : localModels.length === 0 ? (
+              )}
+              {!localLoading && localModels.length === 0 && (
                 <p className="text-sm text-gray-500">ローカルモデルが見つかりません</p>
-              ) : (
+              )}
+              {!localLoading && localModels.length > 0 && (
                 <div className="border rounded max-h-64 overflow-y-auto">
-                  {localModels.map(m => (
+                  {localModels.map(m => {
+                    let btnClass = 'hover:bg-gray-50'
+                    if (m.registered) btnClass = 'bg-gray-50 cursor-not-allowed'
+                    else if (name === m.name) btnClass = 'bg-blue-50'
+                    return (
                     <button
                       key={m.name}
                       onClick={() => !m.registered && selectLocal(m)}
                       disabled={m.registered}
-                      className={`w-full text-left px-3 py-2 border-b last:border-b-0 flex items-center justify-between transition-colors ${
-                        m.registered
-                          ? 'bg-gray-50 cursor-not-allowed'
-                          : name === m.name
-                          ? 'bg-blue-50'
-                          : 'hover:bg-gray-50'
-                      }`}
+                      className={`w-full text-left px-3 py-2 border-b last:border-b-0 flex items-center justify-between transition-colors ${btnClass}`}
                     >
                       <span className="text-sm font-mono">{m.display_name}</span>
-                      {m.registered
-                        ? <Badge variant="secondary" className="text-xs">登録済み</Badge>
-                        : name === m.name
-                        ? <Badge variant="outline" className="text-xs text-blue-600">選択中</Badge>
-                        : null
-                      }
+                      {m.registered && <Badge variant="secondary" className="text-xs">登録済み</Badge>}
+                      {!m.registered && name === m.name && <Badge variant="outline" className="text-xs text-blue-600">選択中</Badge>}
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </>

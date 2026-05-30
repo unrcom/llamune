@@ -46,7 +46,7 @@ def load_model(model_name: str, adapter_path: Optional[str] = None):
             _model, _tokenizer = load(model_name)
         _current_model_name = model_name
         _current_adapter_path = adapter_path
-        print(f"✅ Model loaded: {model_name}" + (f" + adapter" if adapter_path else ""))
+        print(f"✅ Model loaded: {model_name}" + (" + adapter" if adapter_path else ""))
 
 
 def _generate_impl(messages: list, max_tokens: int = 512) -> str:

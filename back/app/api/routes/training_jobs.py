@@ -4,17 +4,21 @@ import subprocess
 from app.core.config import ADAPTER_DIR
 import tempfile
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, text
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Annotated, Optional, List
 from app.db.database import get_db
+from sqlalchemy.orm import Session as _Session
 from app.core.config import DATABASE_URL
 from app.core.auth import get_current_user
 from app.core.llm import _detect_backend
-from app.models.base import Project, Model, TrainingJob, FtConversation
+from app.models.base import Project, Model, TrainingJob, FtConversation, User
+
+DB = Annotated[_Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 router = APIRouter(prefix="/training-jobs", tags=["training_jobs"])
 
@@ -38,12 +42,12 @@ class TrainingJobResponse(BaseModel):
     max_seq_length: int
     iters: int
     batch_size: int
-    learning_rate: Optional[float]
-    adapter_path: Optional[str]
-    error_message: Optional[str]
-    log: Optional[str]
-    started_at: Optional[str]
-    finished_at: Optional[str]
+    learning_rate: Optional[float] = None
+    adapter_path: Optional[str] = None
+    error_message: Optional[str] = None
+    log: Optional[str] = None
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
     created_at: str
 
 
@@ -67,7 +71,7 @@ def _to_response(job: TrainingJob) -> TrainingJobResponse:
     )
 
 
-def _build_jsonl(db: Session, project_id: int, split: str) -> str:
+def _build_jsonl(db: _Session, project_id: int, split: str) -> str:
     convs = db.query(FtConversation).filter(
         FtConversation.project_id == project_id,
         FtConversation.is_base == False,
@@ -86,6 +90,63 @@ def _build_jsonl(db: Session, project_id: int, split: str) -> str:
     return "\n".join(lines)
 
 
+def _prepare_adapter_path(job_id: int) -> str:
+    import shutil
+    adapter_path = os.path.join(ADAPTER_DIR, str(job_id))
+    if os.path.exists(adapter_path):
+        shutil.rmtree(adapter_path)
+    os.makedirs(adapter_path, exist_ok=True)
+    return adapter_path
+
+
+def _build_cmd(model_name: str, tmpdir: str, adapter_path: str,
+               max_seq_length: int, iters: int, batch_size: int,
+               learning_rate: Optional[float]) -> list:
+    if _detect_backend(model_name) == "mlx_vlm":
+        raise NotImplementedError("mlx_vlm モデルの訓練は将来対応予定です")
+    cmd = [
+        "mlx_lm.lora",
+        "--model", model_name,
+        "--train",
+        "--data", tmpdir,
+        "--max-seq-length", str(max_seq_length),
+        "--iters", str(iters),
+        "--batch-size", str(batch_size),
+        "--adapter-path", adapter_path,
+    ]
+    if learning_rate:
+        cmd += ["--learning-rate", str(learning_rate)]
+    return cmd
+
+
+def _stream_log(process: subprocess.Popen, job: TrainingJob, db) -> list:
+    log_lines = []
+    for line in process.stdout:
+        line = line.rstrip()
+        if line:
+            log_lines.append(line)
+            if len(log_lines) % 5 == 0:
+                job.log = "\n".join(log_lines)
+                db.commit()
+    process.wait()
+    return log_lines
+
+
+def _register_ft_model(job: TrainingJob, adapter_path: str, db) -> None:
+    base_model = db.query(Model).filter(Model.id == job.models_id).first()
+    if base_model:
+        ft_model = Model(
+            name=base_model.name,
+            display_name=f"{base_model.display_name} FT #{job.id}",
+            model_type="fine-tuned",
+            adapter_path=adapter_path,
+            parent_models_id=base_model.id,
+            trained_at=datetime.now(timezone.utc),
+        )
+        db.add(ft_model)
+        db.commit()
+
+
 def _run_training(job_id: int, model_name: str, train_data: str, valid_data: str,
                   max_seq_length: int, iters: int, batch_size: int,
                   learning_rate: Optional[float]):
@@ -100,15 +161,11 @@ def _run_training(job_id: int, model_name: str, train_data: str, valid_data: str
             return
 
         job.status = "running"
-        job.started_at = datetime.utcnow()
+        job.started_at = datetime.now(timezone.utc)
         job.log = ""
         db.commit()
 
-        import shutil
-        adapter_path = os.path.join(ADAPTER_DIR, str(job_id))
-        if os.path.exists(adapter_path):
-            shutil.rmtree(adapter_path)
-        os.makedirs(adapter_path, exist_ok=True)
+        adapter_path = _prepare_adapter_path(job_id)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with open(os.path.join(tmpdir, "train.jsonl"), "w") as f:
@@ -116,23 +173,8 @@ def _run_training(job_id: int, model_name: str, train_data: str, valid_data: str
             with open(os.path.join(tmpdir, "valid.jsonl"), "w") as f:
                 f.write(valid_data if valid_data else train_data)
 
-            is_vlm = (_detect_backend(model_name) == "mlx_vlm")
-
-            if is_vlm:
-                raise NotImplementedError("mlx_vlm モデルの訓練は将来対応予定です")
-
-            cmd = [
-                "mlx_lm.lora",
-                "--model", model_name,
-                "--train",
-                "--data", tmpdir,
-                "--max-seq-length", str(max_seq_length),
-                "--iters", str(iters),
-                "--batch-size", str(batch_size),
-                "--adapter-path", adapter_path,
-            ]
-            if learning_rate:
-                cmd += ["--learning-rate", str(learning_rate)]
+            cmd = _build_cmd(model_name, tmpdir, adapter_path,
+                             max_seq_length, iters, batch_size, learning_rate)
 
             process = subprocess.Popen(
                 cmd,
@@ -142,37 +184,15 @@ def _run_training(job_id: int, model_name: str, train_data: str, valid_data: str
                 bufsize=1,
             )
 
-            log_lines = []
-            for line in process.stdout:
-                line = line.rstrip()
-                if line:
-                    log_lines.append(line)
-                    if len(log_lines) % 5 == 0:
-                        job.log = "\n".join(log_lines)
-                        db.commit()
-
-            process.wait()
+            log_lines = _stream_log(process, job, db)
             job.log = "\n".join(log_lines)
-            job.finished_at = datetime.utcnow()
+            job.finished_at = datetime.now(timezone.utc)
 
             if process.returncode == 0:
                 job.status = "completed"
                 job.adapter_path = adapter_path
                 db.commit()
-
-                # FT済みモデルを自動登録
-                base_model = db.query(Model).filter(Model.id == job.models_id).first()
-                if base_model:
-                    ft_model = Model(
-                        name=base_model.name,
-                        display_name=f"{base_model.display_name} FT #{job.id}",
-                        model_type="fine-tuned",
-                        adapter_path=adapter_path,
-                        parent_models_id=base_model.id,
-                        trained_at=datetime.utcnow(),
-                    )
-                    db.add(ft_model)
-                    db.commit()
+                _register_ft_model(job, adapter_path, db)
             else:
                 job.status = "failed"
                 job.error_message = "mlx_lm.lora が異常終了しました"
@@ -184,7 +204,7 @@ def _run_training(job_id: int, model_name: str, train_data: str, valid_data: str
             if job:
                 job.status = "failed"
                 job.error_message = str(e)
-                job.finished_at = datetime.utcnow()
+                job.finished_at = datetime.now(timezone.utc)
                 db.commit()
         except Exception:
             pass
@@ -193,11 +213,11 @@ def _run_training(job_id: int, model_name: str, train_data: str, valid_data: str
         engine.dispose()
 
 
-@router.get("", response_model=List[TrainingJobResponse])
+@router.get("", response_model=List[TrainingJobResponse], responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def get_training_jobs(
     project_id: int,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     jobs = db.query(TrainingJob).filter(
         TrainingJob.project_id == project_id
@@ -205,11 +225,11 @@ def get_training_jobs(
     return [_to_response(j) for j in jobs]
 
 
-@router.get("/{job_id}", response_model=TrainingJobResponse)
+@router.get("/{job_id}", response_model=TrainingJobResponse, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def get_training_job(
     job_id: int,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     job = db.query(TrainingJob).filter(TrainingJob.id == job_id).first()
     if not job:
@@ -217,11 +237,11 @@ def get_training_job(
     return _to_response(job)
 
 
-@router.post("", response_model=TrainingJobResponse, status_code=201)
+@router.post("", response_model=TrainingJobResponse, status_code=201, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def create_and_start_training_job(
     req: TrainingJobCreate,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    db: DB,
+    _: CurrentUser,
 ):
     project = db.query(Project).filter(Project.id == req.project_id).first()
     if not project:

@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List
-from sqlalchemy.orm import Session
+from typing import Annotated, Optional, List
+from sqlalchemy.orm import Session as _Session
 from app.db.database import get_db
 from app.core.auth import get_current_user
-from app.models.base import SystemPrompt
+from app.models.base import SystemPrompt, User
+
+DB = Annotated[_Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 router = APIRouter(prefix="/system-prompts", tags=["system_prompts"])
 
@@ -41,13 +44,13 @@ def _to_response(sp: SystemPrompt) -> SystemPromptResponse:
     )
 
 
-@router.get("", response_model=List[SystemPromptResponse])
-def get_system_prompts(project_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+@router.get("", response_model=List[SystemPromptResponse], responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def get_system_prompts(project_id: int, db: DB, _: CurrentUser):
     return [_to_response(sp) for sp in db.query(SystemPrompt).filter(SystemPrompt.project_id == project_id).all()]
 
 
-@router.post("", response_model=SystemPromptResponse, status_code=201)
-def create_system_prompt(req: SystemPromptCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+@router.post("", response_model=SystemPromptResponse, status_code=201, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def create_system_prompt(req: SystemPromptCreate, db: DB, _: CurrentUser):
     # プロジェクトで1件のみ
     existing = db.query(SystemPrompt).filter(SystemPrompt.project_id == req.project_id).first()
     if existing:
@@ -59,8 +62,8 @@ def create_system_prompt(req: SystemPromptCreate, db: Session = Depends(get_db),
     return _to_response(sp)
 
 
-@router.put("/{sp_id}", response_model=SystemPromptResponse)
-def update_system_prompt(sp_id: int, req: SystemPromptUpdate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+@router.put("/{sp_id}", response_model=SystemPromptResponse, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def update_system_prompt(sp_id: int, req: SystemPromptUpdate, db: DB, _: CurrentUser):
     sp = db.query(SystemPrompt).filter(SystemPrompt.id == sp_id).first()
     if not sp:
         raise HTTPException(status_code=404, detail="見つかりません")
@@ -71,8 +74,8 @@ def update_system_prompt(sp_id: int, req: SystemPromptUpdate, db: Session = Depe
     return _to_response(sp)
 
 
-@router.delete("/{sp_id}", status_code=204)
-def delete_system_prompt(sp_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+@router.delete("/{sp_id}", status_code=204, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def delete_system_prompt(sp_id: int, db: DB, _: CurrentUser):
     sp = db.query(SystemPrompt).filter(SystemPrompt.id == sp_id).first()
     if not sp:
         raise HTTPException(status_code=404, detail="見つかりません")

@@ -1,3 +1,4 @@
+import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { getToken, getIsAdmin } from '@/api/client'
 import Layout from '@/components/layout/Layout'
@@ -9,11 +10,11 @@ import JobsPage from '@/pages/JobsPage'
 import ChatPage from '@/pages/ChatPage'
 import DatasetPage from '@/pages/DatasetPage'
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
+function RequireAuth({ children }: Readonly<{ children: React.ReactNode }>) {
   return getToken() ? <>{children}</> : <Navigate to="/login" replace />
 }
 
-function RequireAdmin({ children }: { children: React.ReactNode }) {
+function RequireAdmin({ children }: Readonly<{ children: React.ReactNode }>) {
   if (!getToken()) return <Navigate to="/login" replace />
   if (!getIsAdmin()) return <Navigate to="/chat" replace />
   return <>{children}</>

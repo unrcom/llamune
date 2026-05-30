@@ -21,3 +21,4 @@ chroma_db/
 backups/
 .scannerwork/
 sonar-project.properties
+chroma_db_backup/

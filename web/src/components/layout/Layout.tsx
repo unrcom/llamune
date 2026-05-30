@@ -14,24 +14,11 @@ const adminItems = [
   { to: '/admin/jobs',      label: '訓練ジョブ',   icon: Wrench },
 ]
 
-export default function Layout() {
-  const navigate = useNavigate()
-  const isAdmin = getIsAdmin()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [adminOpen, setAdminOpen] = useState(true)
+function useBackup() {
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const [backupMsg, setBackupMsg] = useState<string | null>(null)
   const importAllRef = useRef<HTMLInputElement>(null)
-
-  async function onLogout() {
-    try {
-      const refreshToken = localStorage.getItem('llmn_refresh_token')
-      if (refreshToken) await apiClient.post('/auth/logout', { refresh_token: refreshToken })
-    } catch {}
-    clearTokens()
-    navigate('/login')
-  }
 
   async function exportAll() {
     setExporting(true)
@@ -78,12 +65,37 @@ export default function Layout() {
     }
   }
 
+  return { exporting, importing, backupMsg, setBackupMsg, importAllRef, exportAll, handleImportAll }
+}
+
+function useLogout() {
+  const navigate = useNavigate()
+  async function onLogout() {
+    try {
+      const refreshToken = globalThis.localStorage.getItem('llmn_refresh_token')
+      if (refreshToken) await apiClient.post('/auth/logout', { refresh_token: refreshToken })
+    } catch {}
+    clearTokens()
+    navigate('/login')
+  }
+  return { onLogout }
+}
+
+export default function Layout() {
+  const isAdmin = getIsAdmin()
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const toggleSidebar = () => setSidebarOpen(o => !o)
+  const [adminOpen, setAdminOpen] = useState(true)
+  const toggleAdmin = () => setAdminOpen(o => !o)
+  const { exporting, importing, backupMsg, setBackupMsg, importAllRef, exportAll, handleImportAll } = useBackup()
+  const { onLogout } = useLogout()
+
   return (
     <div className="flex h-screen bg-gray-50">
       <aside className={`border-r bg-white flex flex-col shrink-0 transition-all duration-200 ${sidebarOpen ? 'w-48' : 'w-12'}`}>
         <div className="flex items-center justify-between p-3 border-b h-14">
           {sidebarOpen && <h1 className="font-bold text-blue-600">llamune</h1>}
-          <button onClick={() => setSidebarOpen(o => !o)} className="p-1 rounded hover:bg-gray-100 text-gray-500 ml-auto">
+          <button onClick={toggleSidebar} className="p-1 rounded hover:bg-gray-100 text-gray-500 ml-auto">
             {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
         </div>
@@ -91,7 +103,7 @@ export default function Layout() {
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           <NavLink
             to="/chat"
-            title={!sidebarOpen ? 'チャット' : undefined}
+            title={sidebarOpen ? undefined : 'チャット'}
             className={({ isActive }) =>
               `flex items-center gap-2 py-2 rounded text-sm transition-colors ${sidebarOpen ? 'px-3' : 'justify-center px-2'} ${isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`
             }
@@ -102,7 +114,7 @@ export default function Layout() {
 
           <NavLink
             to="/dataset"
-            title={!sidebarOpen ? 'データセット' : undefined}
+            title={sidebarOpen ? undefined : 'データセット'}
             className={({ isActive }) =>
               `flex items-center gap-2 py-2 rounded text-sm transition-colors ${sidebarOpen ? 'px-3' : 'justify-center px-2'} ${isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`
             }
@@ -115,7 +127,7 @@ export default function Layout() {
             <div>
               {sidebarOpen && (
                 <button
-                  onClick={() => setAdminOpen(o => !o)}
+                  onClick={toggleAdmin}
                   className="flex items-center gap-2 px-3 py-2 rounded text-sm text-gray-500 hover:bg-gray-100 w-full mt-2"
                 >
                   {adminOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
@@ -128,7 +140,7 @@ export default function Layout() {
                     <NavLink
                       key={to}
                       to={to}
-                      title={!sidebarOpen ? label : undefined}
+                      title={sidebarOpen ? undefined : label}
                       className={({ isActive }) =>
                         `flex items-center gap-2 py-2 rounded text-sm transition-colors ${sidebarOpen ? 'px-3' : 'justify-center px-2'} ${isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`
                       }
@@ -154,7 +166,7 @@ export default function Layout() {
           <button
             onClick={exportAll}
             disabled={exporting}
-            title={!sidebarOpen ? '全体エクスポート' : undefined}
+            title={sidebarOpen ? undefined : '全体エクスポート'}
             className={`flex items-center gap-2 py-2 rounded text-sm text-gray-600 hover:bg-gray-100 w-full ${sidebarOpen ? 'px-3' : 'justify-center px-2'}`}
           >
             {exporting ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Download className="h-4 w-4 shrink-0" />}
@@ -163,7 +175,7 @@ export default function Layout() {
           <button
             onClick={() => importAllRef.current?.click()}
             disabled={importing}
-            title={!sidebarOpen ? '全体インポート' : undefined}
+            title={sidebarOpen ? undefined : '全体インポート'}
             className={`flex items-center gap-2 py-2 rounded text-sm text-gray-600 hover:bg-gray-100 w-full ${sidebarOpen ? 'px-3' : 'justify-center px-2'}`}
           >
             {importing ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Upload className="h-4 w-4 shrink-0" />}
@@ -173,7 +185,7 @@ export default function Layout() {
 
           <button
             onClick={onLogout}
-            title={!sidebarOpen ? 'ログアウト' : undefined}
+            title={sidebarOpen ? undefined : 'ログアウト'}
             className={`flex items-center gap-2 py-2 rounded text-sm text-gray-600 hover:bg-gray-100 w-full ${sidebarOpen ? 'px-3' : 'justify-center px-2'}`}
           >
             <LogOut className="h-4 w-4 shrink-0" />

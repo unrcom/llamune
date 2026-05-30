@@ -2,10 +2,13 @@ import re
 import os
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Annotated, Optional, List
 from app.core.config import CHROMA_DB_DIR
 from app.core.auth import get_current_user
 from app.core import llm
+from app.models.base import User
+
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 router = APIRouter(prefix="/validate", tags=["validate"])
 
@@ -25,8 +28,8 @@ class GenerateRequest(BaseModel):
 
 class StatusResponse(BaseModel):
     loaded: bool
-    model_name: Optional[str]
-    adapter_path: Optional[str]
+    model_name: Optional[str] = None
+    adapter_path: Optional[str] = None
 
 
 def _search_chroma(query: str, dataset_id: int, db) -> str:
@@ -48,8 +51,8 @@ def _search_chroma(query: str, dataset_id: int, db) -> str:
         return f"検索エラー: {str(e)}"
 
 
-@router.get("/status", response_model=StatusResponse)
-def get_status(_=Depends(get_current_user)):
+@router.get("/status", response_model=StatusResponse, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def get_status(_: CurrentUser):
     return StatusResponse(
         loaded=llm.is_model_loaded(),
         model_name=llm.get_current_model_name(),
@@ -57,8 +60,8 @@ def get_status(_=Depends(get_current_user)):
     )
 
 
-@router.post("/load")
-def load_model(req: LoadRequest, _=Depends(get_current_user)):
+@router.post("/load", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def load_model(req: LoadRequest, _: CurrentUser):
     try:
         llm.load_model(req.model_name, req.adapter_path)
         return {"ok": True, "model_name": req.model_name, "adapter_path": req.adapter_path}
@@ -66,8 +69,8 @@ def load_model(req: LoadRequest, _=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/generate")
-def generate(req: GenerateRequest, _=Depends(get_current_user)):
+@router.post("/generate", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def generate(req: GenerateRequest, _: CurrentUser):
     from app.db.database import get_db
 
     if not llm.is_model_loaded():
@@ -123,8 +126,8 @@ def generate(req: GenerateRequest, _=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/system-prompt/{model_id}")
-def get_model_system_prompt(model_id: int, _=Depends(get_current_user)):
+@router.get("/system-prompt/{model_id}", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def get_model_system_prompt(model_id: int, _: CurrentUser):
     from app.db.database import get_db
     from app.models.base import Model, TrainingJob, SystemPrompt
     db = next(get_db())

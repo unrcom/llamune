@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { apiClient } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -9,6 +9,114 @@ interface Project { id: number; display_name: string }
 interface Dataset { id: number; project_id: number; name: string; display_name: string; description: string | null; created_at: string }
 interface Document { id: string; title: string; content: string; source_id: string; source_data: string; created_at: string }
 interface Source { source_id: string; source_data: string; created_at: string }
+
+// コンポーネント外に移動
+function today() {
+  return new Date().toISOString().slice(0, 19).replace('Z', '')
+}
+
+function splitIntoChunks(text: string, maxLen = 500): string[] {
+  const result: string[] = []
+  const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
+  let current = ''
+  for (const para of paragraphs) {
+    if ((current + '\n\n' + para).trim().length <= maxLen) {
+      current = current ? current + '\n\n' + para : para
+    } else {
+      if (current) result.push(current.trim())
+      if (para.length > maxLen) {
+        const sentences = para.split(/(?<=[。！？\n])/)
+        let sub = ''
+        for (const s of sentences) {
+          if ((sub + s).length <= maxLen) { sub += s }
+          else {
+            if (sub) result.push(sub.trim())
+            sub = s.length > maxLen ? s.slice(0, maxLen) : s
+          }
+        }
+        current = sub.trim()
+      } else {
+        current = para
+      }
+    }
+  }
+  if (current.trim()) result.push(current.trim())
+  return result.filter(Boolean)
+}
+
+interface SourceSelectorProps {
+  value: string
+  onChange: (v: string) => void
+  sources: Source[]
+}
+
+function SourceSelector({ value, onChange, sources }: Readonly<SourceSelectorProps>) {
+  return (
+    <select
+      className="w-full border rounded px-3 py-1.5 text-sm bg-white"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+    >
+      <option value="new">新規資料</option>
+      {sources.map(s => (
+        <option key={s.source_id} value={s.source_id}>
+          {s.source_data || s.source_id}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function getContentClass(len: number) {
+  if (len >= 700) return 'text-red-500 font-medium'
+  if (len >= 500) return 'text-yellow-600'
+  return 'text-gray-400'
+}
+
+function normalizeCreatedAt(v: string): string | undefined {
+  if (!v) return undefined
+  return v.length === 16 ? v + ':00' : v
+}
+
+function getTextareaClass(len: number) {
+  if (len >= 700) return 'text-sm border-red-400'
+  if (len >= 500) return 'text-sm border-yellow-400'
+  return 'text-sm'
+}
+
+
+interface ChunkListProps {
+  chunks: string[]
+  setChunks: React.Dispatch<React.SetStateAction<string[]>>
+}
+
+function ChunkList({ chunks, setChunks }: Readonly<ChunkListProps>) {
+  function removeChunk(i: number) {
+    setChunks(prev => prev.filter((_, j) => j !== i))
+  }
+  function updateChunk(i: number, value: string) {
+    setChunks(prev => prev.map((c, j) => j === i ? value : c))
+  }
+  return (
+    <div className="space-y-2">
+      <div className="text-xs text-gray-400">{chunks.length}件に分割されました。</div>
+      {chunks.map((chunk, i) => (
+        <div key={`chunk-${chunk.slice(0, 20)}-${i}`} className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">#{i + 1}</span>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs ${getContentClass(chunk.length)}`}>
+                {chunk.length} 文字{chunk.length >= 700 ? '　要修正' : ''}
+              </span>
+              <button onClick={() => removeChunk(i)} className="text-gray-300 hover:text-red-400"><X className="h-3 w-3" /></button>
+            </div>
+          </div>
+          <Textarea rows={6} value={chunk} onChange={e => updateChunk(i, e.target.value)} className={getTextareaClass(chunk.length)} />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function DatasetPage() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -21,14 +129,12 @@ export default function DatasetPage() {
   const [showAddDoc, setShowAddDoc] = useState(false)
   const [savingDoc, setSavingDoc] = useState(false)
 
-  // 単体追加フォーム
   const [newDocTitle, setNewDocTitle] = useState('')
   const [newDocContent, setNewDocContent] = useState('')
   const [newDocSourceId, setNewDocSourceId] = useState('new')
   const [newDocSourceData, setNewDocSourceData] = useState('')
   const [newDocCreatedAt, setNewDocCreatedAt] = useState(() => today())
 
-  // ドキュメント編集
   const [editingDocId, setEditingDocId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [editingContent, setEditingContent] = useState('')
@@ -38,14 +144,18 @@ export default function DatasetPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // エクスポート・インポート
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<string | null>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
 
-  function today() {
-    return new Date().toISOString().slice(0, 19).replace('Z', '')
-  }
+  const [showBulkImport, setShowBulkImport] = useState(false)
+  const [bulkText, setBulkText] = useState('')
+  const [bulkTitlePrefix, setBulkTitlePrefix] = useState('')
+  const [bulkSourceId, setBulkSourceId] = useState('new')
+  const [bulkSourceData, setBulkSourceData] = useState('')
+  const [bulkCreatedAt, setBulkCreatedAt] = useState(() => today())
+  const [chunks, setChunks] = useState<string[]>([])
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   useEffect(() => {
     apiClient.get('/projects').then(res => setProjects(res.data))
@@ -136,14 +246,13 @@ export default function DatasetPage() {
     setError(null)
     setSavingDoc(true)
     try {
-      console.log('created_at:', newDocCreatedAt)
       const source_id = newDocSourceId === 'new' ? undefined : newDocSourceId
       await apiClient.post(`/datasets/${dataset.id}/documents`, {
         title: newDocTitle.trim() || undefined,
         content: newDocContent,
         source_id,
         source_data: newDocSourceData.trim() || undefined,
-        created_at: newDocCreatedAt ? (newDocCreatedAt.length === 16 ? newDocCreatedAt + ':00' : newDocCreatedAt) : undefined,
+        created_at: normalizeCreatedAt(newDocCreatedAt),
       })
       setNewDocTitle('')
       setNewDocContent('')
@@ -157,46 +266,6 @@ export default function DatasetPage() {
     } finally {
       setSavingDoc(false)
     }
-  }
-
-  // 一括登録
-  const [showBulkImport, setShowBulkImport] = useState(false)
-  const [bulkText, setBulkText] = useState('')
-  const [bulkTitlePrefix, setBulkTitlePrefix] = useState('')
-  const [bulkSourceId, setBulkSourceId] = useState('new')
-  const [bulkSourceData, setBulkSourceData] = useState('')
-  const [bulkCreatedAt, setBulkCreatedAt] = useState(() => today())
-  const [chunks, setChunks] = useState<string[]>([])
-  const [bulkSaving, setBulkSaving] = useState(false)
-
-  function splitIntoChunks(text: string, maxLen = 500): string[] {
-    const result: string[] = []
-    const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
-    let current = ''
-    for (const para of paragraphs) {
-      if ((current + '\n\n' + para).trim().length <= maxLen) {
-        current = current ? current + '\n\n' + para : para
-      } else {
-        if (current) result.push(current.trim())
-        if (para.length > maxLen) {
-          const sentences = para.split(/(?<=[。！？\n])/)
-          let sub = ''
-          for (const s of sentences) {
-            if ((sub + s).length <= maxLen) { sub += s }
-            else {
-              if (sub) result.push(sub.trim())
-              sub = s.length > maxLen ? s.slice(0, maxLen) : s
-            }
-          }
-          if (sub) current = sub.trim()
-          else current = ''
-        } else {
-          current = para
-        }
-      }
-    }
-    if (current.trim()) result.push(current.trim())
-    return result.filter(Boolean)
   }
 
   async function bulkRegister() {
@@ -241,7 +310,7 @@ export default function DatasetPage() {
         title: editingTitle,
         content: editingContent,
         source_data: editingSourceData,
-        created_at: editingCreatedAt ? (editingCreatedAt.length === 16 ? editingCreatedAt + ':00' : editingCreatedAt) : undefined,
+        created_at: normalizeCreatedAt(editingCreatedAt),
       })
       setEditingDocId(null)
       await refreshDocs()
@@ -256,7 +325,6 @@ export default function DatasetPage() {
     await refreshDocs()
   }
 
-  // エクスポート
   async function exportDataset() {
     if (!dataset) return
     try {
@@ -275,7 +343,6 @@ export default function DatasetPage() {
     }
   }
 
-  // インポート
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     if (!dataset || !e.target.files?.[0]) return
     const file = e.target.files[0]
@@ -298,22 +365,12 @@ export default function DatasetPage() {
     }
   }
 
-  // 資料選択UI共通
-  function SourceSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-    return (
-      <select
-        className="w-full border rounded px-3 py-1.5 text-sm bg-white"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-      >
-        <option value="new">新規資料</option>
-        {sources.map(s => (
-          <option key={s.source_id} value={s.source_id}>
-            {s.source_data || s.source_id}
-          </option>
-        ))}
-      </select>
-    )
+  function handleSourceChange(sourceId: string, setSourceId: (v: string) => void, setSourceData: (v: string) => void) {
+    setSourceId(sourceId)
+    if (sourceId !== 'new') {
+      const s = sources.find(s => s.source_id === sourceId)
+      if (s) { setSourceData(s.source_data) }
+    }
   }
 
   return (
@@ -334,9 +391,10 @@ export default function DatasetPage() {
 
       {selectedProjectId && (
         <>
-          {loading ? (
+          {loading && (
             <div className="text-sm text-gray-400">読み込み中...</div>
-          ) : !dataset ? (
+          )}
+          {!loading && !dataset && (
             <div className="border rounded p-4 bg-gray-50 space-y-3">
               <p className="text-sm text-gray-500">このプロジェクトにはデータセットがありません。</p>
               <Button size="sm" onClick={createDataset} disabled={creatingDataset}>
@@ -344,7 +402,8 @@ export default function DatasetPage() {
               </Button>
               {error && <div className="text-red-500 text-sm">{error}</div>}
             </div>
-          ) : (
+          )}
+          {!loading && dataset && (
             <div className="space-y-4">
 
               {/* ヘッダー */}
@@ -389,7 +448,11 @@ export default function DatasetPage() {
                   <div className="space-y-2">
                     <div>
                       <Label className="text-xs text-gray-500">資料</Label>
-                      <SourceSelector value={bulkSourceId} onChange={v => { setBulkSourceId(v); if (v !== 'new') { const s = sources.find(s => s.source_id === v); if (s) { setBulkSourceData(s.source_data); setBulkCreatedAt(today()) } } }} />
+                      <SourceSelector
+                        value={bulkSourceId}
+                        sources={sources}
+                        onChange={v => handleSourceChange(v, setBulkSourceId, setBulkSourceData)}
+                      />
                     </div>
                     {bulkSourceId === 'new' && (
                       <>
@@ -421,20 +484,7 @@ export default function DatasetPage() {
                   {chunks.length > 0 && (
                     <div className="space-y-2">
                       <div className="text-xs text-gray-400">{chunks.length}件に分割されました。</div>
-                      {chunks.map((chunk, i) => (
-                        <div key={i} className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">#{i + 1}</span>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs ${chunk.length >= 700 ? 'text-red-500 font-medium' : chunk.length >= 500 ? 'text-yellow-600' : 'text-gray-400'}`}>
-                                {chunk.length} 文字{chunk.length >= 700 ? '　要修正' : ''}
-                              </span>
-                              <button onClick={() => setChunks(prev => prev.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400"><X className="h-3 w-3" /></button>
-                            </div>
-                          </div>
-                          <Textarea rows={6} value={chunk} onChange={e => setChunks(prev => prev.map((c, j) => j === i ? e.target.value : c))} className={`text-sm ${chunk.length >= 700 ? 'border-red-400' : chunk.length >= 500 ? 'border-yellow-400' : ''}`} />
-                        </div>
-                      ))}
+                      <ChunkList chunks={chunks} setChunks={setChunks} />
                     </div>
                   )}
                 </div>
@@ -445,7 +495,11 @@ export default function DatasetPage() {
                 <div className="border rounded p-3 bg-gray-50 space-y-2">
                   <div>
                     <Label className="text-xs text-gray-500">資料</Label>
-                    <SourceSelector value={newDocSourceId} onChange={v => { setNewDocSourceId(v); if (v !== 'new') { const s = sources.find(s => s.source_id === v); if (s) { setNewDocSourceData(s.source_data); setNewDocCreatedAt(today()) } } }} />
+                    <SourceSelector
+                      value={newDocSourceId}
+                      sources={sources}
+                      onChange={v => handleSourceChange(v, setNewDocSourceId, setNewDocSourceData)}
+                    />
                   </div>
                   {newDocSourceId === 'new' && (
                     <>
@@ -463,8 +517,8 @@ export default function DatasetPage() {
                     <Label className="text-xs text-gray-500">タイトル（任意）</Label>
                     <input type="text" placeholder="タイトル" value={newDocTitle} onChange={e => setNewDocTitle(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
                   </div>
-                  <Textarea rows={4} placeholder="本文（検索対象）" value={newDocContent} onChange={e => setNewDocContent(e.target.value)} className={`text-sm ${newDocContent.length >= 700 ? 'border-red-400' : newDocContent.length >= 500 ? 'border-yellow-400' : ''}`} />
-                  <div className={`text-xs text-right ${newDocContent.length >= 700 ? 'text-red-500 font-medium' : newDocContent.length >= 500 ? 'text-yellow-600' : 'text-gray-400'}`}>
+                  <Textarea rows={4} placeholder="本文（検索対象）" value={newDocContent} onChange={e => setNewDocContent(e.target.value)} className={getTextareaClass(newDocContent.length)} />
+                  <div className={`text-xs text-right ${getContentClass(newDocContent.length)}`}>
                     {newDocContent.length} 文字{newDocContent.length >= 700 && '　700文字以上は登録できません'}
                   </div>
                   <div className="flex gap-2">
@@ -497,8 +551,8 @@ export default function DatasetPage() {
                             <Label className="text-xs text-gray-500">登録日時</Label>
                             <input type="text" placeholder="2026-05-21T10:00:00" value={editingCreatedAt} onChange={e => setEditingCreatedAt(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm bg-white" />
                           </div>
-                          <Textarea rows={4} value={editingContent} onChange={e => setEditingContent(e.target.value)} className={`text-sm font-mono ${editingContent.length >= 700 ? 'border-red-400' : editingContent.length >= 500 ? 'border-yellow-400' : ''}`} />
-                          <div className={`text-xs text-right ${editingContent.length >= 700 ? 'text-red-500 font-medium' : editingContent.length >= 500 ? 'text-yellow-600' : 'text-gray-400'}`}>{editingContent.length} 文字{editingContent.length >= 700 && '　700文字以上は保存できません'}</div>
+                          <Textarea rows={4} value={editingContent} onChange={e => setEditingContent(e.target.value)} className={`font-mono ${getTextareaClass(editingContent.length)}`} />
+                          <div className={`text-xs text-right ${getContentClass(editingContent.length)}`}>{editingContent.length} 文字{editingContent.length >= 700 && '　700文字以上は保存できません'}</div>
                           <div className="flex gap-2">
                             <Button size="sm" onClick={() => updateDocument(doc.id)} disabled={editingContent.length >= 700}><Check className="h-3 w-3 mr-1" />保存</Button>
                             <Button size="sm" variant="outline" onClick={() => setEditingDocId(null)}><X className="h-3 w-3 mr-1" />キャンセル</Button>
