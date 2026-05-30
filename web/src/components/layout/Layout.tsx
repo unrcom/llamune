@@ -81,12 +81,17 @@ function useLogout() {
   return { onLogout }
 }
 
+function useSidebar() {
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [adminOpen, setAdminOpen] = useState(true)
+  const toggleSidebar = () => setSidebarOpen(o => !o)
+  const toggleAdmin = () => setAdminOpen(o => !o)
+  return { sidebarOpen, adminOpen, toggleSidebar, toggleAdmin }
+}
+
 export default function Layout() {
   const isAdmin = getIsAdmin()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const toggleSidebar = () => setSidebarOpen(o => !o)
-  const [adminOpen, setAdminOpen] = useState(true)
-  const toggleAdmin = () => setAdminOpen(o => !o)
+  const { sidebarOpen, adminOpen, toggleSidebar, toggleAdmin } = useSidebar()
   const { exporting, importing, backupMsg, setBackupMsg, importAllRef, exportAll, handleImportAll } = useBackup()
   const { onLogout } = useLogout()
 

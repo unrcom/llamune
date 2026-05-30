@@ -32,7 +32,7 @@ class DatasetResponse(BaseModel):
     project_id: int
     name: str
     display_name: str
-    description: Optional[str]
+    description: Optional[str] = None
     created_at: str
 
 
@@ -63,7 +63,13 @@ def create_dataset(req: DatasetCreate, db: DB, _: CurrentUser):
         raise HTTPException(status_code=400, detail="このプロジェクトにはすでにデータセットが存在します")
 
     auto_name = f"ds-{uuid.uuid4().hex[:12]}"
-    client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+    client = chromadb.PersistentClient(
+        path=CHROMA_DB_DIR,
+        settings=Settings(anonymized_telemetry=False),
+        tenant=DEFAULT_TENANT,
+        database=DEFAULT_DATABASE,
+    )
     client.get_or_create_collection(auto_name)
 
     dataset = Dataset(
@@ -86,7 +92,13 @@ def delete_dataset(dataset_id: int, db: DB, _: CurrentUser):
     if not dataset:
         raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
-    client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+    client = chromadb.PersistentClient(
+        path=CHROMA_DB_DIR,
+        settings=Settings(anonymized_telemetry=False),
+        tenant=DEFAULT_TENANT,
+        database=DEFAULT_DATABASE,
+    )
     try:
         client.delete_collection(dataset.name)
     except Exception:
@@ -122,7 +134,13 @@ def add_document(
     if not dataset:
         raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
-    client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+    client = chromadb.PersistentClient(
+        path=CHROMA_DB_DIR,
+        settings=Settings(anonymized_telemetry=False),
+        tenant=DEFAULT_TENANT,
+        database=DEFAULT_DATABASE,
+    )
     collection = client.get_or_create_collection(dataset.name)
 
     doc_id = req.doc_id or str(uuid.uuid4())
@@ -152,7 +170,13 @@ def get_documents(
     if not dataset:
         raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
-    client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+    client = chromadb.PersistentClient(
+        path=CHROMA_DB_DIR,
+        settings=Settings(anonymized_telemetry=False),
+        tenant=DEFAULT_TENANT,
+        database=DEFAULT_DATABASE,
+    )
     collection = client.get_or_create_collection(dataset.name)
     result = collection.get()
 
@@ -184,7 +208,13 @@ def delete_document(
     if not dataset:
         raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
-    client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+    client = chromadb.PersistentClient(
+        path=CHROMA_DB_DIR,
+        settings=Settings(anonymized_telemetry=False),
+        tenant=DEFAULT_TENANT,
+        database=DEFAULT_DATABASE,
+    )
     collection = client.get_or_create_collection(dataset.name)
     collection.delete(ids=[doc_id])
 
@@ -210,7 +240,13 @@ def update_document(
     if not dataset:
         raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
-    client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+    client = chromadb.PersistentClient(
+        path=CHROMA_DB_DIR,
+        settings=Settings(anonymized_telemetry=False),
+        tenant=DEFAULT_TENANT,
+        database=DEFAULT_DATABASE,
+    )
     collection = client.get_or_create_collection(dataset.name)
 
     if len(req.content) > 700:
@@ -244,7 +280,13 @@ def get_sources(
     if not dataset:
         raise HTTPException(status_code=404, detail=DATASET_NOT_FOUND)
 
-    client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+    client = chromadb.PersistentClient(
+        path=CHROMA_DB_DIR,
+        settings=Settings(anonymized_telemetry=False),
+        tenant=DEFAULT_TENANT,
+        database=DEFAULT_DATABASE,
+    )
     collection = client.get_or_create_collection(dataset.name)
     result = collection.get()
 
@@ -287,7 +329,13 @@ def update_dataset(
 # ── 共通ヘルパー ──────────────────────────────────────────────────
 def _get_docs_from_collection(dataset) -> list:
     import chromadb
-    client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+    client = chromadb.PersistentClient(
+        path=CHROMA_DB_DIR,
+        settings=Settings(anonymized_telemetry=False),
+        tenant=DEFAULT_TENANT,
+        database=DEFAULT_DATABASE,
+    )
     collection = client.get_or_create_collection(dataset.name)
     result = collection.get()
     docs = []
@@ -509,7 +557,13 @@ async def import_all_datasets(
 
     _snapshot_all(db)
 
-    client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+    client = chromadb.PersistentClient(
+        path=CHROMA_DB_DIR,
+        settings=Settings(anonymized_telemetry=False),
+        tenant=DEFAULT_TENANT,
+        database=DEFAULT_DATABASE,
+    )
     total_imported = total_skipped = 0
     not_found = set()
 
@@ -586,7 +640,13 @@ async def import_dataset(
 
     _snapshot_dataset(dataset)
 
-    client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+    client = chromadb.PersistentClient(
+        path=CHROMA_DB_DIR,
+        settings=Settings(anonymized_telemetry=False),
+        tenant=DEFAULT_TENANT,
+        database=DEFAULT_DATABASE,
+    )
     collection = client.get_or_create_collection(dataset.name)
     imported, skipped = _upsert_docs(collection, docs)
     return {"imported": imported, "skipped": skipped}
