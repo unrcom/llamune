@@ -15,6 +15,20 @@ function today() {
   return new Date().toISOString().slice(0, 19).replace('Z', '')
 }
 
+function splitLongParagraph(para: string, maxLen: number, result: string[]): string {
+  const sentences = para.split(/(?<=[。！？\n])/)
+  let sub = ''
+  for (const s of sentences) {
+    if ((sub + s).length <= maxLen) {
+      sub += s
+    } else {
+      if (sub) result.push(sub.trim())
+      sub = s.length > maxLen ? s.slice(0, maxLen) : s
+    }
+  }
+  return sub.trim()
+}
+
 function splitIntoChunks(text: string, maxLen = 500): string[] {
   const result: string[] = []
   const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
@@ -24,20 +38,7 @@ function splitIntoChunks(text: string, maxLen = 500): string[] {
       current = current ? current + '\n\n' + para : para
     } else {
       if (current) result.push(current.trim())
-      if (para.length > maxLen) {
-        const sentences = para.split(/(?<=[。！？\n])/)
-        let sub = ''
-        for (const s of sentences) {
-          if ((sub + s).length <= maxLen) { sub += s }
-          else {
-            if (sub) result.push(sub.trim())
-            sub = s.length > maxLen ? s.slice(0, maxLen) : s
-          }
-        }
-        current = sub.trim()
-      } else {
-        current = para
-      }
+      current = para.length > maxLen ? splitLongParagraph(para, maxLen, result) : para
     }
   }
   if (current.trim()) result.push(current.trim())
