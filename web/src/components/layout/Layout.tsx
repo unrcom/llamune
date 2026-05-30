@@ -81,6 +81,13 @@ function useLogout() {
   return { onLogout }
 }
 
+function navLinkClass(isActive: boolean, sidebarOpen: boolean) {
+  const base = 'flex items-center gap-2 py-2 rounded text-sm transition-colors'
+  const padding = sidebarOpen ? 'px-3' : 'justify-center px-2'
+  const state = isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
+  return `${base} ${padding} ${state}`
+}
+
 function useSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [adminOpen, setAdminOpen] = useState(true)
@@ -109,9 +116,7 @@ export default function Layout() {
           <NavLink
             to="/chat"
             title={sidebarOpen ? undefined : 'チャット'}
-            className={({ isActive }) =>
-              `flex items-center gap-2 py-2 rounded text-sm transition-colors ${sidebarOpen ? 'px-3' : 'justify-center px-2'} ${isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`
-            }
+            className={({ isActive }) => navLinkClass(isActive, sidebarOpen)}
           >
             <MessageSquare className="h-4 w-4 shrink-0" />
             {sidebarOpen && 'チャット'}
@@ -120,9 +125,7 @@ export default function Layout() {
           <NavLink
             to="/dataset"
             title={sidebarOpen ? undefined : 'データセット'}
-            className={({ isActive }) =>
-              `flex items-center gap-2 py-2 rounded text-sm transition-colors ${sidebarOpen ? 'px-3' : 'justify-center px-2'} ${isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`
-            }
+            className={({ isActive }) => navLinkClass(isActive, sidebarOpen)}
           >
             <Database className="h-4 w-4 shrink-0" />
             {sidebarOpen && 'データセット'}
@@ -146,9 +149,7 @@ export default function Layout() {
                       key={to}
                       to={to}
                       title={sidebarOpen ? undefined : label}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2 py-2 rounded text-sm transition-colors ${sidebarOpen ? 'px-3' : 'justify-center px-2'} ${isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`
-                      }
+                      className={({ isActive }) => navLinkClass(isActive, sidebarOpen)}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
                       {sidebarOpen && label}
