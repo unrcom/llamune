@@ -4,6 +4,10 @@
 
 📖 [セットアップ手順](doc/setup.md)' README.md
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=unrcom_llamune&metric=alert_status)](https://sonarcloud.io/project/overview?id=unrcom_llamune)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=unrcom_llamune&metric=reliability_rating)](https://sonarcloud.io/project/overview?id=unrcom_llamune)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=unrcom_llamune&metric=sqale_rating)](https://sonarcloud.io/project/overview?id=unrcom_llamune)
+
 閉域LLMを使ったRAGとファインチューニングのプラットフォームです。
 
 ## システム構成
