@@ -54,8 +54,8 @@ static_dir = os.path.join(os.path.dirname(__file__), "../../web/dist")
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
-    file_path = os.path.join(static_dir, full_path)
-    if os.path.isfile(file_path):
-        return FileResponse(file_path)
     index = os.path.join(static_dir, "index.html")
+    file_path = os.path.realpath(os.path.join(static_dir, full_path))
+    if file_path.startswith(os.path.realpath(static_dir)) and os.path.isfile(file_path):
+        return FileResponse(file_path)
     return FileResponse(index)
