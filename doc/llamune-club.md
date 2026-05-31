@@ -7,11 +7,11 @@
 
 | プロジェクト | サブドメイン | バックエンドポート | DBポート | 曜日（目安） |
 |---|---|---|---|---|
-| bb | bb.llamune.com | 8001 | 5434 | 月曜 |
-| c3 | c3.llamune.com | 8002 | 5435 | 火曜 |
-| ds | ds.llamune.com | 8003 | 5436 | 水曜 |
-| ew | ew.llamune.com | 8004 | 5437 | 木曜 |
-| r2 | r2.llamune.com | 8005 | 5438 | 金曜 |
+| bb | bb.llamune.com | 8001 | 5435 | 月曜 |
+| c3 | c3.llamune.com | 8002 | 5436 | 火曜 |
+| ds | ds.llamune.com | 8003 | 5437 | 水曜 |
+| ew | ew.llamune.com | 8004 | 5438 | 木曜 |
+| r2 | r2.llamune.com | 8005 | 5439 | 金曜 |
 
 ## 認証フロー
 
@@ -46,7 +46,7 @@ docker compose up -d
 ```bash
 cd ~/dev/llamune/back
 source .venv/bin/activate
-DATABASE_URL=postgresql://llmn:llmn@localhost:5434/llmndb uvicorn app.main:app --port 8001
+DATABASE_URL=postgresql://llmn:llmn@localhost:5435/llmndb uvicorn app.main:app --port 8001
 ```
 
 **c3（ポート 8002）：**
@@ -113,7 +113,7 @@ uvicorn app.main:app --reload --port 8000
 ```bash
 cd ~/dev/llamune/back
 source .venv/bin/activate
-DATABASE_URL=postgresql://llmn:llmn@localhost:5434/llmndb python create_user.py <username> <password>
+DATABASE_URL=postgresql://llmn:llmn@localhost:5435/llmndb python create_user.py <username> <password>
 ```
 
 ## Cloudflare Access のユーザー管理
