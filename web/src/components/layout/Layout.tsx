@@ -146,7 +146,7 @@ interface SidebarFooterProps {
   exporting: boolean
   importing: boolean
   exportAll: () => void
-  importAllRef: React.RefObject<HTMLInputElement>
+  importAllRef: React.RefObject<HTMLInputElement | null>
   handleImportAll: (e: React.ChangeEvent<HTMLInputElement>) => void
   onLogout: () => void
 }

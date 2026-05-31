@@ -141,7 +141,7 @@ export default function FtDataPage() {
     setEditingId(conv.id)
     setIsBase(conv.is_base)
     setBaseId(conv.base_id)
-    setSplit(conv.split)
+    setSplit(conv.split as 'train' | 'valid')
     // systemロールの内容はプロジェクトのシステムプロンプトで上書き
     const msgs = conv.messages.map(m =>
       m.role === 'system' ? { ...m, content: systemPrompt?.content ?? m.content } : m

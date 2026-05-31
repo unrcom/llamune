@@ -47,7 +47,7 @@ type Tab = 'local' | 'hf'
 export default function ModelsPage() {
   const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<string | null>('')
   const [tab, setTab] = useState<Tab>('local')
 
   const [name, setName] = useState('')

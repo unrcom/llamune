@@ -45,3 +45,19 @@ app.include_router(system_prompts.router)
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+from fastapi.staticfiles import StaticFiles
+import os
+
+static_dir = os.path.join(os.path.dirname(__file__), "../../web/dist")
+if os.path.exists(static_dir):
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+
+
+from fastapi.responses import FileResponse
+
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    index = os.path.join(static_dir, "index.html")
+    return FileResponse(index)
