@@ -64,6 +64,12 @@ nvm install --lts
 brew install python
 ```
 
+### cloudflared
+
+```bash
+brew install cloudflared
+```
+
 ## 2. リポジトリのクローン
 
 ```bash
@@ -172,31 +178,37 @@ ADAPTER_DIR=/path/to/llamune/adapters
 python create_user.py <ユーザー名> <パスワード> --admin
 ```
 
-### バックエンドの起動
+## 6. フロントエンドのビルド
+
+フロントエンドはビルドして静的ファイルを生成します。バックエンドが静的ファイルを配信します。
 
 ```bash
+cd ../web
+npm install
+npm run build
+```
+
+ビルドが成功すると `web/dist/` ディレクトリが生成されます。
+
+> 💡 フロントエンドのコードを変更した場合は `npm run build` を再実行してください。
+
+## 7. バックエンドの起動
+
+```bash
+cd ../back
+source .venv/bin/activate
 uvicorn app.main:app --reload --port 8000
 ```
 
-## 6. フロントエンドのセットアップ
+バックエンドがポート 8000 で起動し、フロントエンドの静的ファイルも配信します。
 
-別のターミナルを開いて実行してください。
+## 8. 動作確認
 
-```bash
-cd llamune/web
-npm install
-npm run dev
-```
-
-フロントエンドがポート 5174 で起動します。
-
-## 7. 動作確認
-
-ブラウザで http://localhost:5174 にアクセスし、作成したユーザーでログインできることを確認してください。
+ブラウザで http://localhost:8000 にアクセスし、作成したユーザーでログインできることを確認してください。
 
 ## 停止方法
 
-フロントエンド・バックエンドはそれぞれのターミナルで `Ctrl+C` で停止します。
+バックエンドのターミナルで `Ctrl+C` で停止します。
 
 データベースの停止：
 
@@ -204,4 +216,21 @@ npm run dev
 docker compose down
 ```
 
-データベースのデータは Docker ボリューム `llmn_db_data` に保持されるため、再起動してもデータは失われません。
+データベースのデータは Docker ボリュームに保持されるため、再起動してもデータは失われません。
+
+## ユーザー管理
+
+ユーザーはコマンドラインで作成します。
+
+```bash
+cd ~/dev/llamune/back
+source .venv/bin/activate
+
+# 一般ユーザー作成
+python create_user.py <username> <password>
+
+# 管理者ユーザー作成
+python create_user.py <username> <password> --admin
+```
+
+管理者のみプロジェクト・モデル・FTデータ・訓練ジョブの管理が可能です。

@@ -1,7 +1,7 @@
 services:
-  db:
+  db_dev:
     image: postgres:17
-    container_name: llmn_db
+    container_name: llmn_db_dev
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -10,5 +10,71 @@ services:
       - "5434:5432"
     volumes:
       - llmn_db_data:/var/lib/postgresql/data
+
+  db_bb:
+    image: postgres:17
+    container_name: llmn_db_bb
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5435:5432"
+    volumes:
+      - llmn_db_bb:/var/lib/postgresql/data
+
+  db_c3:
+    image: postgres:17
+    container_name: llmn_db_c3
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5436:5432"
+    volumes:
+      - llmn_db_c3:/var/lib/postgresql/data
+
+  db_ds:
+    image: postgres:17
+    container_name: llmn_db_ds
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5437:5432"
+    volumes:
+      - llmn_db_ds:/var/lib/postgresql/data
+
+  db_ew:
+    image: postgres:17
+    container_name: llmn_db_ew
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5438:5432"
+    volumes:
+      - llmn_db_ew:/var/lib/postgresql/data
+
+  db_r2:
+    image: postgres:17
+    container_name: llmn_db_r2
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5439:5432"
+    volumes:
+      - llmn_db_r2:/var/lib/postgresql/data
+
 volumes:
   llmn_db_data:
+  llmn_db_bb:
+  llmn_db_c3:
+  llmn_db_ds:
+  llmn_db_ew:
+  llmn_db_r2:
