@@ -47,17 +47,15 @@ def health_check():
     return {"status": "ok"}
 
 
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import os
 
 static_dir = os.path.join(os.path.dirname(__file__), "../../web/dist")
-if os.path.exists(static_dir):
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
-
-
-from fastapi.responses import FileResponse
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
+    file_path = os.path.join(static_dir, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
     index = os.path.join(static_dir, "index.html")
     return FileResponse(index)

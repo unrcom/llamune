@@ -32,41 +32,18 @@ cloudflared tunnel --config ~/.cloudflared/llamune-rag.yml run
 
 ### 2. バックエンドの起動（プロジェクトごとに1つずつ）
 
-各プロジェクトはディレクトリを共有し、ポートと環境変数（DBポート）だけ変えて起動します。
-
-**bb（ポート 8001）：**
+各プロジェクトはスクリプトで起動します。DBの起動も含まれています。
 
 ```bash
-cd ~/dev/llamune/back
-source .venv/bin/activate
-DATABASE_URL=postgresql://llmn:llmn@localhost:5435/llmndb uvicorn app.main:app --port 8001
+~/dev/llamune/scripts/start-bb.sh
 ```
 
-**c3（ポート 8002）：**
+他のプロジェクトも同様です（`start-c3.sh`、`start-ds.sh`、`start-ew.sh`、`start-r2.sh`）。
 
-```bash
-DATABASE_URL=postgresql://llmn:llmn@localhost:5435/llmndb uvicorn app.main:app --port 8002
-```
-
-**ds（ポート 8003）：**
-
-```bash
-DATABASE_URL=postgresql://llmn:llmn@localhost:5436/llmndb uvicorn app.main:app --port 8003
-```
-
-**ew（ポート 8004）：**
-
-```bash
-DATABASE_URL=postgresql://llmn:llmn@localhost:5437/llmndb uvicorn app.main:app --port 8004
-```
-
-**r2（ポート 8005）：**
-
-```bash
-DATABASE_URL=postgresql://llmn:llmn@localhost:5438/llmndb uvicorn app.main:app --port 8005
-```
-
-> 💡 プロジェクトの切り替え時は、前のバックエンドを `Ctrl+C` で停止してから次を起動してください。MLXモデルのメモリ解放のため、同時起動は避けてください。
+> 💡 プロジェクトの切り替え時は以下の手順で行ってください：
+> 1. 現在起動中のuvicornを `Ctrl+C` で停止
+> 2. `stop-xx.sh` でDBを停止
+> 3. `start-yy.sh` で次のプロジェクトを起動
 
 ## 停止手順
 
