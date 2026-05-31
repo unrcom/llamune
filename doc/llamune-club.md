@@ -30,14 +30,7 @@ cloudflared tunnel --config ~/.cloudflared/llamune-rag.yml run
 
 別ターミナルで起動したままにしてください。
 
-### 2. データベースの起動
-
-```bash
-cd ~/dev/llamune
-docker compose up -d
-```
-
-### 3. バックエンドの起動（プロジェクトごとに1つずつ）
+### 2. バックエンドの起動（プロジェクトごとに1つずつ）
 
 各プロジェクトはディレクトリを共有し、ポートと環境変数（DBポート）だけ変えて起動します。
 
