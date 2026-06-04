@@ -17,6 +17,7 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 router = APIRouter(prefix="/validate", tags=["validate"])
 
 DISTANCE_THRESHOLD = 1.0
+NO_RESULTS = NO_RESULTS
 
 
 class LoadRequest(BaseModel):
@@ -43,7 +44,7 @@ def _search_chroma(query: str, dataset_id: int, db) -> str:
     from app.models.base import Dataset
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        return "検索結果なし"
+        return NO_RESULTS
     client = _get_chroma_client()
     try:
         collection = client.get_collection(dataset.name)
@@ -51,13 +52,13 @@ def _search_chroma(query: str, dataset_id: int, db) -> str:
         docs = results.get("documents", [[]])[0]
         distances = results.get("distances", [[]])[0]
         if not docs:
-            return "検索結果なし"
+            return NO_RESULTS
         for i, (doc, dist) in enumerate(zip(docs, distances)):
             logger.info(f"[RAG] query={query!r} rank={i+1} distance={dist:.4f}")
         relevant_docs = [doc for doc, dist in zip(docs, distances) if dist <= DISTANCE_THRESHOLD]
         if not relevant_docs:
             logger.info(f"[RAG] query={query!r} no relevant docs (min_distance={min(distances):.4f})")
-            return "検索結果なし"
+            return NO_RESULTS
         return "\n".join(relevant_docs)
     except Exception as e:
         return f"検索エラー: {str(e)}"

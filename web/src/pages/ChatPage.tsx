@@ -179,7 +179,8 @@ export default function ChatPage() {
         {/* ロード済みモデル（折り畳み時のみ非表示・設定ヘッダー下に縦表示） */}
         {loadedModelName && !settingsOpen && (
           <div className="px-1 py-2 text-xs text-green-600 bg-green-50 border-b text-center" style={{writingMode: 'vertical-rl'}}>
-            ✅{searchMode !== 'off' ? (searchMode === 'direct' ? ' 直接検索' : ' LLM検索') : ''}
+            ✅{searchMode === 'direct' ? ' 直接検索' : ''}
+            {searchMode === 'llm' ? ' LLM検索' : ''}
           </div>
         )}
 

@@ -14,7 +14,7 @@ interface FtConversation {
   project_id: number
   is_base: boolean
   base_id: number | null
-  split: string
+  split: 'train' | 'valid'
   messages: MessageTurn[]
   created_at: string
 }
@@ -141,7 +141,7 @@ export default function FtDataPage() {
     setEditingId(conv.id)
     setIsBase(conv.is_base)
     setBaseId(conv.base_id)
-    setSplit(conv.split as 'train' | 'valid')
+    setSplit(conv.split)
     // systemロールの内容はプロジェクトのシステムプロンプトで上書き
     const msgs = conv.messages.map(m =>
       m.role === 'system' ? { ...m, content: systemPrompt?.content ?? m.content } : m
