@@ -12,15 +12,7 @@ from app.core.auth import get_current_user
 from app.models.base import Dataset, User
 
 
-def _get_chroma_client():
-    import chromadb
-    from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
-    return chromadb.PersistentClient(
-        path=CHROMA_DB_DIR,
-        settings=Settings(anonymized_telemetry=False),
-        tenant=DEFAULT_TENANT,
-        database=DEFAULT_DATABASE,
-    )
+from app.core.chroma import get_chroma_client as _get_chroma_client
 
 DB = Annotated[_Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]

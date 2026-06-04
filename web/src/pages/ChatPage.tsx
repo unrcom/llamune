@@ -43,7 +43,7 @@ export default function ChatPage() {
   const loadingModelRef = useRef(false)
   const setLoadingModel = (v: boolean) => { loadingModelRef.current = v }
   const [generating, setGenerating] = useState(false)
-  const [ragMode, setRagMode] = useState(false)
+  const [searchMode, setSearchMode] = useState<'off' | 'direct' | 'llm'>('off')
   const [ragContext, setRagContext] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(true)
   const [loadedModelName, setLoadedModelName] = useState<string | null>(null)
@@ -136,7 +136,7 @@ export default function ChatPage() {
         system_prompt: systemPrompt || null,
         max_tokens: 512,
         dataset_id: selectedDatasetId || null,
-        rag_mode: ragMode,
+        rag_mode: searchMode === 'direct',
       })
       setRagContext(res.data.rag_context || null)
       // バックエンドから返ってきたmessages（tool含む）で更新
@@ -179,7 +179,7 @@ export default function ChatPage() {
         {/* ロード済みモデル（折り畳み時のみ非表示・設定ヘッダー下に縦表示） */}
         {loadedModelName && !settingsOpen && (
           <div className="px-1 py-2 text-xs text-green-600 bg-green-50 border-b text-center" style={{writingMode: 'vertical-rl'}}>
-            ✅{ragMode ? ' RAG' : ''}
+            ✅{searchMode !== 'off' ? (searchMode === 'direct' ? ' 直接検索' : ' LLM検索') : ''}
           </div>
         )}
 
@@ -224,14 +224,16 @@ export default function ChatPage() {
 
             {selectedProjectId && selectedDatasetId && (
               <div className="flex items-center justify-between">
-                <Label className="text-xs text-gray-500">RAGモード</Label>
-                <button
-                  type="button"
-                  onClick={() => { setRagMode(v => !v); setRagContext(null) }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${ragMode ? 'bg-blue-600' : 'bg-gray-300'}`}
+                <Label className="text-xs text-gray-500">ドキュメント参照</Label>
+                <select
+                  value={searchMode}
+                  onChange={e => { setSearchMode(e.target.value as 'off' | 'direct' | 'llm'); setRagContext(null) }}
+                  className="text-xs border rounded px-2 py-1"
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${ragMode ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
+                  <option value="off">オフ</option>
+                  <option value="direct">直接検索</option>
+                  <option value="llm">LLM検索</option>
+                </select>
               </div>
             )}
 

@@ -68,7 +68,7 @@ def refresh(req: RefreshRequest, db: DB):
     db_token = db.query(RefreshToken).filter(RefreshToken.token == req.refresh_token).first()
     if not db_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-    if db_token.expires_at < datetime.now(timezone.utc):
+    if db_token.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
         db.delete(db_token)
         db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired")
