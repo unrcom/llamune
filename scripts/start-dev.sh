@@ -5,4 +5,4 @@ sleep 3
 cd back
 source .venv/bin/activate
 cp .env.dev .env
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --port 8000
