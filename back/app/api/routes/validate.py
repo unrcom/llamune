@@ -17,7 +17,7 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 router = APIRouter(prefix="/validate", tags=["validate"])
 
 DISTANCE_THRESHOLD = 1.0
-NO_RESULTS = NO_RESULTS
+NO_RESULTS = "検索結果なし"
 
 
 class LoadRequest(BaseModel):
@@ -101,7 +101,10 @@ def generate(req: GenerateRequest, _: CurrentUser):
                 db_gen = get_db()
                 db = next(db_gen)
                 search_result = _search_chroma(user_query, req.dataset_id, db)
-                rag_system = (req.system_prompt or '') + f'\n\n【参考情報】\n{search_result}'
+                if search_result != NO_RESULTS:
+                    rag_system = (req.system_prompt or '') + f'\n\n【参考情報】\n{search_result}'
+                else:
+                    rag_system = req.system_prompt or ''
                 messages = []
                 messages.append({"role": "system", "content": rag_system})
                 messages.extend(req.messages)
