@@ -67,9 +67,7 @@ docker compose down
 ラムネクラブとは別に、開発用として通常の llamune を起動する場合：
 
 ```bash
-cd ~/dev/llamune/back
-source .venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+~/dev/llamune/scripts/start-dev.sh
 ```
 
 ブラウザで http://localhost:8000 にアクセスします（外部公開なし）。
