@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, Boolean, ForeignKey, Float
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 
@@ -131,3 +131,21 @@ class Dataset(Base):
     display_name = Column(String(100), nullable=False)
     description  = Column(Text, nullable=True)
     created_at   = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+
+
+class ChatLog(Base):
+    __tablename__ = "chat_logs"
+    __table_args__ = {"schema": SCHEMA}
+
+    id               = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    session_id       = Column(UUID(as_uuid=True), nullable=False)
+    turn_cnt         = Column(Integer, nullable=False)
+    model_name       = Column(Text, nullable=False)
+    user_message     = Column(Text, nullable=False)
+    search_mode      = Column(Text, nullable=False)
+    rag_query        = Column(Text, nullable=True)
+    rag_result       = Column(Text, nullable=True)
+    system_prompt    = Column(Text, nullable=False)
+    llm_response     = Column(Text, nullable=False)
+    response_time_ms = Column(Integer, nullable=False)
+    created_at       = Column(TIMESTAMP, server_default=func.now(), nullable=False)

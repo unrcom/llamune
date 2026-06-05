@@ -3,7 +3,7 @@ import { apiClient } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Send, Loader2, X, Settings } from 'lucide-react'
+import { Send, Loader2, X, Settings, ChevronDown, ChevronRight } from 'lucide-react'
 
 interface Model {
   id: number
@@ -29,6 +29,138 @@ interface Message {
   content: string
 }
 
+interface RagHit {
+  rank: number
+  distance: number
+  text: string
+}
+
+interface RagResult {
+  hits: RagHit[]
+  threshold: number
+  used: boolean
+  error?: string
+}
+
+interface TurnLog {
+  search_mode: 'off' | 'direct' | 'llm'
+  rag_query: string | null
+  rag_result: string | null  // JSON文字列
+  response_time_ms: number
+  model_name: string
+  system_prompt: string
+}
+
+// userメッセージとassistantメッセージをターン単位で管理
+interface Turn {
+  userMessage: string
+  assistantMessage: string
+  log: TurnLog | null
+}
+
+const SEARCH_MODE_LABEL: Record<string, string> = {
+  off: 'RAGなし',
+  direct: '直接検索',
+  llm: 'LLM検索',
+}
+
+function SystemPromptPanel({ content }: { content: string }) {
+  const [open, setOpen] = useState(false)
+  if (!content) return null
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1 text-gray-400 hover:opacity-70"
+      >
+        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <span>system_prompt</span>
+      </button>
+      {open && (
+        <pre className="mt-0.5 whitespace-pre-wrap break-all text-gray-500 bg-white border rounded p-1 max-h-40 overflow-y-auto">
+          {content}
+        </pre>
+      )}
+    </div>
+  )
+}
+
+function TurnLogPanel({ log }: { log: TurnLog }) {
+  const [open, setOpen] = useState(false)
+  const modeColor =
+    log.search_mode === 'off' ? 'text-gray-400' :
+    log.search_mode === 'direct' ? 'text-blue-500' : 'text-purple-500'
+
+  return (
+    <div className="my-1 mx-auto w-full max-w-[75%]">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className={`flex items-center gap-1 text-xs ${modeColor} hover:opacity-70 transition-opacity`}
+      >
+        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <span>{SEARCH_MODE_LABEL[log.search_mode]}</span>
+        <span className="text-gray-400 ml-1">{log.response_time_ms}ms</span>
+      </button>
+
+      {open && (
+        <div className="mt-1 rounded border bg-gray-50 text-xs text-gray-600 p-2 space-y-1">
+          <div>
+            <span className="text-gray-400 mr-1">model:</span>
+            <span className="text-gray-700">{log.model_name}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 mr-1">search_mode:</span>
+            <span className={modeColor}>{log.search_mode}</span>
+          </div>
+          <SystemPromptPanel content={log.system_prompt} />
+          {log.rag_query && (
+            <div>
+              <span className="text-gray-400 mr-1">rag_query:</span>
+              <span>{log.rag_query}</span>
+            </div>
+          )}
+          {log.rag_result && (() => {
+            let parsed: RagResult | null = null
+            try { parsed = JSON.parse(log.rag_result) } catch {}
+            if (!parsed) return (
+              <div>
+                <span className="text-gray-400 mr-1">rag_result:</span>
+                <pre className="mt-0.5 whitespace-pre-wrap break-all text-gray-500 bg-white border rounded p-1">{log.rag_result}</pre>
+              </div>
+            )
+            return (
+              <div>
+                <div className="text-gray-400 mb-0.5">
+                  rag_hits: threshold={parsed.threshold} / used={parsed.used ? '✅' : '❌'}
+                </div>
+                <div className="space-y-1">
+                  {parsed.hits.map(h => (
+                    <div key={h.rank} className={`border rounded p-1 bg-white ${h.distance <= parsed!.threshold ? 'border-blue-200' : 'border-gray-200 opacity-50'}`}>
+                      <div className="flex gap-2 text-gray-400 mb-0.5">
+                        <span>rank={h.rank}</span>
+                        <span className={h.distance <= parsed!.threshold ? 'text-blue-500' : 'text-red-400'}>
+                          distance={h.distance}
+                        </span>
+                      </div>
+                      <div className="text-gray-600 whitespace-pre-wrap break-all">{h.text}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+          <div>
+            <span className="text-gray-400 mr-1">response_time:</span>
+            <span>{log.response_time_ms}ms</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ChatPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
@@ -38,17 +170,18 @@ export default function ChatPage() {
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null)
   const [selectedDatasetId, setSelectedDatasetId] = useState<number | null>(null)
   const [systemPrompt, setSystemPrompt] = useState('')
-  const [messages, setMessages] = useState<Message[]>([])
+  const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState('')
   const loadingModelRef = useRef(false)
   const setLoadingModel = (v: boolean) => { loadingModelRef.current = v }
   const [generating, setGenerating] = useState(false)
-  const [searchMode, setSearchMode] = useState<'off' | 'direct' | 'llm'>('off')
-  const [ragContext, setRagContext] = useState<string | null>(null)
+  const [searchMode, setSearchMode] = useState<'off' | 'direct' | 'llm'>('direct')
   const [settingsOpen, setSettingsOpen] = useState(true)
   const [loadedModelName, setLoadedModelName] = useState<string | null>(null)
   const [loadedAdapterPath, setLoadedAdapterPath] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -70,23 +203,31 @@ export default function ChatPage() {
       else setSelectedDatasetId(null)
     })
     apiClient.get(`/system-prompts?project_id=${selectedProjectId}`).then(res => {
-      if (res.data.length > 0) {
-        setSystemPrompt(res.data[0].content)
-      }
+      if (res.data.length > 0) setSystemPrompt(res.data[0].content)
     })
   }, [selectedProjectId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [turns])
 
   const selectedModel = models.find(m => m.id === selectedModelId)
 
   useEffect(() => {
     if (!selectedModel) return
     apiClient.get(`/validate/system-prompt/${selectedModel.id}`).then(res => {
-      setSystemPrompt(res.data.system_prompt || '')
-    }).catch(() => setSystemPrompt(''))
+      if (res.data.system_prompt) {
+        setSystemPrompt(res.data.system_prompt)
+      } else if (selectedProjectId) {
+        // FTモデルのシステムプロンプトがない場合はプロジェクトのものを使う
+        apiClient.get(`/system-prompts?project_id=${selectedProjectId}`).then(r => {
+          if (r.data.length > 0) setSystemPrompt(r.data[0].content)
+          else setSystemPrompt('')
+        }).catch(() => setSystemPrompt(''))
+      } else {
+        setSystemPrompt('')
+      }
+    }).catch(() => {})
     setLoadingModel(true)
     setError(null)
     apiClient.post('/validate/load', {
@@ -95,7 +236,8 @@ export default function ChatPage() {
     }).then(() => {
       setLoadedModelName(selectedModel.name)
       setLoadedAdapterPath(selectedModel.adapter_path)
-      setMessages([])
+      setTurns([])
+      sessionIdRef.current = null
     }).catch((e: any) => {
       setError(e.response?.data?.detail || 'モデルのロードに失敗しました')
     }).finally(() => {
@@ -103,46 +245,53 @@ export default function ChatPage() {
     })
   }, [selectedModelId])
 
-  async function handleLoadModel() {
-    if (!selectedModel) return
-    setLoadingModel(true)
-    setError(null)
-    try {
-      await apiClient.post('/validate/load', {
-        model_name: selectedModel.name,
-        adapter_path: selectedModel.adapter_path,
-      })
-      setLoadedModelName(selectedModel.name)
-      setLoadedAdapterPath(selectedModel.adapter_path)
-      setMessages([])
-    } catch (e: any) {
-      setError(e.response?.data?.detail || 'モデルのロードに失敗しました')
-    } finally {
-      setLoadingModel(false)
+  // turns → messages変換（generate APIに渡す用）
+  function turnsToMessages(ts: Turn[]): Message[] {
+    const msgs: Message[] = []
+    for (const t of ts) {
+      msgs.push({ role: 'user', content: t.userMessage })
+      msgs.push({ role: 'assistant', content: t.assistantMessage })
     }
+    return msgs
   }
 
   async function handleSend() {
     if (!input.trim() || generating) return
-    const userMsg: Message = { role: 'user', content: input.trim() }
-    const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
+    const userMessage = input.trim()
     setInput('')
+    setPendingUserMessage(userMessage)
     setGenerating(true)
     setError(null)
+
+    // 現在の会話履歴 + 今回のユーザーメッセージ
+    const historyMessages = turnsToMessages(turns)
+    const allMessages = [...historyMessages, { role: 'user' as const, content: userMessage }]
+
     try {
       const res = await apiClient.post('/validate/generate', {
-        messages: newMessages.filter(m => m.role !== 'tool'),
+        messages: allMessages,
         system_prompt: systemPrompt || null,
         max_tokens: 512,
         dataset_id: selectedDatasetId || null,
         rag_mode: searchMode === 'direct',
+        rag_llm_mode: searchMode === 'llm',
+        session_id: sessionIdRef.current,
       })
-      setRagContext(res.data.rag_context || null)
-      // バックエンドから返ってきたmessages（tool含む）で更新
-      const assistantMsg: Message = { role: 'assistant', content: res.data.result }
-      setMessages([...newMessages, assistantMsg])
+
+      // session_idを保持（2ターン目以降は同一sessionとして記録）
+      if (res.data.session_id) {
+        sessionIdRef.current = res.data.session_id
+      }
+
+      const newTurn: Turn = {
+        userMessage,
+        assistantMessage: res.data.result,
+        log: res.data.log ?? null,
+      }
+      setPendingUserMessage(null)
+      setTurns(prev => [...prev, newTurn])
     } catch (e: any) {
+      setPendingUserMessage(null)
       setError(e.response?.data?.detail || '生成に失敗しました')
     } finally {
       setGenerating(false)
@@ -158,9 +307,8 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full">
-      {/* 左パネル */}
+      {/* 左パネル：設定 */}
       <div className={`border-r bg-white flex flex-col shrink-0 transition-all duration-200 ${settingsOpen ? 'w-64' : 'w-8'}`}>
-        {/* 設定ヘッダー（常時表示） */}
         <button
           type="button"
           onClick={() => setSettingsOpen(v => !v)}
@@ -176,7 +324,6 @@ export default function ChatPage() {
           )}
         </button>
 
-        {/* ロード済みモデル（折り畳み時のみ非表示・設定ヘッダー下に縦表示） */}
         {loadedModelName && !settingsOpen && (
           <div className="px-1 py-2 text-xs text-green-600 bg-green-50 border-b text-center" style={{writingMode: 'vertical-rl'}}>
             ✅{searchMode === 'direct' ? ' 直接検索' : ''}
@@ -184,7 +331,6 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* 折り畳み可能な設定エリア */}
         {settingsOpen && (
           <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">
             <div>
@@ -228,12 +374,12 @@ export default function ChatPage() {
                 <Label className="text-xs text-gray-500">ドキュメント参照</Label>
                 <select
                   value={searchMode}
-                  onChange={e => { setSearchMode(e.target.value as 'off' | 'direct' | 'llm'); setRagContext(null) }}
+                  onChange={e => setSearchMode(e.target.value as 'off' | 'direct' | 'llm')}
                   className="text-xs border rounded px-2 py-1"
                 >
-                  <option value="off">オフ</option>
                   <option value="direct">直接検索</option>
                   <option value="llm">LLM検索</option>
+                  <option value="off">オフ</option>
                 </select>
               </div>
             )}
@@ -253,7 +399,7 @@ export default function ChatPage() {
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => setMessages([])}
+              onClick={() => { setTurns([]); sessionIdRef.current = null }}
             >
               会話をリセット
             </Button>
@@ -261,49 +407,55 @@ export default function ChatPage() {
         )}
       </div>
 
-      {/* 右パネル */}
+      {/* 右パネル：チャット */}
       <div className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.length === 0 && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+          {turns.length === 0 && (
             <div className="text-center text-gray-400 text-sm mt-20">
               モデルをロードしてメッセージを送信してください
             </div>
           )}
-          {messages.map((msg, i) => {
-            const msgKey = `${i}-${msg.role}`
-            let bubbleClass = 'bg-white border text-gray-800'
-            if (msg.role === 'user') bubbleClass = 'bg-blue-600 text-white'
-            else if (msg.role === 'tool') bubbleClass = 'bg-gray-100 text-gray-500 text-xs font-mono'
-            return (
-              <div key={msgKey} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap ${bubbleClass}`}>
-                  {msg.role === 'tool' && <div className="text-xs text-gray-400 mb-1">🔍 検索結果</div>}
-                  {msg.content}
+
+          {turns.map((turn, i) => (
+            <div key={i}>
+              {/* ユーザーメッセージ */}
+              <div className="flex justify-end mb-1">
+                <div className="max-w-[75%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap bg-blue-600 text-white">
+                  {turn.userMessage}
                 </div>
               </div>
-            )
-          })}
+
+              {/* ターンログ（折りたたみ） */}
+              {turn.log && <TurnLogPanel log={turn.log} />}
+
+              {/* アシスタントメッセージ */}
+              <div className="flex justify-start mt-1">
+                <div className="max-w-[75%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap bg-white border text-gray-800">
+                  {turn.assistantMessage}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {pendingUserMessage && (
+            <div className="flex justify-end mb-1">
+              <div className="max-w-[75%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap bg-blue-600 text-white">
+                {pendingUserMessage}
+              </div>
+            </div>
+          )}
           {generating && (
-            <div className="flex justify-start">
+            <div className="flex justify-start mt-1">
               <div className="bg-white border rounded-lg px-4 py-2 text-sm text-gray-400 flex items-center gap-2">
                 <Loader2 className="h-3 w-3 animate-spin" /> 生成中...
               </div>
             </div>
           )}
           {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
+            <div className="text-red-500 text-sm text-center mt-2">{error}</div>
           )}
           <div ref={bottomRef} />
         </div>
-
-        {ragContext && (
-          <div className="px-4 pt-2">
-            <details className="text-xs text-gray-400 border rounded p-2 bg-gray-50">
-              <summary className="cursor-pointer">🔍 RAG検索コンテキスト</summary>
-              <pre className="mt-1 whitespace-pre-wrap break-all text-gray-500">{ragContext}</pre>
-            </details>
-          </div>
-        )}
 
         <div className="border-t p-4 bg-white flex gap-2 items-end">
           <Textarea
