@@ -102,8 +102,8 @@ export default function ProjectsPage() {
   }
 
   async function handleSaveThreshold(projectId: number) {
-    const val = parseFloat(editingThresholdValue)
-    if (isNaN(val) || val <= 0) {
+    const val = Number.parseFloat(editingThresholdValue)
+    if (Number.isNaN(val) || val <= 0) {
       setError('閾値は0より大きい数値を入力してください')
       return
     }
