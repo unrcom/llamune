@@ -1,11 +1,11 @@
 import re
-import os
 import json
 import logging
+import time
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Annotated, Optional, List
-from app.core.config import CHROMA_DB_DIR
+from typing import Annotated, Optional
 from app.core.auth import get_current_user
 from app.core import llm
 from app.core.chroma import get_chroma_client as _get_chroma_client
@@ -19,6 +19,11 @@ router = APIRouter(prefix="/validate", tags=["validate"])
 
 DISTANCE_THRESHOLD = 1.0
 NO_RESULTS = "検索結果なし"
+NO_RESULTS_PROMPT = (
+    '\n\n【重要】今回はドキュメントから参考情報が見つかりませんでした。'
+    'このドメインに関する具体的な情報は提供せず、'
+    '「お調べしましたが、該当する情報が見つかりませんでした」と答えてください。'
+)
 
 
 class LoadRequest(BaseModel):
@@ -45,13 +50,14 @@ class StatusResponse(BaseModel):
 def _search_chroma(query: str, dataset_id: int, db):
     """
     戻り値: (context_str, rag_result_json)
-      - context_str  : LLMに渡す文字列（ヒットなしの場合は NO_RESULTS）
+      - context_str     : LLMに渡す文字列（ヒットなしの場合は NO_RESULTS）
       - rag_result_json : ログ保存用JSON文字列（全hitと閾値・使用可否を含む）
     """
     from app.models.base import Dataset
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        return NO_RESULTS, json.dumps({"hits": [], "threshold": DISTANCE_THRESHOLD, "used": False}, ensure_ascii=False)
+        empty = json.dumps({"hits": [], "threshold": DISTANCE_THRESHOLD, "used": False}, ensure_ascii=False)
+        return NO_RESULTS, empty
 
     client = _get_chroma_client()
     try:
@@ -71,7 +77,8 @@ def _search_chroma(query: str, dataset_id: int, db):
         used = len(relevant_docs) > 0
 
         if not used:
-            logger.info(f"[RAG] query={query!r} no relevant docs (min_distance={hits[0]['distance'] if hits else 'N/A'})")
+            min_dist = hits[0]["distance"] if hits else "N/A"
+            logger.info(f"[RAG] query={query!r} no relevant docs (min_distance={min_dist})")
 
         rag_result_json = json.dumps(
             {"hits": hits, "threshold": DISTANCE_THRESHOLD, "used": used},
@@ -83,6 +90,138 @@ def _search_chroma(query: str, dataset_id: int, db):
     except Exception as e:
         err_json = json.dumps({"error": str(e), "threshold": DISTANCE_THRESHOLD, "used": False}, ensure_ascii=False)
         return f"検索エラー: {str(e)}", err_json
+
+
+def _build_log(*, search_mode: str, rag_query, rag_result, elapsed_ms: int, final_system: str) -> dict:
+    return {
+        "search_mode": search_mode,
+        "rag_query": rag_query,
+        "rag_result": rag_result,
+        "response_time_ms": elapsed_ms,
+        "model_name": llm.get_current_model_name() or "",
+        "system_prompt": final_system,
+    }
+
+
+def _save_chat_log(db, *, session_id, turn_cnt: int, search_mode: str,
+                   rag_query, rag_result, final_system: str,
+                   user_message: str, llm_response: str, elapsed_ms: int):
+    from app.models.base import ChatLog
+    log = ChatLog(
+        session_id       = session_id,
+        turn_cnt         = turn_cnt,
+        model_name       = llm.get_current_model_name() or "",
+        user_message     = user_message,
+        search_mode      = search_mode,
+        rag_query        = rag_query,
+        rag_result       = rag_result,
+        system_prompt    = final_system,
+        llm_response     = llm_response,
+        response_time_ms = elapsed_ms,
+    )
+    db.add(log)
+    db.commit()
+
+
+def _handle_direct_rag(req: GenerateRequest, session_id, turn_cnt: int, user_query: str) -> dict:
+    from app.db.database import get_db
+    db = next(get_db())
+    context_str, rag_result_json = _search_chroma(user_query, req.dataset_id, db)
+
+    if context_str != NO_RESULTS:
+        rag_system = (req.system_prompt or '') + f'\n\n【参考情報】\n{context_str}'
+    else:
+        rag_system = (req.system_prompt or '') + NO_RESULTS_PROMPT
+
+    messages = [{"role": "system", "content": rag_system}]
+    messages.extend(req.messages)
+
+    t0 = time.monotonic()
+    result = llm.generate_with_messages(messages, req.max_tokens)
+    elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+    _save_chat_log(db,
+        session_id   = session_id,
+        turn_cnt     = turn_cnt,
+        search_mode  = "direct",
+        rag_query    = user_query,
+        rag_result   = rag_result_json,
+        final_system = rag_system,
+        user_message = user_query,
+        llm_response = result,
+        elapsed_ms   = elapsed_ms,
+    )
+    return {
+        "result": result,
+        "messages": messages,
+        "rag_used": context_str != NO_RESULTS,
+        "rag_context": context_str if context_str != NO_RESULTS else None,
+        "session_id": str(session_id),
+        "log": _build_log(search_mode="direct", rag_query=user_query,
+                          rag_result=rag_result_json, elapsed_ms=elapsed_ms,
+                          final_system=rag_system),
+    }
+
+
+def _handle_llm_rag(req: GenerateRequest, session_id, turn_cnt: int,
+                    user_query: str, messages: list, first_result: str, elapsed_ms_first: int) -> dict:
+    from app.db.database import get_db
+    search_match = re.search(r'\[SEARCH\](.*?)\[/SEARCH\]', first_result)
+    if not search_match:
+        return None
+    query = search_match.group(1)
+    messages.append({"role": "assistant", "content": first_result})
+    db = next(get_db())
+    context_str, rag_result_json = _search_chroma(query, req.dataset_id, db)
+    messages.append({"role": "user", "content": f'検索結果: {context_str}'})
+
+    t0 = time.monotonic()
+    result = llm.generate_with_messages(messages, req.max_tokens)
+    elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+    _save_chat_log(db,
+        session_id   = session_id,
+        turn_cnt     = turn_cnt,
+        search_mode  = "llm",
+        rag_query    = query,
+        rag_result   = rag_result_json,
+        final_system = req.system_prompt or "",
+        user_message = user_query,
+        llm_response = result,
+        elapsed_ms   = elapsed_ms,
+    )
+    return {
+        "result": result,
+        "messages": messages,
+        "session_id": str(session_id),
+        "log": _build_log(search_mode="llm", rag_query=query,
+                          rag_result=rag_result_json, elapsed_ms=elapsed_ms,
+                          final_system=req.system_prompt or ""),
+    }
+
+
+def _handle_no_rag(req: GenerateRequest, session_id, turn_cnt: int,
+                   user_query: str, messages: list, result: str, elapsed_ms: int) -> dict:
+    from app.db.database import get_db
+    db = next(get_db())
+    _save_chat_log(db,
+        session_id   = session_id,
+        turn_cnt     = turn_cnt,
+        search_mode  = "off",
+        rag_query    = None,
+        rag_result   = None,
+        final_system = req.system_prompt or "",
+        user_message = user_query,
+        llm_response = result,
+        elapsed_ms   = elapsed_ms,
+    )
+    return {
+        "result": result,
+        "messages": messages,
+        "session_id": str(session_id),
+        "log": _build_log(search_mode="off", rag_query=None, rag_result=None,
+                          elapsed_ms=elapsed_ms, final_system=req.system_prompt or ""),
+    }
 
 
 @router.get("/status", response_model=StatusResponse, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
@@ -105,34 +244,12 @@ def load_model(req: LoadRequest, _: CurrentUser):
 
 @router.post("/generate", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def generate(req: GenerateRequest, _: CurrentUser):
-    import time
-    import uuid
-    from app.db.database import get_db
-    from app.models.base import ChatLog
-
     if not llm.is_model_loaded():
         raise HTTPException(status_code=400, detail="モデルがロードされていません")
 
     session_id = uuid.UUID(req.session_id) if req.session_id else uuid.uuid4()
     turn_cnt = sum(1 for m in req.messages if m['role'] == 'user')
-
-    def _save_log(db, *, search_mode: str, rag_query, rag_result,
-                  final_system: str, user_message: str,
-                  llm_response: str, elapsed_ms: int):
-        log = ChatLog(
-            session_id       = session_id,
-            turn_cnt         = turn_cnt,
-            model_name       = llm.get_current_model_name() or "",
-            user_message     = user_message,
-            search_mode      = search_mode,
-            rag_query        = rag_query,
-            rag_result       = rag_result,
-            system_prompt    = final_system,
-            llm_response     = llm_response,
-            response_time_ms = elapsed_ms,
-        )
-        db.add(log)
-        db.commit()
+    user_query = next((m['content'] for m in reversed(req.messages) if m['role'] == 'user'), "")
 
     try:
         messages = []
@@ -140,116 +257,20 @@ def generate(req: GenerateRequest, _: CurrentUser):
             messages.append({"role": "system", "content": req.system_prompt})
         messages.extend(req.messages)
 
-        user_query = next((m['content'] for m in reversed(req.messages) if m['role'] == 'user'), "")
-
-        # --- direct RAG モード ---
         if req.rag_mode and req.dataset_id:
-            db_gen = get_db()
-            db = next(db_gen)
-            context_str, rag_result_json = _search_chroma(user_query, req.dataset_id, db)
-            if context_str != NO_RESULTS:
-                rag_system = (req.system_prompt or '') + f'\n\n【参考情報】\n{context_str}'
-            else:
-                rag_system = (req.system_prompt or '') + (
-                    '\n\n【重要】今回はドキュメントから参考情報が見つかりませんでした。'
-                    'このドメインに関する具体的な情報は提供せず、'
-                    '「お調べしましたが、該当する情報が見つかりませんでした」と答えてください。'
-                )
-            messages = [{"role": "system", "content": rag_system}]
-            messages.extend(req.messages)
-            t0 = time.monotonic()
-            result = llm.generate_with_messages(messages, req.max_tokens)
-            elapsed_ms = int((time.monotonic() - t0) * 1000)
-            _save_log(db,
-                search_mode  = "direct",
-                rag_query    = user_query,
-                rag_result   = rag_result_json,
-                final_system = rag_system,
-                user_message = user_query,
-                llm_response = result,
-                elapsed_ms   = elapsed_ms,
-            )
-            return {
-                "result": result,
-                "messages": messages,
-                "rag_used": context_str != NO_RESULTS,
-                "rag_context": context_str if context_str != NO_RESULTS else None,
-                "session_id": str(session_id),
-                "log": {
-                    "search_mode": "direct",
-                    "rag_query": user_query,
-                    "rag_result": rag_result_json,
-                    "response_time_ms": elapsed_ms,
-                    "model_name": llm.get_current_model_name() or "",
-                    "system_prompt": rag_system,
-                },
-            }
+            return _handle_direct_rag(req, session_id, turn_cnt, user_query)
 
-        # --- 通常生成（LLM-driven RAG の第1ターンも含む）---
         t0 = time.monotonic()
         result = llm.generate_with_messages(messages, req.max_tokens)
         elapsed_ms = int((time.monotonic() - t0) * 1000)
 
-        # --- LLM-driven RAG モード ---
-        search_match = re.search(r'\[SEARCH\](.*?)\[/SEARCH\]', result)
-        if search_match and req.dataset_id and req.rag_llm_mode:
-            query = search_match.group(1)
-            messages.append({"role": "assistant", "content": result})
-            db_gen = get_db()
-            db = next(db_gen)
-            context_str, rag_result_json = _search_chroma(query, req.dataset_id, db)
-            messages.append({"role": "user", "content": f'検索結果: {context_str}'})
-            t0 = time.monotonic()
-            result = llm.generate_with_messages(messages, req.max_tokens)
-            elapsed_ms = int((time.monotonic() - t0) * 1000)
-            _save_log(db,
-                search_mode  = "llm",
-                rag_query    = query,
-                rag_result   = rag_result_json,
-                final_system = req.system_prompt or "",
-                user_message = user_query,
-                llm_response = result,
-                elapsed_ms   = elapsed_ms,
-            )
-            return {
-                "result": result,
-                "messages": messages,
-                "session_id": str(session_id),
-                "log": {
-                    "search_mode": "llm",
-                    "rag_query": query,
-                    "rag_result": rag_result_json,
-                    "response_time_ms": elapsed_ms,
-                    "model_name": llm.get_current_model_name() or "",
-                    "system_prompt": req.system_prompt or "",
-                },
-            }
+        if req.rag_llm_mode and req.dataset_id:
+            llm_rag_result = _handle_llm_rag(req, session_id, turn_cnt,
+                                              user_query, messages, result, elapsed_ms)
+            if llm_rag_result:
+                return llm_rag_result
 
-        # --- RAG なし ---
-        db_gen = get_db()
-        db = next(db_gen)
-        _save_log(db,
-            search_mode  = "off",
-            rag_query    = None,
-            rag_result   = None,
-            final_system = req.system_prompt or "",
-            user_message = user_query,
-            llm_response = result,
-            elapsed_ms   = elapsed_ms,
-        )
-        return {
-            "result": result,
-            "messages": messages,
-            "session_id": str(session_id),
-            "log": {
-                "search_mode": "off",
-                "rag_query": None,
-                "rag_result": None,
-                "response_time_ms": elapsed_ms,
-                "model_name": llm.get_current_model_name() or "",
-                "system_prompt": req.system_prompt or "",
-            },
-        }
+        return _handle_no_rag(req, session_id, turn_cnt, user_query, messages, result, elapsed_ms)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

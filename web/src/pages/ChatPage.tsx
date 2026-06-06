@@ -42,16 +42,18 @@ interface RagResult {
   error?: string
 }
 
+// union型をtype aliasに（SonarCloud: L46）
+type SearchMode = 'off' | 'direct' | 'llm'
+
 interface TurnLog {
-  search_mode: 'off' | 'direct' | 'llm'
+  search_mode: SearchMode
   rag_query: string | null
-  rag_result: string | null  // JSON文字列
+  rag_result: string | null
   response_time_ms: number
   model_name: string
   system_prompt: string
 }
 
-// userメッセージとassistantメッセージをターン単位で管理
 interface Turn {
   userMessage: string
   assistantMessage: string
@@ -64,7 +66,8 @@ const SEARCH_MODE_LABEL: Record<string, string> = {
   llm: 'LLM検索',
 }
 
-function SystemPromptPanel({ content }: { content: string }) {
+// propsをreadonly化（SonarCloud: L67）
+function SystemPromptPanel({ content }: Readonly<{ content: string }>) {
   const [open, setOpen] = useState(false)
   if (!content) return null
   return (
@@ -86,11 +89,20 @@ function SystemPromptPanel({ content }: { content: string }) {
   )
 }
 
-function TurnLogPanel({ log }: { log: TurnLog }) {
+// propsをreadonly化（SonarCloud: L89）
+function TurnLogPanel({ log }: Readonly<{ log: TurnLog }>) {
   const [open, setOpen] = useState(false)
   const modeColor =
     log.search_mode === 'off' ? 'text-gray-400' :
     log.search_mode === 'direct' ? 'text-blue-500' : 'text-purple-500'
+
+  // rag_resultのパース（SonarCloud: L93 ネストした三項演算子を解消）
+  function parseRagResult(): RagResult | null {
+    if (!log.rag_result) return null
+    try { return JSON.parse(log.rag_result) as RagResult } catch { return null }
+  }
+
+  const parsedRag = parseRagResult()
 
   return (
     <div className="my-1 mx-auto w-full max-w-[75%]">
@@ -121,36 +133,32 @@ function TurnLogPanel({ log }: { log: TurnLog }) {
               <span>{log.rag_query}</span>
             </div>
           )}
-          {log.rag_result && (() => {
-            let parsed: RagResult | null = null
-            try { parsed = JSON.parse(log.rag_result) } catch {}
-            if (!parsed) return (
-              <div>
-                <span className="text-gray-400 mr-1">rag_result:</span>
-                <pre className="mt-0.5 whitespace-pre-wrap break-all text-gray-500 bg-white border rounded p-1">{log.rag_result}</pre>
+          {log.rag_result && !parsedRag && (
+            <div>
+              <span className="text-gray-400 mr-1">rag_result:</span>
+              <pre className="mt-0.5 whitespace-pre-wrap break-all text-gray-500 bg-white border rounded p-1">{log.rag_result}</pre>
+            </div>
+          )}
+          {parsedRag && (
+            <div>
+              <div className="text-gray-400 mb-0.5">
+                rag_hits: threshold={parsedRag.threshold} / used={parsedRag.used ? '✅' : '❌'}
               </div>
-            )
-            return (
-              <div>
-                <div className="text-gray-400 mb-0.5">
-                  rag_hits: threshold={parsed.threshold} / used={parsed.used ? '✅' : '❌'}
-                </div>
-                <div className="space-y-1">
-                  {parsed.hits.map(h => (
-                    <div key={h.rank} className={`border rounded p-1 bg-white ${h.distance <= parsed!.threshold ? 'border-blue-200' : 'border-gray-200 opacity-50'}`}>
-                      <div className="flex gap-2 text-gray-400 mb-0.5">
-                        <span>rank={h.rank}</span>
-                        <span className={h.distance <= parsed!.threshold ? 'text-blue-500' : 'text-red-400'}>
-                          distance={h.distance}
-                        </span>
-                      </div>
-                      <div className="text-gray-600 whitespace-pre-wrap break-all">{h.text}</div>
+              <div className="space-y-1">
+                {parsedRag.hits.map(h => (
+                  <div key={h.rank} className={`border rounded p-1 bg-white ${h.distance <= parsedRag.threshold ? 'border-blue-200' : 'border-gray-200 opacity-50'}`}>
+                    <div className="flex gap-2 text-gray-400 mb-0.5">
+                      <span>rank={h.rank}</span>
+                      <span className={h.distance <= parsedRag.threshold ? 'text-blue-500' : 'text-red-400'}>
+                        distance={h.distance}
+                      </span>
                     </div>
-                  ))}
-                </div>
+                    <div className="text-gray-600 whitespace-pre-wrap break-all">{h.text}</div>
+                  </div>
+                ))}
               </div>
-            )
-          })()}
+            </div>
+          )}
           <div>
             <span className="text-gray-400 mr-1">response_time:</span>
             <span>{log.response_time_ms}ms</span>
@@ -175,7 +183,7 @@ export default function ChatPage() {
   const loadingModelRef = useRef(false)
   const setLoadingModel = (v: boolean) => { loadingModelRef.current = v }
   const [generating, setGenerating] = useState(false)
-  const [searchMode, setSearchMode] = useState<'off' | 'direct' | 'llm'>('direct')
+  const [searchMode, setSearchMode] = useState<SearchMode>('direct')
   const [settingsOpen, setSettingsOpen] = useState(true)
   const [loadedModelName, setLoadedModelName] = useState<string | null>(null)
   const [loadedAdapterPath, setLoadedAdapterPath] = useState<string | null>(null)
@@ -219,7 +227,6 @@ export default function ChatPage() {
       if (res.data.system_prompt) {
         setSystemPrompt(res.data.system_prompt)
       } else if (selectedProjectId) {
-        // FTモデルのシステムプロンプトがない場合はプロジェクトのものを使う
         apiClient.get(`/system-prompts?project_id=${selectedProjectId}`).then(r => {
           if (r.data.length > 0) setSystemPrompt(r.data[0].content)
           else setSystemPrompt('')
@@ -245,7 +252,6 @@ export default function ChatPage() {
     })
   }, [selectedModelId])
 
-  // turns → messages変換（generate APIに渡す用）
   function turnsToMessages(ts: Turn[]): Message[] {
     const msgs: Message[] = []
     for (const t of ts) {
@@ -263,7 +269,6 @@ export default function ChatPage() {
     setGenerating(true)
     setError(null)
 
-    // 現在の会話履歴 + 今回のユーザーメッセージ
     const historyMessages = turnsToMessages(turns)
     const allMessages = [...historyMessages, { role: 'user' as const, content: userMessage }]
 
@@ -278,7 +283,6 @@ export default function ChatPage() {
         session_id: sessionIdRef.current,
       })
 
-      // session_idを保持（2ターン目以降は同一sessionとして記録）
       if (res.data.session_id) {
         sessionIdRef.current = res.data.session_id
       }
@@ -307,7 +311,6 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full">
-      {/* 左パネル：設定 */}
       <div className={`border-r bg-white flex flex-col shrink-0 transition-all duration-200 ${settingsOpen ? 'w-64' : 'w-8'}`}>
         <button
           type="button"
@@ -374,7 +377,7 @@ export default function ChatPage() {
                 <Label className="text-xs text-gray-500">ドキュメント参照</Label>
                 <select
                   value={searchMode}
-                  onChange={e => setSearchMode(e.target.value as 'off' | 'direct' | 'llm')}
+                  onChange={e => setSearchMode(e.target.value as SearchMode)}
                   className="text-xs border rounded px-2 py-1"
                 >
                   <option value="direct">直接検索</option>
@@ -407,7 +410,6 @@ export default function ChatPage() {
         )}
       </div>
 
-      {/* 右パネル：チャット */}
       <div className="flex-1 flex flex-col">
         <div className="flex-1 overflow-y-auto p-4 space-y-1">
           {turns.length === 0 && (
@@ -418,17 +420,12 @@ export default function ChatPage() {
 
           {turns.map((turn, i) => (
             <div key={i}>
-              {/* ユーザーメッセージ */}
               <div className="flex justify-end mb-1">
                 <div className="max-w-[75%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap bg-blue-600 text-white">
                   {turn.userMessage}
                 </div>
               </div>
-
-              {/* ターンログ（折りたたみ） */}
               {turn.log && <TurnLogPanel log={turn.log} />}
-
-              {/* アシスタントメッセージ */}
               <div className="flex justify-start mt-1">
                 <div className="max-w-[75%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap bg-white border text-gray-800">
                   {turn.assistantMessage}
