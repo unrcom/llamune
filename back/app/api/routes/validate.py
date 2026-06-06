@@ -164,7 +164,7 @@ def _handle_direct_rag(req: GenerateRequest, session_id, turn_cnt: int, user_que
 
 
 def _handle_llm_rag(req: GenerateRequest, session_id, turn_cnt: int,
-                    user_query: str, messages: list, first_result: str, elapsed_ms_first: int) -> dict:
+                    user_query: str, messages: list, first_result: str) -> dict | None:
     from app.db.database import get_db
     search_match = re.search(r'\[SEARCH\](.*?)\[/SEARCH\]', first_result)
     if not search_match:
@@ -266,7 +266,7 @@ def generate(req: GenerateRequest, _: CurrentUser):
 
         if req.rag_llm_mode and req.dataset_id:
             llm_rag_result = _handle_llm_rag(req, session_id, turn_cnt,
-                                              user_query, messages, result, elapsed_ms)
+                                              user_query, messages, result)
             if llm_rag_result:
                 return llm_rag_result
 

@@ -92,9 +92,9 @@ function SystemPromptPanel({ content }: Readonly<{ content: string }>) {
 // propsをreadonly化（SonarCloud: L89）
 function TurnLogPanel({ log }: Readonly<{ log: TurnLog }>) {
   const [open, setOpen] = useState(false)
-  const modeColor =
-    log.search_mode === 'off' ? 'text-gray-400' :
-    log.search_mode === 'direct' ? 'text-blue-500' : 'text-purple-500'
+  let modeColor = 'text-purple-500'
+  if (log.search_mode === 'off') modeColor = 'text-gray-400'
+  else if (log.search_mode === 'direct') modeColor = 'text-blue-500'
 
   // rag_resultのパース（SonarCloud: L93 ネストした三項演算子を解消）
   function parseRagResult(): RagResult | null {
@@ -253,12 +253,10 @@ export default function ChatPage() {
   }, [selectedModelId])
 
   function turnsToMessages(ts: Turn[]): Message[] {
-    const msgs: Message[] = []
-    for (const t of ts) {
-      msgs.push({ role: 'user', content: t.userMessage })
-      msgs.push({ role: 'assistant', content: t.assistantMessage })
-    }
-    return msgs
+    return ts.flatMap(t => [
+      { role: 'user' as const, content: t.userMessage },
+      { role: 'assistant' as const, content: t.assistantMessage },
+    ])
   }
 
   async function handleSend() {
@@ -419,7 +417,7 @@ export default function ChatPage() {
           )}
 
           {turns.map((turn, i) => (
-            <div key={i}>
+            <div key={`${turn.userMessage}-${i}`}>
               <div className="flex justify-end mb-1">
                 <div className="max-w-[75%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap bg-blue-600 text-white">
                   {turn.userMessage}
