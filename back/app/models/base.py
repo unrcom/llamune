@@ -47,7 +47,8 @@ class Project(Base):
     id           = Column(Integer, primary_key=True)
     name         = Column(String(100), nullable=False, unique=True)
     display_name = Column(String(100), nullable=False)
-    created_at   = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    created_at    = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    rag_threshold = Column(Float, nullable=False, server_default="1.0")
 
 
 class Model(Base):
@@ -160,3 +161,4 @@ class ChatLog(Base):
     llm_response     = Column(Text, nullable=False)
     response_time_ms = Column(Integer, nullable=False)
     created_at       = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+

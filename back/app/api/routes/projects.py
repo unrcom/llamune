@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Annotated
+from typing import Annotated, Optional
 from sqlalchemy.orm import Session as _Session
 from pydantic import BaseModel
 from app.db.database import get_db
@@ -17,10 +17,15 @@ class ProjectCreate(BaseModel):
     display_name: str
 
 
+class ProjectUpdate(BaseModel):
+    rag_threshold: Optional[float] = None
+
+
 class ProjectResponse(BaseModel):
     id: int
     name: str
     display_name: str
+    rag_threshold: float
 
     class Config:
         from_attributes = True
@@ -43,6 +48,23 @@ def create_project(
     auto_name = f"proj-{uuid.uuid4().hex[:12]}"
     project = Project(name=auto_name, display_name=project_in.display_name)
     db.add(project)
+    db.commit()
+    db.refresh(project)
+    return project
+
+
+@router.patch("/{project_id}", response_model=ProjectResponse, responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
+def update_project(
+    project_id: int,
+    project_in: ProjectUpdate,
+    db: DB,
+    _: CurrentUser,
+):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+    if project_in.rag_threshold is not None:
+        project.rag_threshold = project_in.rag_threshold
     db.commit()
     db.refresh(project)
     return project

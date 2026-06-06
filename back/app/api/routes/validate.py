@@ -18,7 +18,7 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 router = APIRouter(prefix="/validate", tags=["validate"])
 
-DISTANCE_THRESHOLD = 1.0
+DISTANCE_THRESHOLD = 1.0  # fallback default
 NO_RESULTS = "検索結果なし"
 NO_RESULTS_PROMPT = (
     '\n\n【重要】今回はドキュメントから参考情報が見つかりませんでした。'
@@ -69,7 +69,7 @@ def _get_project_id_from_dataset(dataset_id: int) -> Optional[int]:
         return dataset.project_id if dataset else None
 
 
-def _search_chroma(query: str, dataset_id: int, db):
+def _search_chroma(query: str, dataset_id: int, db, threshold: float = DISTANCE_THRESHOLD):
     """
     戻り値: (context_str, rag_result_json)
       - context_str     : LLMに渡す文字列（ヒットなしの場合は NO_RESULTS）
@@ -78,7 +78,7 @@ def _search_chroma(query: str, dataset_id: int, db):
     from app.models.base import Dataset
     dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
     if not dataset:
-        empty = json.dumps({"hits": [], "threshold": DISTANCE_THRESHOLD, "used": False}, ensure_ascii=False)
+        empty = json.dumps({"hits": [], "threshold": threshold, "used": False}, ensure_ascii=False)
         return NO_RESULTS, empty
 
     client = _get_chroma_client()
@@ -95,7 +95,7 @@ def _search_chroma(query: str, dataset_id: int, db):
         for h in hits:
             logger.info(f"[RAG] query={query!r} rank={h['rank']} distance={h['distance']}")
 
-        relevant_docs = [h["text"] for h in hits if h["distance"] <= DISTANCE_THRESHOLD]
+        relevant_docs = [h["text"] for h in hits if h["distance"] <= threshold]
         used = len(relevant_docs) > 0
 
         if not used:
@@ -103,14 +103,14 @@ def _search_chroma(query: str, dataset_id: int, db):
             logger.info(f"[RAG] query={query!r} no relevant docs (min_distance={min_dist})")
 
         rag_result_json = json.dumps(
-            {"hits": hits, "threshold": DISTANCE_THRESHOLD, "used": used},
+            {"hits": hits, "threshold": threshold, "used": used},
             ensure_ascii=False,
         )
         context_str = "\n".join(relevant_docs) if used else NO_RESULTS
         return context_str, rag_result_json
 
     except Exception as e:
-        err_json = json.dumps({"error": str(e), "threshold": DISTANCE_THRESHOLD, "used": False}, ensure_ascii=False)
+        err_json = json.dumps({"error": str(e), "threshold": threshold, "used": False}, ensure_ascii=False)
         return f"検索エラー: {str(e)}", err_json
 
 
@@ -147,7 +147,11 @@ def _save_chat_log(db, *, session_id, turn_cnt: int, search_mode: str,
 
 def _handle_direct_rag(req: GenerateRequest, session_id, turn_cnt: int, user_query: str) -> dict:
     with _get_db_ctx() as db:
-        context_str, rag_result_json = _search_chroma(user_query, req.dataset_id, db)
+        from app.models.base import Dataset, Project
+        dataset = db.query(Dataset).filter(Dataset.id == req.dataset_id).first()
+        project = db.query(Project).filter(Project.id == dataset.project_id).first() if dataset else None
+        threshold = project.rag_threshold if project else DISTANCE_THRESHOLD
+        context_str, rag_result_json = _search_chroma(user_query, req.dataset_id, db, threshold)
 
         if context_str != NO_RESULTS:
             rag_system = (req.system_prompt or '') + f'\n\n【参考情報】\n{context_str}'
@@ -193,7 +197,11 @@ def _handle_llm_rag(req: GenerateRequest, session_id, turn_cnt: int,
     messages.append({"role": "assistant", "content": first_result})
 
     with _get_db_ctx() as db:
-        context_str, rag_result_json = _search_chroma(query, req.dataset_id, db)
+        from app.models.base import Dataset, Project
+        dataset = db.query(Dataset).filter(Dataset.id == req.dataset_id).first()
+        project = db.query(Project).filter(Project.id == dataset.project_id).first() if dataset else None
+        threshold = project.rag_threshold if project else DISTANCE_THRESHOLD
+        context_str, rag_result_json = _search_chroma(query, req.dataset_id, db, threshold)
         messages.append({"role": "user", "content": f'検索結果: {context_str}'})
 
         t0 = time.monotonic()
@@ -326,3 +334,4 @@ def get_model_system_prompt(model_id: int, _: CurrentUser):
         if not sp:
             return {"system_prompt": None}
         return {"system_prompt": sp.content}
+

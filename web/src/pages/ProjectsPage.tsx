@@ -11,6 +11,7 @@ interface Project {
   id: number
   name: string
   display_name: string
+  rag_threshold: number
 }
 
 interface SystemPrompt {
@@ -31,6 +32,9 @@ export default function ProjectsPage() {
 
   const [editingSpProjectId, setEditingSpProjectId] = useState<number | null>(null)
   const [editingSpContent, setEditingSpContent] = useState('')
+
+  const [editingThresholdProjectId, setEditingThresholdProjectId] = useState<number | null>(null)
+  const [editingThresholdValue, setEditingThresholdValue] = useState('')
 
   async function load() {
     try {
@@ -97,6 +101,21 @@ export default function ProjectsPage() {
     }
   }
 
+  async function handleSaveThreshold(projectId: number) {
+    const val = parseFloat(editingThresholdValue)
+    if (isNaN(val) || val <= 0) {
+      setError('閾値は0より大きい数値を入力してください')
+      return
+    }
+    try {
+      await apiClient.patch(`/projects/${projectId}`, { rag_threshold: val })
+      setEditingThresholdProjectId(null)
+      await load()
+    } catch (e: any) {
+      setError(e.response?.data?.detail || '閾値の保存に失敗しました')
+    }
+  }
+
   if (loading) return <div className="p-6 text-gray-500">読み込み中...</div>
 
   return (
@@ -137,6 +156,45 @@ export default function ProjectsPage() {
                   <Button variant="ghost" size="sm" onClick={() => handleDelete(p.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
+                </div>
+
+                {/* RAG閾値 */}
+                <div className="border-t pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-xs text-gray-500">RAG閾値</Label>
+                    {editingThresholdProjectId !== p.id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingThresholdProjectId(p.id)
+                          setEditingThresholdValue(String(p.rag_threshold))
+                        }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  {editingThresholdProjectId === p.id ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={editingThresholdValue}
+                        onChange={e => setEditingThresholdValue(e.target.value)}
+                        className="w-28 text-sm"
+                      />
+                      <Button size="sm" onClick={() => handleSaveThreshold(p.id)}>
+                        <Check className="h-3 w-3 mr-1" />保存
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingThresholdProjectId(null)}>
+                        <X className="h-3 w-3 mr-1" />キャンセル
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-600">{p.rag_threshold}</p>
+                  )}
                 </div>
 
                 {/* システムプロンプト */}
