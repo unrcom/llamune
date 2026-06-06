@@ -208,19 +208,19 @@ function SessionRow({ session, onDelete, onRename }: Readonly<SessionRowProps>) 
     <div className="border rounded-lg bg-white overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 hover:bg-gray-50">
         <button onClick={toggleExpand} className="flex items-center gap-2 flex-1 min-w-0 text-left">
-          {loadingDetail
-            ? <Loader2 className="h-4 w-4 text-gray-400 shrink-0 animate-spin" />
-            : expanded
-              ? <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
-              : <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
-          }
+          {loadingDetail && <Loader2 className="h-4 w-4 text-gray-400 shrink-0 animate-spin" />}
+          {!loadingDetail && expanded && <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />}
+          {!loadingDetail && !expanded && <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />}
           <div className="flex-1 min-w-0">
             {editing ? (
-              <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+              <button type="button" className="flex items-center gap-2 w-full cursor-default" onClick={e => e.stopPropagation()}>
                 <Input
                   value={editName}
                   onChange={e => setEditName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') setEditing(false) }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { saveRename() }
+                    else if (e.key === 'Escape') { setEditing(false) }
+                  }}
                   className="h-7 text-sm"
                   autoFocus
                 />
@@ -230,7 +230,7 @@ function SessionRow({ session, onDelete, onRename }: Readonly<SessionRowProps>) 
                 <button onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="h-4 w-4" />
                 </button>
-              </div>
+              </button>
             ) : (
               <div className="flex items-center gap-3 min-w-0">
                 <span className="font-medium text-sm text-gray-800 truncate">{session.name}</span>
@@ -257,7 +257,7 @@ function SessionRow({ session, onDelete, onRename }: Readonly<SessionRowProps>) 
               {session.turn_count}ターン
             </span>
             <button
-              onClick={e => { e.stopPropagation(); setEditing(true) }}
+              onClick={e => { e.stopPropagation(); setEditName(session.name); setEditing(true) }}
               className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
               title="名前を変更"
             >

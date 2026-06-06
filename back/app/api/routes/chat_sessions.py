@@ -9,6 +9,8 @@ router = APIRouter(prefix="/chat-sessions", tags=["chat-sessions"])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
+SESSION_NOT_FOUND = "セッションが見つかりません"
+
 
 @contextmanager
 def _get_db_ctx():
@@ -108,7 +110,7 @@ def get_session_logs(session_id: str, _: CurrentUser):
     with _get_db_ctx() as db:
         session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
         if not session:
-            raise HTTPException(status_code=404, detail="セッションが見つかりません")
+            raise HTTPException(status_code=404, detail=SESSION_NOT_FOUND)
         logs = db.query(ChatLog).filter(ChatLog.session_id == session_id).order_by(ChatLog.turn_cnt).all()
         return {
             "session": {
@@ -147,7 +149,7 @@ def rename_session(session_id: str, body: SessionRename, _: CurrentUser):
     with _get_db_ctx() as db:
         session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
         if not session:
-            raise HTTPException(status_code=404, detail="セッションが見つかりません")
+            raise HTTPException(status_code=404, detail=SESSION_NOT_FOUND)
         session.name = body.name
         db.commit()
     return {"ok": True}
@@ -165,7 +167,7 @@ def delete_session(session_id: str, _: CurrentUser):
     with _get_db_ctx() as db:
         session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
         if not session:
-            raise HTTPException(status_code=404, detail="セッションが見つかりません")
+            raise HTTPException(status_code=404, detail=SESSION_NOT_FOUND)
         db.delete(session)
         db.commit()
     return {"ok": True}
