@@ -4,7 +4,7 @@ import { apiClient, clearTokens, getIsAdmin } from '@/api/client'
 import {
   MessageSquare, FolderOpen, Cpu, Wrench,
   ChevronDown, ChevronRight, LogOut, Database, Menu, X, BookOpen,
-  Download, Upload, Loader2,
+  Download, Upload, Loader2, ScrollText,
 } from 'lucide-react'
 
 const adminItems = [
@@ -12,6 +12,7 @@ const adminItems = [
   { to: '/admin/models',    label: 'モデル',       icon: Cpu },
   { to: '/admin/ft-data',   label: 'FTデータ管理', icon: BookOpen },
   { to: '/admin/jobs',      label: '訓練ジョブ',   icon: Wrench },
+  { to: '/admin/logs',      label: 'ログ',         icon: ScrollText },
 ]
 
 function useBackup() {

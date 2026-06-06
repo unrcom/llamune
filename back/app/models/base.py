@@ -133,6 +133,17 @@ class Dataset(Base):
     created_at   = Column(TIMESTAMP, server_default=func.now(), nullable=False)
 
 
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    __table_args__ = {"schema": SCHEMA}
+
+    id         = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    name       = Column(Text, nullable=False)
+    user_id    = Column(Integer, ForeignKey(f"{SCHEMA}.users.id", ondelete="SET NULL"), nullable=True)
+    project_id = Column(Integer, ForeignKey(f"{SCHEMA}.projects.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+
+
 class ChatLog(Base):
     __tablename__ = "chat_logs"
     __table_args__ = {"schema": SCHEMA}

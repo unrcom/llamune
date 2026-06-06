@@ -400,7 +400,7 @@ export default function ChatPage() {
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => { setTurns([]); sessionIdRef.current = null }}
+              onClick={() => { setTurns([]); sessionIdRef.current = null; setPendingUserMessage(null) }}
             >
               会話をリセット
             </Button>

@@ -9,6 +9,7 @@ import FtDataPage from '@/pages/FtDataPage'
 import JobsPage from '@/pages/JobsPage'
 import ChatPage from '@/pages/ChatPage'
 import DatasetPage from '@/pages/DatasetPage'
+import LogsPage from '@/pages/LogsPage'
 
 function RequireAuth({ children }: Readonly<{ children: React.ReactNode }>) {
   return getToken() ? <>{children}</> : <Navigate to="/login" replace />
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/admin/models"   element={<RequireAdmin><ModelsPage /></RequireAdmin>} />
           <Route path="/admin/ft-data"  element={<RequireAdmin><FtDataPage /></RequireAdmin>} />
           <Route path="/admin/jobs"     element={<RequireAdmin><JobsPage /></RequireAdmin>} />
+          <Route path="/admin/logs"     element={<RequireAdmin><LogsPage /></RequireAdmin>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

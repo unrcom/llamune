@@ -4,7 +4,7 @@ logging.basicConfig(level=logging.INFO)
 import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import auth, models, projects, question_sets, ft_conversations, training_jobs, validate, datasets, system_prompts
+from app.api.routes import auth, models, projects, question_sets, ft_conversations, training_jobs, validate, datasets, system_prompts, chat_sessions
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.include_router(training_jobs.router)
 app.include_router(validate.router)
 app.include_router(datasets.router)
 app.include_router(system_prompts.router)
+app.include_router(chat_sessions.router)
 
 
 @app.get("/health")

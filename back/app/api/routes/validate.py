@@ -3,6 +3,7 @@ import json
 import logging
 import time
 import uuid
+from contextlib import contextmanager
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Annotated, Optional
@@ -45,6 +46,27 @@ class StatusResponse(BaseModel):
     loaded: bool
     model_name: Optional[str] = None
     adapter_path: Optional[str] = None
+
+
+@contextmanager
+def _get_db_ctx():
+    from app.db.database import get_db
+    gen = get_db()
+    db = next(gen)
+    try:
+        yield db
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+
+
+def _get_project_id_from_dataset(dataset_id: int) -> Optional[int]:
+    from app.models.base import Dataset
+    with _get_db_ctx() as db:
+        dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+        return dataset.project_id if dataset else None
 
 
 def _search_chroma(query: str, dataset_id: int, db):
@@ -124,33 +146,32 @@ def _save_chat_log(db, *, session_id, turn_cnt: int, search_mode: str,
 
 
 def _handle_direct_rag(req: GenerateRequest, session_id, turn_cnt: int, user_query: str) -> dict:
-    from app.db.database import get_db
-    db = next(get_db())
-    context_str, rag_result_json = _search_chroma(user_query, req.dataset_id, db)
+    with _get_db_ctx() as db:
+        context_str, rag_result_json = _search_chroma(user_query, req.dataset_id, db)
 
-    if context_str != NO_RESULTS:
-        rag_system = (req.system_prompt or '') + f'\n\n【参考情報】\n{context_str}'
-    else:
-        rag_system = (req.system_prompt or '') + NO_RESULTS_PROMPT
+        if context_str != NO_RESULTS:
+            rag_system = (req.system_prompt or '') + f'\n\n【参考情報】\n{context_str}'
+        else:
+            rag_system = (req.system_prompt or '') + NO_RESULTS_PROMPT
 
-    messages = [{"role": "system", "content": rag_system}]
-    messages.extend(req.messages)
+        messages = [{"role": "system", "content": rag_system}]
+        messages.extend(req.messages)
 
-    t0 = time.monotonic()
-    result = llm.generate_with_messages(messages, req.max_tokens)
-    elapsed_ms = int((time.monotonic() - t0) * 1000)
+        t0 = time.monotonic()
+        result = llm.generate_with_messages(messages, req.max_tokens)
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
 
-    _save_chat_log(db,
-        session_id   = session_id,
-        turn_cnt     = turn_cnt,
-        search_mode  = "direct",
-        rag_query    = user_query,
-        rag_result   = rag_result_json,
-        final_system = rag_system,
-        user_message = user_query,
-        llm_response = result,
-        elapsed_ms   = elapsed_ms,
-    )
+        _save_chat_log(db,
+            session_id   = session_id,
+            turn_cnt     = turn_cnt,
+            search_mode  = "direct",
+            rag_query    = user_query,
+            rag_result   = rag_result_json,
+            final_system = rag_system,
+            user_message = user_query,
+            llm_response = result,
+            elapsed_ms   = elapsed_ms,
+        )
     return {
         "result": result,
         "messages": messages,
@@ -165,31 +186,31 @@ def _handle_direct_rag(req: GenerateRequest, session_id, turn_cnt: int, user_que
 
 def _handle_llm_rag(req: GenerateRequest, session_id, turn_cnt: int,
                     user_query: str, messages: list, first_result: str) -> dict | None:
-    from app.db.database import get_db
     search_match = re.search(r'\[SEARCH\](.*?)\[/SEARCH\]', first_result)
     if not search_match:
         return None
     query = search_match.group(1)
     messages.append({"role": "assistant", "content": first_result})
-    db = next(get_db())
-    context_str, rag_result_json = _search_chroma(query, req.dataset_id, db)
-    messages.append({"role": "user", "content": f'検索結果: {context_str}'})
 
-    t0 = time.monotonic()
-    result = llm.generate_with_messages(messages, req.max_tokens)
-    elapsed_ms = int((time.monotonic() - t0) * 1000)
+    with _get_db_ctx() as db:
+        context_str, rag_result_json = _search_chroma(query, req.dataset_id, db)
+        messages.append({"role": "user", "content": f'検索結果: {context_str}'})
 
-    _save_chat_log(db,
-        session_id   = session_id,
-        turn_cnt     = turn_cnt,
-        search_mode  = "llm",
-        rag_query    = query,
-        rag_result   = rag_result_json,
-        final_system = req.system_prompt or "",
-        user_message = user_query,
-        llm_response = result,
-        elapsed_ms   = elapsed_ms,
-    )
+        t0 = time.monotonic()
+        result = llm.generate_with_messages(messages, req.max_tokens)
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+        _save_chat_log(db,
+            session_id   = session_id,
+            turn_cnt     = turn_cnt,
+            search_mode  = "llm",
+            rag_query    = query,
+            rag_result   = rag_result_json,
+            final_system = req.system_prompt or "",
+            user_message = user_query,
+            llm_response = result,
+            elapsed_ms   = elapsed_ms,
+        )
     return {
         "result": result,
         "messages": messages,
@@ -202,19 +223,18 @@ def _handle_llm_rag(req: GenerateRequest, session_id, turn_cnt: int,
 
 def _handle_no_rag(req: GenerateRequest, session_id, turn_cnt: int,
                    user_query: str, messages: list, result: str, elapsed_ms: int) -> dict:
-    from app.db.database import get_db
-    db = next(get_db())
-    _save_chat_log(db,
-        session_id   = session_id,
-        turn_cnt     = turn_cnt,
-        search_mode  = "off",
-        rag_query    = None,
-        rag_result   = None,
-        final_system = req.system_prompt or "",
-        user_message = user_query,
-        llm_response = result,
-        elapsed_ms   = elapsed_ms,
-    )
+    with _get_db_ctx() as db:
+        _save_chat_log(db,
+            session_id   = session_id,
+            turn_cnt     = turn_cnt,
+            search_mode  = "off",
+            rag_query    = None,
+            rag_result   = None,
+            final_system = req.system_prompt or "",
+            user_message = user_query,
+            llm_response = result,
+            elapsed_ms   = elapsed_ms,
+        )
     return {
         "result": result,
         "messages": messages,
@@ -243,12 +263,28 @@ def load_model(req: LoadRequest, _: CurrentUser):
 
 
 @router.post("/generate", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
-def generate(req: GenerateRequest, _: CurrentUser):
+def generate(req: GenerateRequest, current_user: CurrentUser):
     if not llm.is_model_loaded():
         raise HTTPException(status_code=400, detail="モデルがロードされていません")
 
+    is_new_session = not req.session_id
     session_id = uuid.UUID(req.session_id) if req.session_id else uuid.uuid4()
     turn_cnt = sum(1 for m in req.messages if m['role'] == 'user')
+
+    if is_new_session:
+        from app.models.base import ChatSession
+        session_name = time.strftime('%Y-%m-%d %H:%M', time.gmtime())
+        project_id = _get_project_id_from_dataset(req.dataset_id) if req.dataset_id else None
+        with _get_db_ctx() as db:
+            chat_session = ChatSession(
+                id         = session_id,
+                name       = session_name,
+                user_id    = current_user.id,
+                project_id = project_id,
+            )
+            db.add(chat_session)
+            db.commit()
+
     user_query = next((m['content'] for m in reversed(req.messages) if m['role'] == 'user'), "")
 
     try:
@@ -278,16 +314,15 @@ def generate(req: GenerateRequest, _: CurrentUser):
 
 @router.get("/system-prompt/{model_id}", responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}, 500: {"description": "Internal Server Error"}})
 def get_model_system_prompt(model_id: int, _: CurrentUser):
-    from app.db.database import get_db
     from app.models.base import Model, TrainingJob, SystemPrompt
-    db = next(get_db())
-    model = db.query(Model).filter(Model.id == model_id).first()
-    if not model or model.model_type != "fine-tuned":
-        return {"system_prompt": None}
-    job = db.query(TrainingJob).filter(TrainingJob.models_id == model.parent_models_id).first()
-    if not job:
-        return {"system_prompt": None}
-    sp = db.query(SystemPrompt).filter(SystemPrompt.project_id == job.project_id).first()
-    if not sp:
-        return {"system_prompt": None}
-    return {"system_prompt": sp.content}
+    with _get_db_ctx() as db:
+        model = db.query(Model).filter(Model.id == model_id).first()
+        if not model or model.model_type != "fine-tuned":
+            return {"system_prompt": None}
+        job = db.query(TrainingJob).filter(TrainingJob.models_id == model.parent_models_id).first()
+        if not job:
+            return {"system_prompt": None}
+        sp = db.query(SystemPrompt).filter(SystemPrompt.project_id == job.project_id).first()
+        if not sp:
+            return {"system_prompt": None}
+        return {"system_prompt": sp.content}
