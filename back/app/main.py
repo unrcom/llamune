@@ -19,6 +19,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logging.critical(f"DB接続に失敗しました。起動を中止します: {e}")
         sys.exit(1)
+    # ChromaDB初期化（起動時にメインスレッドで一度だけ実行）
+    from app.core.chroma import get_chroma_client
+    try:
+        get_chroma_client()
+        logging.info("ChromaDB connection: OK")
+    except Exception as e:
+        logging.critical(f"ChromaDB接続に失敗しました。起動を中止します: {e}")
+        sys.exit(1)
     yield
 
 

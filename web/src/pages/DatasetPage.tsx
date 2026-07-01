@@ -537,15 +537,15 @@ export default function DatasetPage() {
                       ) : (
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-0.5">
                               {doc.title && <span className="text-xs font-medium text-gray-500">{doc.title}</span>}
-                              {doc.source_data && <span className="text-xs text-blue-500">{doc.source_data}</span>}
                               {doc.created_at && <span className="text-xs text-gray-400">{doc.created_at.slice(0, 19).replace('T', ' ')}</span>}
                             </div>
+                            {doc.source_data && <div className="text-xs text-blue-500 break-all mb-1">{doc.source_data}</div>}
                             <p className="text-sm text-gray-800 whitespace-pre-wrap break-all">{doc.content}</p>
                           </div>
                           <div className="flex gap-1 shrink-0">
-                            <button onClick={() => { docEditor.setEditingDocId(doc.id); docEditor.setEditingTitle(doc.title); docEditor.setEditingContent(doc.content); docEditor.setEditingSourceData(doc.source_data); docEditor.setEditingCreatedAt(doc.created_at.replace('Z', '').slice(0, 19)) }} className="text-gray-400 hover:text-blue-500">
+                            <button onClick={() => { docEditor.setEditingDocId(doc.id); docEditor.setEditingTitle(doc.title ?? ''); docEditor.setEditingContent(doc.content); docEditor.setEditingSourceData(doc.source_data ?? ''); docEditor.setEditingCreatedAt(doc.created_at.replace('Z', '').slice(0, 19)) }} className="text-gray-400 hover:text-blue-500">
                               <Pencil className="h-3 w-3" />
                             </button>
                             <button onClick={() => docEditor.deleteDocument(doc.id)} className="text-gray-400 hover:text-red-500">
