@@ -530,7 +530,11 @@ async def import_all_datasets(
             not_found.add(ds_name)
             total_skipped += len(ds_docs)
             continue
-        collection = client.get_or_create_collection(dataset.name)
+        try:
+            client.delete_collection(dataset.name)
+        except Exception:
+            pass
+        collection = client.create_collection(dataset.name)
         imp, skp = _upsert_docs(collection, ds_docs)
         total_imported += imp
         total_skipped += skp
@@ -590,6 +594,10 @@ async def import_dataset(
     _snapshot_dataset(dataset)
 
     client = _get_chroma_client()
-    collection = client.get_or_create_collection(dataset.name)
+    try:
+        client.delete_collection(dataset.name)
+    except Exception:
+        pass
+    collection = client.create_collection(dataset.name)
     imported, skipped = _upsert_docs(collection, docs)
     return {"imported": imported, "skipped": skipped}
